@@ -45,6 +45,13 @@ struct RootView: View {
             chatBadge.start()
             PushSync.start()
         }
+        // teamradio://countdown|results|standings|paddock|news
+        .onOpenURL { url in
+            let map = ["countdown": 0, "results": 1, "standings": 2, "paddock": 3, "news": 4]
+            if let tab = map[(url.host ?? "").lowercased()] {
+                selection = tab
+            }
+        }
         .onChange(of: selection) { _, tab in
             if tab == 3 {
                 chatBadge.markRead()

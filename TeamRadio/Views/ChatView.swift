@@ -494,6 +494,7 @@ private extension UIImage {
 struct ChatBubble: View {
     let message: ChatMessage
     let isMine: Bool
+    @State private var gifAspect: CGFloat = 1
 
     var body: some View {
         VStack(alignment: isMine ? .trailing : .leading, spacing: 2) {
@@ -506,8 +507,10 @@ struct ChatBubble: View {
                     .foregroundStyle(Theme.faintText)
             }
             if message.isGiphy, let url = URL(string: message.text) {
-                AnimatedGIFView(url: url)
-                    .frame(width: 200, height: 200)
+                AnimatedGIFView(url: url) { size in
+                    if size.width > 0, size.height > 0 { gifAspect = size.width / size.height }
+                }
+                .frame(width: 200, height: min(max(200 / gifAspect, 80), 280))
                     .background(message.mediaType == "gif" ? Theme.card : .clear)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
             } else if let mediaType = message.mediaType {

@@ -6,6 +6,8 @@ import UniformTypeIdentifiers
 /// UIImageView animation. Downloads are cached on disk and in memory.
 struct AnimatedGIFView: UIViewRepresentable {
     let url: URL
+    /// Reports the decoded pixel size so the host can match the GIF's shape.
+    var onSize: ((CGSize) -> Void)? = nil
 
     func makeUIView(context: Context) -> UIImageView {
         let view = UIImageView()
@@ -24,6 +26,7 @@ struct AnimatedGIFView: UIViewRepresentable {
             let image = await GIFCache.shared.image(for: url)
             guard context.coordinator.url == url else { return }
             view.image = image
+            if let image { onSize?(image.size) }
         }
     }
 
