@@ -3,6 +3,18 @@ import CloudKit
 import PhotosUI
 import SwiftUI
 
+/// Loads a bundled sticker PNG from Resources (not the asset catalog).
+enum StickerArt {
+    private static var cache: [String: UIImage] = [:]
+    static func image(_ name: String) -> UIImage? {
+        if let hit = cache[name] { return hit }
+        guard let url = Bundle.main.url(forResource: name, withExtension: "png"),
+              let img = UIImage(contentsOfFile: url.path) else { return nil }
+        cache[name] = img
+        return img
+    }
+}
+
 /// Paddock chat: one shared room per race weekend, on CloudKit.
 struct ChatView: View {
     @State private var model = ChatViewModel()
@@ -500,10 +512,12 @@ struct ChatBubble: View {
                     .foregroundStyle(Theme.faintText)
             }
             if message.mediaType == "sticker" {
-                Image(message.text)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 170)
+                if let art = StickerArt.image(message.text) {
+                    Image(uiImage: art)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 170)
+                }
             } else if let mediaType = message.mediaType {
                 MediaBubble(id: message.id, type: mediaType)
             }
@@ -603,9 +617,14 @@ struct StickerPicker: View {
                     Button {
                         onPick(name)
                     } label: {
-                        Image(name)
-                            .resizable()
-                            .scaledToFit()
+                        if let art = StickerArt.image(name) {
+                            Image(uiImage: art)
+                                .resizable()
+                                .scaledToFit()
+                        } else {
+                            RoundedRectangle(cornerRadius: 16).fill(Theme.card)
+                                .aspectRatio(480.0/280.0, contentMode: .fit)
+                        }
                     }
                     .buttonStyle(.plain)
                 }
