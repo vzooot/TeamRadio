@@ -58,17 +58,20 @@ enum TrackSceneBuilder {
         // Asphalt ribbon with a hint of thickness (top face + slightly lower
         // shadow face reads as a slab from shallow angles).
         let asphalt = SCNMaterial()
-        asphalt.diffuse.contents = UIColor(white: 0.17, alpha: 1)
-        asphalt.specular.contents = UIColor(white: 0.3, alpha: 1)
+        asphalt.lightingModel = .constant
+        asphalt.diffuse.contents = UIColor(white: 0.16, alpha: 1)
         asphalt.isDoubleSided = true
-        let ribbon = SCNNode(geometry: ribbonGeometry(points: points, halfWidth: 0.15, material: asphalt))
+        // Wide ribbons use a strided centerline: fewer points means fewer
+        // folded slivers at hairpins, and the width hides the difference.
+        let roadPoints = stride(from: 0, to: points.count, by: 2).map { points[$0] }
+        let ribbon = SCNNode(geometry: ribbonGeometry(points: roadPoints, halfWidth: 0.15, material: asphalt))
         flat.addChildNode(ribbon)
 
         let edge = SCNMaterial()
         edge.lightingModel = .constant
         edge.diffuse.contents = UIColor(white: 0.32, alpha: 1)
         edge.isDoubleSided = true
-        let underlay = SCNNode(geometry: ribbonGeometry(points: points, halfWidth: 0.18, material: edge))
+        let underlay = SCNNode(geometry: ribbonGeometry(points: roadPoints, halfWidth: 0.18, material: edge))
         underlay.position.z = -0.03
         flat.addChildNode(underlay)
 
@@ -82,9 +85,12 @@ enum TrackSceneBuilder {
         ]
         let third = points.count / 3
         for s in 0..<3 {
-            let end = s == 2 ? points.count - 1 : (s + 1) * third
-            var arc = Array(points[(s * third)...min(end, points.count - 1)])
-            if s == 2 { arc.append(points[0]) }  // close the lap
+            // Each sector runs past its boundary so the next one's start
+            // covers the seam — no torn line ends at any zoom.
+            var arc: [(x: Float, y: Float, h: Float)] = []
+            for i in 0..<(third + 14) {
+                arc.append(points[(s * third + i) % points.count])
+            }
             let glow = SCNMaterial()
             glow.lightingModel = .constant
             glow.diffuse.contents = sectorColors[s].0
@@ -110,7 +116,7 @@ enum TrackSceneBuilder {
             let h = points.min(by: { hypot($0.x - p.x, $0.y - p.y) < hypot($1.x - p.x, $1.y - p.y) })?.h ?? 0
             let text = SCNText(string: "\(corner.number)", extrusionDepth: 0.4)
             text.font = UIFont.systemFont(ofSize: 5, weight: .heavy)
-            text.flatness = 0.2
+            text.flatness = 0.04
             text.firstMaterial?.lightingModel = .constant
             text.firstMaterial?.diffuse.contents = UIColor(white: 0.85, alpha: 1)
 

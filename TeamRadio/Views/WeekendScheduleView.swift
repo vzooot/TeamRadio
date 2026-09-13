@@ -81,7 +81,7 @@ struct SessionRow: View {
                 .frame(width: 46, height: 26)
                 .background(
                     RoundedRectangle(cornerRadius: 7)
-                        .fill(session.kind == .race ? Theme.accent : Color.white.opacity(0.06))
+                        .fill(session.kind == .race ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Color.white.opacity(0.06)))
                 )
 
             VStack(alignment: .leading, spacing: 1) {
