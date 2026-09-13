@@ -39,13 +39,14 @@ enum Theme {
 }
 
 extension Font {
-    /// The F1-broadcast look: black weight, condensed. Apply .italic() at the call site when wanted.
+    /// The Team Radio look: heavy weight, rounded — smooth and bold.
+    /// Apply .italic() at the call site when wanted.
     static func f1(_ size: CGFloat, weight: Font.Weight = .black) -> Font {
-        .system(size: size, weight: weight, design: .default).width(.condensed)
+        .system(size: size, weight: weight, design: .rounded)
     }
 
     static func f1Digits(_ size: CGFloat) -> Font {
-        .system(size: size, weight: .black, design: .default).width(.condensed).monospacedDigit()
+        .system(size: size, weight: .black, design: .rounded).monospacedDigit()
     }
 }
 
