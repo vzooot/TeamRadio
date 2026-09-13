@@ -97,7 +97,7 @@ struct AboutView: View {
                         .fill(Theme.card)
                         .overlay(
                             RoundedRectangle(cornerRadius: 14)
-                                .strokeBorder(Theme.cardStroke, lineWidth: 1)
+                                .strokeBorder(Theme.glassStroke, lineWidth: 1)
                         )
                 )
         }

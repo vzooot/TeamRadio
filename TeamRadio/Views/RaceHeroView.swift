@@ -15,7 +15,7 @@ struct RaceHeroView: View {
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 20)
-                        .strokeBorder(Theme.cardStroke, lineWidth: 1)
+                        .strokeBorder(Theme.glassStroke, lineWidth: 1)
                 )
 
             Text(Flags.emoji(for: race.circuit.location.country))
@@ -34,7 +34,7 @@ struct RaceHeroView: View {
                         .foregroundStyle(Theme.onAccent)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
-                        .background(Theme.accent, in: RoundedRectangle(cornerRadius: 7))
+                        .background(Theme.accentGradient, in: RoundedRectangle(cornerRadius: 7))
 
                     if race.isSprintWeekend {
                         Text("SPRINT")

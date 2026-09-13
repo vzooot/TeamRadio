@@ -129,7 +129,7 @@ enum TrackSceneBuilder {
         car.geometry?.firstMaterial?.lightingModel = .constant
         car.geometry?.firstMaterial?.diffuse.contents = UIColor.white
         car.geometry?.firstMaterial?.emission.contents = UIColor(red: 0.6, green: 0.85, blue: 1.0, alpha: 1)
-        let path = stride(from: 0, to: points.count, by: 2).map { points[$0] } + [points[0]]
+        let path = stride(from: 0, to: points.count, by: 8).map { points[$0] } + [points[0]]
         var lapLength: Float = 0
         for i in 1..<path.count {
             lapLength += hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y)
@@ -204,10 +204,27 @@ enum TrackSceneBuilder {
         } else {
             heights = [Float](repeating: 0, count: map.x.count)
         }
-        return zip(zip(map.x, map.y), heights).map { pair, h in
+        let raw = zip(zip(map.x, map.y), heights).map { pair, h in
             let p = normalize(pair.0, pair.1, map: map)
-            return (p.x, p.y, h)
+            return (x: p.x, y: p.y, h: h)
         }
+        // Two Chaikin passes: corner-cutting subdivision that keeps the ribbon
+        // silky even when the user zooms right into an apex.
+        return chaikin(chaikin(raw))
+    }
+
+    /// One closed-loop Chaikin corner-cutting pass (doubles the point count).
+    private static func chaikin(_ pts: [(x: Float, y: Float, h: Float)]) -> [(x: Float, y: Float, h: Float)] {
+        guard pts.count > 2 else { return pts }
+        var out: [(x: Float, y: Float, h: Float)] = []
+        out.reserveCapacity(pts.count * 2)
+        for i in 0..<pts.count {
+            let a = pts[i]
+            let b = pts[(i + 1) % pts.count]
+            out.append((a.x * 0.75 + b.x * 0.25, a.y * 0.75 + b.y * 0.25, a.h * 0.75 + b.h * 0.25))
+            out.append((a.x * 0.25 + b.x * 0.75, a.y * 0.25 + b.y * 0.75, a.h * 0.25 + b.h * 0.75))
+        }
+        return out
     }
 
     /// Builds the track ribbon as an explicit triangle strip between the

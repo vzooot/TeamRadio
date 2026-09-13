@@ -33,7 +33,7 @@ struct WeekendScheduleView: View {
                         .fill(Theme.card)
                         .overlay(
                             RoundedRectangle(cornerRadius: 18)
-                                .strokeBorder(Theme.cardStroke, lineWidth: 1)
+                                .strokeBorder(Theme.glassStroke, lineWidth: 1)
                         )
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 18))

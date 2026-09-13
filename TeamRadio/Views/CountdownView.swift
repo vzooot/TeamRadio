@@ -70,7 +70,7 @@ struct CountdownView: View {
                     .fill(Theme.card)
                     .overlay(
                         RoundedRectangle(cornerRadius: 20)
-                            .strokeBorder(Theme.cardStroke, lineWidth: 1)
+                            .strokeBorder(Theme.glassStroke, lineWidth: 1)
                     )
                     .shadow(color: Theme.accent.opacity(0.25), radius: 24, y: 6)
             )
@@ -157,7 +157,7 @@ struct CountdownView: View {
         VStack(spacing: 4) {
             Text(String(format: "%02d", value))
                 .font(.f1Digits(42))
-                .foregroundStyle(hot ? Theme.accent : .white)
+                .foregroundStyle(hot ? AnyShapeStyle(Theme.liveGradient) : AnyShapeStyle(.white))
                 .contentTransition(.numericText(countsDown: true))
                 .animation(.snappy(duration: 0.3), value: value)
             Text(label)
@@ -172,7 +172,7 @@ struct CountdownView: View {
                 .fill(Color.black.opacity(0.45))
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
-                        .strokeBorder(hot ? Theme.accent.opacity(0.5) : Theme.cardStroke, lineWidth: 1)
+                        .strokeBorder(hot ? Theme.live.opacity(0.55) : Theme.cardStroke, lineWidth: 1)
                 )
         )
     }

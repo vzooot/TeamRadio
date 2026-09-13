@@ -15,6 +15,22 @@ enum Theme {
     static let dimText = Color.white.opacity(0.55)
     static let faintText = Color.white.opacity(0.35)
 
+    /// Chrome-lit fills: highlights catch light at the top like the logo's
+    /// reflective surfaces.
+    static let accentGradient = LinearGradient(
+        colors: [Color(red: 0.42, green: 0.83, blue: 1.0), accent],
+        startPoint: .top, endPoint: .bottom
+    )
+    static let liveGradient = LinearGradient(
+        colors: [Color(red: 1.0, green: 0.56, blue: 0.28), live],
+        startPoint: .top, endPoint: .bottom
+    )
+    /// Glass edge: bright where light hits, fading out below.
+    static let glassStroke = LinearGradient(
+        colors: [Color.white.opacity(0.34), Color.white.opacity(0.03)],
+        startPoint: .top, endPoint: .bottom
+    )
+
     /// Team colors keyed by Ergast constructorId.
     static let teamColors: [String: Color] = [
         "red_bull": Color(red: 0.14, green: 0.12, blue: 0.60),

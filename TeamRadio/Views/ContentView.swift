@@ -14,6 +14,12 @@ struct ContentView: View {
             )
             .ignoresSafeArea()
 
+            RadialGradient(
+                colors: [Theme.live.opacity(0.10), .clear],
+                center: .bottomTrailing, startRadius: 0, endRadius: 460
+            )
+            .ignoresSafeArea()
+
             switch model.phase {
             case .loading:
                 LoadingView()
@@ -36,6 +42,7 @@ struct ContentView: View {
     }
 
     private var loadedContent: some View {
+        ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 HeaderView(onInfo: { showAbout = true })
@@ -77,6 +84,13 @@ struct ContentView: View {
             .padding(.bottom, 32)
         }
         .refreshable { await model.load() }
+        .task {
+            if UserDefaults.standard.bool(forKey: "ScrollTrack") {
+                try? await Task.sleep(for: .seconds(2.5))
+                withAnimation { proxy.scrollTo("trackSection", anchor: .top) }
+            }
+        }
+        }
     }
 }
 
@@ -151,7 +165,7 @@ struct ErrorView: View {
                     .foregroundStyle(Theme.onAccent)
                     .padding(.horizontal, 24)
                     .padding(.vertical, 12)
-                    .background(Theme.accent, in: RoundedRectangle(cornerRadius: 10))
+                    .background(Theme.accentGradient, in: RoundedRectangle(cornerRadius: 10))
             }
         }
         .padding(32)
@@ -210,7 +224,7 @@ struct SessionAlertsCard: View {
                 .fill(Theme.card)
                 .overlay(
                     RoundedRectangle(cornerRadius: 18)
-                        .strokeBorder(Theme.cardStroke, lineWidth: 1)
+                        .strokeBorder(Theme.glassStroke, lineWidth: 1)
                 )
         )
         .onChange(of: enabled) { old, wantsOn in

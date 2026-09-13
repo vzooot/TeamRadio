@@ -12,7 +12,11 @@ struct TeamRadioApp: App {
 
 struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
-    @State private var selection = 0
+    // TEMP screenshot hook: launch with `-Tab results|standings|paddock|news`.
+    @State private var selection: Int = {
+        let map = ["countdown": 0, "results": 1, "standings": 2, "paddock": 3, "news": 4]
+        return map[UserDefaults.standard.string(forKey: "Tab") ?? "countdown"] ?? 0
+    }()
     @State private var chatBadge = ChatBadge()
     @State private var showMessageToast = false
     @State private var toastDismissTask: Task<Void, Never>?

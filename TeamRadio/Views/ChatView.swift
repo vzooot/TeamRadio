@@ -31,6 +31,12 @@ struct ChatView: View {
             )
             .ignoresSafeArea()
 
+            RadialGradient(
+                colors: [Theme.live.opacity(0.10), .clear],
+                center: .bottomTrailing, startRadius: 0, endRadius: 460
+            )
+            .ignoresSafeArea()
+
             switch model.state {
             case .checking:
                 LoadingView()
@@ -90,7 +96,7 @@ struct ChatView: View {
                     .foregroundStyle(Theme.onAccent)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 13)
-                    .background(Theme.accent, in: RoundedRectangle(cornerRadius: 12))
+                    .background(Theme.accentGradient, in: RoundedRectangle(cornerRadius: 12))
             }
             .buttonStyle(.plain)
             .padding(.top, 6)
@@ -99,7 +105,7 @@ struct ChatView: View {
         .background(
             RoundedRectangle(cornerRadius: 20)
                 .fill(Theme.card)
-                .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Theme.cardStroke, lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Theme.glassStroke, lineWidth: 1))
         )
         .padding(20)
     }
@@ -177,7 +183,7 @@ struct ChatView: View {
         .background(
             RoundedRectangle(cornerRadius: 20)
                 .fill(Theme.card)
-                .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Theme.cardStroke, lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Theme.glassStroke, lineWidth: 1))
         )
         .padding(20)
     }
@@ -218,7 +224,7 @@ struct ChatView: View {
                     .background(
                         Capsule()
                             .fill(Color.white.opacity(0.05))
-                            .overlay(Capsule().strokeBorder(Theme.cardStroke, lineWidth: 1))
+                            .overlay(Capsule().strokeBorder(Theme.glassStroke, lineWidth: 1))
                     )
                 }
                 .buttonStyle(.plain)
@@ -366,7 +372,7 @@ struct ChatView: View {
                     .background(
                         RoundedRectangle(cornerRadius: 18)
                             .fill(Theme.card)
-                            .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Theme.cardStroke, lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Theme.glassStroke, lineWidth: 1))
                     )
                     .foregroundStyle(.white)
                     .contentShape(Rectangle())

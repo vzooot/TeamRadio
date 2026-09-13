@@ -20,6 +20,12 @@ struct StandingsTabView: View {
             )
             .ignoresSafeArea()
 
+            RadialGradient(
+                colors: [Theme.live.opacity(0.10), .clear],
+                center: .bottomTrailing, startRadius: 0, endRadius: 460
+            )
+            .ignoresSafeArea()
+
             switch model.phase {
             case .loading:
                 LoadingView()
@@ -77,7 +83,7 @@ struct StandingsTabView: View {
                         .padding(.vertical, 9)
                         .background(
                             RoundedRectangle(cornerRadius: 10)
-                                .fill(isSelected ? Theme.accent : Color.white.opacity(0.06))
+                                .fill(isSelected ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Color.white.opacity(0.06)))
                         )
                 }
                 .buttonStyle(.plain)
@@ -100,7 +106,7 @@ struct StandingsTabView: View {
                 .fill(Theme.card)
                 .overlay(
                     RoundedRectangle(cornerRadius: 18)
-                        .strokeBorder(Theme.cardStroke, lineWidth: 1)
+                        .strokeBorder(Theme.glassStroke, lineWidth: 1)
                 )
         )
         .clipShape(RoundedRectangle(cornerRadius: 18))
@@ -121,7 +127,7 @@ struct StandingsTabView: View {
                 .fill(Theme.card)
                 .overlay(
                     RoundedRectangle(cornerRadius: 18)
-                        .strokeBorder(Theme.cardStroke, lineWidth: 1)
+                        .strokeBorder(Theme.glassStroke, lineWidth: 1)
                 )
         )
         .clipShape(RoundedRectangle(cornerRadius: 18))

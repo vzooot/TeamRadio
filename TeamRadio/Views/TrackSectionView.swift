@@ -71,7 +71,7 @@ struct TrackSectionView: View {
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 20)
-                            .strokeBorder(Theme.cardStroke, lineWidth: 1)
+                            .strokeBorder(Theme.glassStroke, lineWidth: 1)
                     )
             )
 
@@ -108,7 +108,7 @@ struct TrackSectionView: View {
                 .fill(Color.white.opacity(0.05))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .strokeBorder(Theme.cardStroke, lineWidth: 1)
+                        .strokeBorder(Theme.glassStroke, lineWidth: 1)
                 )
         )
     }
@@ -122,7 +122,7 @@ struct TrackSectionView: View {
                 .background(
                     Circle()
                         .fill(Color.black.opacity(0.5))
-                        .overlay(Circle().strokeBorder(Theme.cardStroke, lineWidth: 1))
+                        .overlay(Circle().strokeBorder(Theme.glassStroke, lineWidth: 1))
                 )
         }
         .buttonStyle(.plain)

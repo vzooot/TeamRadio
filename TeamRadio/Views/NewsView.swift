@@ -15,6 +15,12 @@ struct NewsView: View {
             )
             .ignoresSafeArea()
 
+            RadialGradient(
+                colors: [Theme.live.opacity(0.10), .clear],
+                center: .bottomTrailing, startRadius: 0, endRadius: 460
+            )
+            .ignoresSafeArea()
+
             if model.isLoading {
                 LoadingView()
             } else if model.items.isEmpty {
@@ -113,7 +119,7 @@ struct NewsCard: View {
                 .fill(Theme.card)
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
-                        .strokeBorder(Theme.cardStroke, lineWidth: 1)
+                        .strokeBorder(Theme.glassStroke, lineWidth: 1)
                 )
         )
     }
