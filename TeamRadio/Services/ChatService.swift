@@ -79,8 +79,7 @@ enum ChatService {
     /// Returns the sent message so the UI can echo it immediately.
     /// `media` attaches a photo or video file (already compressed by the UI).
     static func send(text: String, sender: String, round: String,
-                     media: (url: URL, type: String)? = nil,
-                     sticker: String? = nil) async throws -> ChatMessage {
+                     media: (url: URL, type: String)? = nil) async throws -> ChatMessage {
         let record = CKRecord(recordType: "Message")
         let senderId = await currentUserId() ?? "unknown"
         let created = Date()
@@ -93,15 +92,9 @@ enum ChatService {
             record["media"] = CKAsset(fileURL: media.url)
             record["mediaType"] = media.type
         }
-        if let sticker {
-            // The bundled sticker's asset name rides in the text field —
-            // no upload needed, the art ships with the app.
-            record["text"] = sticker
-            record["mediaType"] = "sticker"
-        }
         let saved = try await database.save(record)
-        return ChatMessage(id: saved.recordID, text: sticker ?? text, sender: sender, senderId: senderId,
-                           date: created, mediaType: sticker != nil ? "sticker" : media?.type)
+        return ChatMessage(id: saved.recordID, text: text, sender: sender, senderId: senderId,
+                           date: created, mediaType: media?.type)
     }
 
     // MARK: - Nickname registration
