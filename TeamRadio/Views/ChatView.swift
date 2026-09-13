@@ -37,6 +37,12 @@ struct ChatView: View {
             )
             .ignoresSafeArea()
 
+            RadialGradient(
+                colors: [Theme.violet.opacity(0.08), .clear],
+                center: .leading, startRadius: 0, endRadius: 420
+            )
+            .ignoresSafeArea()
+
             switch model.state {
             case .checking:
                 LoadingView()
@@ -196,7 +202,7 @@ struct ChatView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("PADDOCK CHAT")
                         .font(.f1(30).italic())
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Theme.chromeText)
                     Text(model.roundTitle.uppercased())
                         .font(.f1(12, weight: .semibold))
                         .tracking(2)

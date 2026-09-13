@@ -20,6 +20,12 @@ struct ContentView: View {
             )
             .ignoresSafeArea()
 
+            RadialGradient(
+                colors: [Theme.violet.opacity(0.08), .clear],
+                center: .leading, startRadius: 0, endRadius: 420
+            )
+            .ignoresSafeArea()
+
             switch model.phase {
             case .loading:
                 LoadingView()
@@ -139,7 +145,8 @@ struct LoadingView: View {
             Text("WARMING UP TYRES…")
                 .font(.f1(15).italic())
                 .tracking(3)
-                .foregroundStyle(Theme.dimText)
+                .foregroundStyle(LinearGradient(colors: [Theme.accent, Theme.violet, Theme.live],
+                                                startPoint: .leading, endPoint: .trailing))
         }
         .onAppear { pulse = true }
     }

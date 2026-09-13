@@ -49,6 +49,12 @@ struct ResultsView: View {
             )
             .ignoresSafeArea()
 
+            RadialGradient(
+                colors: [Theme.violet.opacity(0.08), .clear],
+                center: .leading, startRadius: 0, endRadius: 420
+            )
+            .ignoresSafeArea()
+
             switch model.phase {
             case .loading:
                 LoadingView()
@@ -203,7 +209,7 @@ struct ResultsView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("RESULTS")
                     .font(.f1(30).italic())
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.chromeText)
                 Text("\(Flags.emoji(for: race.circuit.location.country)) \(race.raceName.uppercased()) · ROUND \(race.roundNumber)")
                     .font(.f1(12, weight: .semibold))
                     .tracking(2)

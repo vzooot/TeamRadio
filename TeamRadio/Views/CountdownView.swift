@@ -44,9 +44,9 @@ struct CountdownView: View {
                     StartLightsView(secondsRemaining: remaining)
                     let parts = split(remaining)
                     HStack(spacing: 10) {
-                        tile(parts.days, "DAYS")
-                        tile(parts.hours, "HRS")
-                        tile(parts.minutes, "MIN")
+                        tile(parts.days, "DAYS", tint: Theme.accent)
+                        tile(parts.hours, "HRS", tint: Theme.violet)
+                        tile(parts.minutes, "MIN", tint: Theme.violet)
                         tile(parts.seconds, "SEC", hot: true)
                     }
                 } else if let session, now < session.date.addingTimeInterval(session.kind.expectedDuration) {
@@ -153,7 +153,7 @@ struct CountdownView: View {
         .padding(.vertical, 18)
     }
 
-    private func tile(_ value: Int, _ label: String, hot: Bool = false) -> some View {
+    private func tile(_ value: Int, _ label: String, hot: Bool = false, tint: Color? = nil) -> some View {
         VStack(spacing: 4) {
             Text(String(format: "%02d", value))
                 .font(.f1Digits(42))
@@ -172,7 +172,7 @@ struct CountdownView: View {
                 .fill(Color.black.opacity(0.45))
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
-                        .strokeBorder(hot ? Theme.live.opacity(0.55) : Theme.cardStroke, lineWidth: 1)
+                        .strokeBorder(hot ? Theme.live.opacity(0.55) : (tint?.opacity(0.35) ?? Theme.cardStroke), lineWidth: 1)
                 )
         )
     }

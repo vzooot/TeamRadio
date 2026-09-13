@@ -158,7 +158,8 @@ struct SectionTitle: View {
     var body: some View {
         HStack(spacing: 8) {
             Rectangle()
-                .fill(Theme.live)
+                .fill(LinearGradient(colors: [Theme.accent, Theme.violet, Theme.live],
+                                     startPoint: .top, endPoint: .bottom))
                 .frame(width: 4, height: 18)
                 .rotationEffect(.degrees(12))
             Text(text)

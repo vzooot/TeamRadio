@@ -21,6 +21,12 @@ struct NewsView: View {
             )
             .ignoresSafeArea()
 
+            RadialGradient(
+                colors: [Theme.violet.opacity(0.08), .clear],
+                center: .leading, startRadius: 0, endRadius: 420
+            )
+            .ignoresSafeArea()
+
             if model.isLoading {
                 LoadingView()
             } else if model.items.isEmpty {
@@ -38,7 +44,7 @@ struct NewsView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("PADDOCK NEWS")
                                 .font(.f1(30).italic())
-                                .foregroundStyle(.white)
+                                .foregroundStyle(Theme.chromeText)
                             Text("F1.COM · BBC SPORT · MOTORSPORT.COM")
                                 .font(.f1(11, weight: .semibold))
                                 .tracking(2)
