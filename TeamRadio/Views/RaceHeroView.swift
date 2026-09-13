@@ -9,7 +9,9 @@ struct RaceHeroView: View {
             RoundedRectangle(cornerRadius: 20)
                 .fill(
                     LinearGradient(
-                        colors: [Theme.card, Theme.accent.opacity(0.22)],
+                        colors: [Theme.card,
+                                 Theme.violet.opacity(0.16),
+                                 Theme.accent.opacity(0.24)],
                         startPoint: .topLeading, endPoint: .bottomTrailing
                     )
                 )
@@ -55,7 +57,7 @@ struct RaceHeroView: View {
 
                 Text(race.raceName.uppercased())
                     .font(.f1(32).italic())
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.chromeText)
                     .lineLimit(2)
                     .minimumScaleFactor(0.6)
 

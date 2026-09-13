@@ -97,7 +97,9 @@ enum TrackSceneBuilder {
             glow.emission.contents = sectorColors[s].1
             glow.isDoubleSided = true
             let line = SCNNode(geometry: ribbonGeometry(points: arc, halfWidth: 0.042, material: glow, closed: false))
-            line.position.z = 0.02
+            // Each sector sits a hair above the previous so overlaps stack
+            // cleanly instead of z-fighting into speckles.
+            line.position.z = 0.02 + Float(s) * 0.006
             flat.addChildNode(line)
         }
 

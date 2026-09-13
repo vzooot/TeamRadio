@@ -111,12 +111,12 @@ struct SessionRow: View {
                 Text(countdown)
                     .font(.f1(10, weight: .heavy).monospacedDigit())
                     .tracking(1)
-                    .foregroundStyle(Theme.accent)
+                    .foregroundStyle(Theme.violet)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 3)
                     .overlay(
                         RoundedRectangle(cornerRadius: 5)
-                            .strokeBorder(Theme.accent.opacity(0.6), lineWidth: 1)
+                            .strokeBorder(Theme.violet.opacity(0.65), lineWidth: 1)
                     )
             } else if let countdown = miniCountdown {
                 Text(countdown)
@@ -163,7 +163,7 @@ struct SectionTitle: View {
                 .rotationEffect(.degrees(12))
             Text(text)
                 .font(.f1(19).italic())
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.chromeText)
         }
     }
 }

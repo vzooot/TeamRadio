@@ -15,10 +15,18 @@ enum Theme {
     static let dimText = Color.white.opacity(0.55)
     static let faintText = Color.white.opacity(0.35)
 
+    /// Electric violet: the futuristic bridge between the blue and the red.
+    static let violet = Color(red: 0.52, green: 0.42, blue: 1.0)             // #856BFF
+
     /// Chrome-lit fills: highlights catch light at the top like the logo's
-    /// reflective surfaces.
+    /// reflective surfaces, sinking into violet below.
     static let accentGradient = LinearGradient(
-        colors: [Color(red: 0.42, green: 0.83, blue: 1.0), accent],
+        colors: [Color(red: 0.45, green: 0.85, blue: 1.0), accent, Color(red: 0.42, green: 0.4, blue: 1.0)],
+        startPoint: .top, endPoint: .bottom
+    )
+    /// Brushed-metal headline text, like the logo's TEAM lettering.
+    static let chromeText = LinearGradient(
+        colors: [Color.white, Color(red: 0.66, green: 0.76, blue: 0.92)],
         startPoint: .top, endPoint: .bottom
     )
     static let liveGradient = LinearGradient(
