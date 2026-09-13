@@ -61,14 +61,14 @@ enum TrackSceneBuilder {
         asphalt.diffuse.contents = UIColor(white: 0.17, alpha: 1)
         asphalt.specular.contents = UIColor(white: 0.3, alpha: 1)
         asphalt.isDoubleSided = true
-        let ribbon = SCNNode(geometry: ribbonGeometry(points: points, halfWidth: 0.22, material: asphalt))
+        let ribbon = SCNNode(geometry: ribbonGeometry(points: points, halfWidth: 0.15, material: asphalt))
         flat.addChildNode(ribbon)
 
         let edge = SCNMaterial()
         edge.lightingModel = .constant
         edge.diffuse.contents = UIColor(white: 0.32, alpha: 1)
         edge.isDoubleSided = true
-        let underlay = SCNNode(geometry: ribbonGeometry(points: points, halfWidth: 0.26, material: edge))
+        let underlay = SCNNode(geometry: ribbonGeometry(points: points, halfWidth: 0.18, material: edge))
         underlay.position.z = -0.03
         flat.addChildNode(underlay)
 
@@ -90,7 +90,7 @@ enum TrackSceneBuilder {
             glow.diffuse.contents = sectorColors[s].0
             glow.emission.contents = sectorColors[s].1
             glow.isDoubleSided = true
-            let line = SCNNode(geometry: ribbonGeometry(points: arc, halfWidth: 0.05, material: glow, closed: false))
+            let line = SCNNode(geometry: ribbonGeometry(points: arc, halfWidth: 0.042, material: glow, closed: false))
             line.position.z = 0.02
             flat.addChildNode(line)
         }
