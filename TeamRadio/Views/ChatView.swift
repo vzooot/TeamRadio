@@ -10,6 +10,7 @@ struct ChatView: View {
     @State private var nicknameDraft = ""
     @State private var editingName = false
     @State private var pickedItem: PhotosPickerItem?
+    @State private var showStickers = false
     @State private var pendingMedia: PendingMedia?
     @State private var isLoadingMedia = false
     @FocusState private var nicknameFocused: Bool
@@ -358,6 +359,23 @@ struct ChatView: View {
             }
 
             HStack(spacing: 10) {
+                Button {
+                    showStickers = true
+                } label: {
+                    Image(systemName: "star.bubble.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(Theme.violet)
+                }
+                .buttonStyle(.plain)
+                .sheet(isPresented: $showStickers) {
+                    StickerPicker { name in
+                        showStickers = false
+                        Task { await model.send("", sticker: name) }
+                    }
+                    .presentationDetents([.height(340)])
+                    .presentationBackground(Theme.background)
+                }
+
                 PhotosPicker(selection: $pickedItem, matching: .any(of: [.images, .videos])) {
                     if isLoadingMedia {
                         ProgressView().tint(Theme.accent).frame(width: 26)
@@ -481,11 +499,16 @@ struct ChatBubble: View {
                     .font(.system(size: 10))
                     .foregroundStyle(Theme.faintText)
             }
-            if let mediaType = message.mediaType {
+            if message.mediaType == "sticker" {
+                Image(message.text)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 170)
+            } else if let mediaType = message.mediaType {
                 MediaBubble(id: message.id, type: mediaType)
             }
 
-            if !message.text.isEmpty {
+            if !message.text.isEmpty && message.mediaType != "sticker" {
                 Text(ChatModeration.cleaned(message.text))
                     .font(.system(size: 15))
                     .foregroundStyle(.white)
@@ -558,5 +581,37 @@ struct MediaBubble: View {
         .task(id: id.recordName) {
             fileURL = await ChatMediaCache.shared.url(for: id, type: type)
         }
+    }
+}
+
+
+/// Bundled Team Radio sticker pack — racing shouts in the sector trio style.
+struct StickerPicker: View {
+    let onPick: (String) -> Void
+
+    private let names = ["st-boxbox", "st-lightsout", "st-p1", "st-gg",
+                         "st-sendit", "st-drs", "st-redflag", "st-radiocheck"]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("STICKERS")
+                .font(.f1(17).italic())
+                .foregroundStyle(Theme.chromeText)
+                .padding(.top, 18)
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                ForEach(names, id: \.self) { name in
+                    Button {
+                        onPick(name)
+                    } label: {
+                        Image(name)
+                            .resizable()
+                            .scaledToFit()
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 18)
     }
 }

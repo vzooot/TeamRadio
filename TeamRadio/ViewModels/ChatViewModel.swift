@@ -118,13 +118,13 @@ final class ChatViewModel {
         }
     }
 
-    func send(_ text: String, media: (url: URL, type: String)? = nil) async {
+    func send(_ text: String, media: (url: URL, type: String)? = nil, sticker: String? = nil) async {
         let trimmed = ChatModeration.cleaned(text.trimmingCharacters(in: .whitespacesAndNewlines))
-        guard !trimmed.isEmpty || media != nil, !nickname.isEmpty else { return }
+        guard !trimmed.isEmpty || media != nil || sticker != nil, !nickname.isEmpty else { return }
         isSending = true
         defer { isSending = false }
         do {
-            let sent = try await ChatService.send(text: String(trimmed.prefix(280)), sender: nickname, round: round, media: media)
+            let sent = try await ChatService.send(text: String(trimmed.prefix(280)), sender: nickname, round: round, media: media, sticker: sticker)
             if let media {
                 ChatMediaCache.shared.seed(id: sent.id, type: media.type, url: media.url)
             }

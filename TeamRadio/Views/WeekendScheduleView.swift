@@ -35,6 +35,7 @@ struct WeekendScheduleView: View {
                             RoundedRectangle(cornerRadius: 18)
                                 .strokeBorder(Theme.glassStroke, lineWidth: 1)
                         )
+                        .shadow(color: Theme.accent.opacity(0.16), radius: 18, y: 5)
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 18))
 
