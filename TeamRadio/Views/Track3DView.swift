@@ -76,12 +76,15 @@ enum TrackSceneBuilder {
         flat.addChildNode(underlay)
 
         // Glowing racing line in the three timing-sector colors.
+        // Saturated sector trio (blue / violet / red) — emissions stay deep
+        // in hue so bloom can't wash the line out to white at map scale.
         let sectorColors: [(UIColor, UIColor)] = [
-            (UIColor(red: 0.18, green: 0.70, blue: 1.0, alpha: 1),
-             UIColor(red: 0.4, green: 0.78, blue: 1.0, alpha: 1)),          // S1 cyan
-            (UIColor(white: 0.95, alpha: 1), UIColor(white: 0.85, alpha: 1)), // S2 white
-            (UIColor(red: 0.994, green: 0.297, blue: 0.16, alpha: 1),
-             UIColor(red: 1.0, green: 0.4, blue: 0.25, alpha: 1)),          // S3 red
+            (UIColor(red: 0.10, green: 0.55, blue: 1.0, alpha: 1),
+             UIColor(red: 0.14, green: 0.62, blue: 1.0, alpha: 1)),   // S1 electric blue
+            (UIColor(red: 0.46, green: 0.32, blue: 1.0, alpha: 1),
+             UIColor(red: 0.52, green: 0.38, blue: 1.0, alpha: 1)),   // S2 violet
+            (UIColor(red: 0.95, green: 0.22, blue: 0.09, alpha: 1),
+             UIColor(red: 1.0, green: 0.3, blue: 0.13, alpha: 1)),    // S3 red
         ]
         let third = points.count / 3
         for s in 0..<3 {
@@ -173,8 +176,11 @@ enum TrackSceneBuilder {
         // Camera with a touch of bloom so the racing line glows.
         let camera = SCNCamera()
         camera.wantsHDR = true
-        camera.bloomIntensity = 0.8
-        camera.bloomThreshold = 0.45
+        // The scene is mostly black; adaptive exposure would crank the gain
+        // and bleach every color toward white. Lock it.
+        camera.wantsExposureAdaptation = false
+        camera.bloomIntensity = 0.5
+        camera.bloomThreshold = 0.55
         camera.zFar = 200
         let cameraNode = SCNNode()
         cameraNode.camera = camera
