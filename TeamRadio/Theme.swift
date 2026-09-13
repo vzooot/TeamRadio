@@ -4,13 +4,13 @@ import SwiftUI
 /// neon-cyan comm ring, coral radio arc — with condensed italic type.
 enum Theme {
     /// Primary accent: electric blue, matching the icon's cool glow.
-    static let accent = Color(red: 0.18, green: 0.70, blue: 1.0)           // #2EB2FF
+    static let accent = Color(red: 0.15, green: 0.82, blue: 1.0)           // #26D1FF icy cyan
     /// Red-orange of the radio-wave arc: live sessions, alerts, errors.
     static let live = Color(red: 0.994, green: 0.297, blue: 0.16)          // #FD4B28
     /// Text/icons placed on an accent-filled surface.
     static let onAccent = Color(red: 0.01, green: 0.043, blue: 0.09)       // #030B17
-    static let background = Color(red: 0.024, green: 0.043, blue: 0.09)    // #060B17
-    static let card = Color(red: 0.055, green: 0.09, blue: 0.155)          // #0E1728
+    static let background = Color(red: 0.016, green: 0.02, blue: 0.027)    // #040507 carbon
+    static let card = Color(red: 0.055, green: 0.065, blue: 0.085)         // #0E1116
     static let cardStroke = Color(red: 0.45, green: 0.72, blue: 1.0).opacity(0.12)
     static let dimText = Color.white.opacity(0.55)
     static let faintText = Color.white.opacity(0.35)

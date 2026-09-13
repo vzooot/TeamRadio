@@ -178,7 +178,7 @@ struct Provider: TimelineProvider {
 
 // MARK: - Widget views
 
-private let accent = Color(red: 0.18, green: 0.70, blue: 1.0)  // #2EB2FF — electric blue
+private let accent = Color(red: 0.15, green: 0.82, blue: 1.0)  // #26D1FF — icy cyan
 private let liveAccent = Color(red: 0.994, green: 0.297, blue: 0.16)  // #FD4B28 — icon radio-arc red
 
 struct TeamRadioWidgetEntryView: View {
@@ -375,7 +375,7 @@ struct TeamRadioWidgetEntryView: View {
 
     private var widgetBackground: some View {
         LinearGradient(
-            colors: [Color(red: 0.035, green: 0.07, blue: 0.14), Color(red: 0.024, green: 0.043, blue: 0.09)],
+            colors: [Color(red: 0.03, green: 0.04, blue: 0.06), Color(red: 0.016, green: 0.02, blue: 0.027)],
             startPoint: .topLeading, endPoint: .bottomTrailing
         )
         .overlay(alignment: .topTrailing) {

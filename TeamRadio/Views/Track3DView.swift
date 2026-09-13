@@ -79,8 +79,8 @@ enum TrackSceneBuilder {
         // Saturated sector trio (blue / violet / red) — emissions stay deep
         // in hue so bloom can't wash the line out to white at map scale.
         let sectorColors: [(UIColor, UIColor)] = [
-            (UIColor(red: 0.10, green: 0.55, blue: 1.0, alpha: 1),
-             UIColor(red: 0.14, green: 0.62, blue: 1.0, alpha: 1)),   // S1 electric blue
+            (UIColor(red: 0.08, green: 0.72, blue: 1.0, alpha: 1),
+             UIColor(red: 0.14, green: 0.80, blue: 1.0, alpha: 1)),   // S1 icy cyan
             (UIColor(red: 0.46, green: 0.32, blue: 1.0, alpha: 1),
              UIColor(red: 0.52, green: 0.38, blue: 1.0, alpha: 1)),   // S2 violet
             (UIColor(red: 0.95, green: 0.22, blue: 0.09, alpha: 1),
