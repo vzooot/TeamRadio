@@ -5,13 +5,13 @@ import SwiftUI
 /// Wolt-style live tracking: the pinned session countdown on the Lock Screen
 /// and in the Dynamic Island, flipping to LIVE at lights out.
 struct RaceLiveActivity: Widget {
-    private let accent = Color(red: 0.0, green: 0.91, blue: 0.99)  // #00E8FC — icon comm-ring cyan
+    private let accent = Color(red: 0.18, green: 0.70, blue: 1.0)  // #2EB2FF — electric blue
     private let liveAccent = Color(red: 0.994, green: 0.297, blue: 0.16)  // #FD4B28 — icon radio-arc red
 
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: RaceActivityAttributes.self) { context in
             lockScreenView(context)
-                .activityBackgroundTint(Color(red: 0.02, green: 0.03, blue: 0.055))
+                .activityBackgroundTint(Color(red: 0.024, green: 0.043, blue: 0.09))
                 .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             DynamicIsland {

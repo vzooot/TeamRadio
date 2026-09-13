@@ -58,7 +58,9 @@ final class ChatBadge {
         }
         if let newest = fresh.max(by: { $0.date < $1.date }) {
             latestSender = newest.sender
-            latestText = newest.text
+            latestText = newest.text.isEmpty
+                ? (newest.mediaType == "video" ? "🎬 Video" : "📷 Photo")
+                : newest.text
         }
         unread = fresh.count
     }

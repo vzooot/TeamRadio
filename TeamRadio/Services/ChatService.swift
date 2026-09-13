@@ -7,6 +7,8 @@ struct ChatMessage: Identifiable, Equatable {
     let sender: String
     let senderId: String
     let date: Date
+    /// "image" or "video" when the message carries media.
+    var mediaType: String?
 
     static func == (lhs: ChatMessage, rhs: ChatMessage) -> Bool { lhs.id == rhs.id }
 }
@@ -38,8 +40,11 @@ enum ChatService {
         )
         query.sortDescriptors = [NSSortDescriptor(key: "created", ascending: false)]
 
+        // The media asset itself is deliberately NOT fetched here — bubbles
+        // download it lazily via ChatMediaCache, keeping list loads light.
         do {
-            let (results, cursor) = try await database.records(matching: query, resultsLimit: limit)
+            let (results, cursor) = try await database.records(
+                matching: query, desiredKeys: Self.listKeys, resultsLimit: limit)
             return (parse(results), cursor)
         } catch let error as CKError where error.code == .unknownItem || error.code == .invalidArguments {
             // Record type doesn't exist yet (first ever run) — empty room.
@@ -47,9 +52,12 @@ enum ChatService {
         }
     }
 
+    private static let listKeys = ["text", "sender", "senderId", "round", "created", "mediaType"]
+
     /// Continues a previous query further back in time.
     static func olderMessages(from cursor: CKQueryOperation.Cursor, limit: Int = 80) async throws -> (messages: [ChatMessage], older: CKQueryOperation.Cursor?) {
-        let (results, next) = try await database.records(continuingMatchFrom: cursor, resultsLimit: limit)
+        let (results, next) = try await database.records(
+            continuingMatchFrom: cursor, desiredKeys: Self.listKeys, resultsLimit: limit)
         return (parse(results), next)
     }
 
@@ -61,13 +69,17 @@ enum ChatService {
                       let sender = record["sender"] as? String,
                       let senderId = record["senderId"] as? String else { return nil }
                 let date = (record["created"] as? Date) ?? record.creationDate ?? .now
-                return ChatMessage(id: record.recordID, text: text, sender: sender, senderId: senderId, date: date)
+                return ChatMessage(id: record.recordID, text: text, sender: sender,
+                                   senderId: senderId, date: date,
+                                   mediaType: record["mediaType"] as? String)
             }
             .sorted { $0.date < $1.date }
     }
 
     /// Returns the sent message so the UI can echo it immediately.
-    static func send(text: String, sender: String, round: String) async throws -> ChatMessage {
+    /// `media` attaches a photo or video file (already compressed by the UI).
+    static func send(text: String, sender: String, round: String,
+                     media: (url: URL, type: String)? = nil) async throws -> ChatMessage {
         let record = CKRecord(recordType: "Message")
         let senderId = await currentUserId() ?? "unknown"
         let created = Date()
@@ -76,8 +88,13 @@ enum ChatService {
         record["round"] = round
         record["senderId"] = senderId
         record["created"] = created
+        if let media {
+            record["media"] = CKAsset(fileURL: media.url)
+            record["mediaType"] = media.type
+        }
         let saved = try await database.save(record)
-        return ChatMessage(id: saved.recordID, text: text, sender: sender, senderId: senderId, date: created)
+        return ChatMessage(id: saved.recordID, text: text, sender: sender, senderId: senderId,
+                           date: created, mediaType: media?.type)
     }
 
     // MARK: - Nickname registration

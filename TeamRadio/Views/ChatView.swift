@@ -1,3 +1,6 @@
+import AVKit
+import CloudKit
+import PhotosUI
 import SwiftUI
 
 /// Paddock chat: one shared room per race weekend, on CloudKit.
@@ -6,8 +9,17 @@ struct ChatView: View {
     @State private var draft = ""
     @State private var nicknameDraft = ""
     @State private var editingName = false
+    @State private var pickedItem: PhotosPickerItem?
+    @State private var pendingMedia: PendingMedia?
+    @State private var isLoadingMedia = false
     @FocusState private var nicknameFocused: Bool
     @FocusState private var draftFocused: Bool
+
+    struct PendingMedia {
+        let url: URL
+        let type: String        // "image" | "video"
+        let preview: UIImage?
+    }
 
     var body: some View {
         ZStack {
@@ -295,37 +307,151 @@ struct ChatView: View {
         }
     }
 
-    private var inputBar: some View {
-        HStack(spacing: 10) {
-            TextField("Say something…", text: $draft, axis: .vertical)
-                .textFieldStyle(.plain)
-                .focused($draftFocused)
-                .lineLimit(1...4)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(
-                    RoundedRectangle(cornerRadius: 18)
-                        .fill(Theme.card)
-                        .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Theme.cardStroke, lineWidth: 1))
-                )
-                .foregroundStyle(.white)
-                .contentShape(Rectangle())
-                .onTapGesture { draftFocused = true }
+    private var canSend: Bool {
+        !draft.trimmingCharacters(in: .whitespaces).isEmpty || pendingMedia != nil
+    }
 
-            Button {
-                let text = draft
-                draft = ""
-                Task { await model.send(text) }
-            } label: {
-                Image(systemName: "arrow.up.circle.fill")
-                    .font(.system(size: 30))
-                    .foregroundStyle(draft.trimmingCharacters(in: .whitespaces).isEmpty ? Theme.dimText : Theme.accent)
+    private var inputBar: some View {
+        VStack(spacing: 8) {
+            if let media = pendingMedia {
+                HStack(spacing: 10) {
+                    if let preview = media.preview {
+                        Image(uiImage: preview)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 52, height: 52)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                    } else {
+                        Image(systemName: media.type == "video" ? "video.fill" : "photo.fill")
+                            .font(.system(size: 20))
+                            .foregroundStyle(Theme.accent)
+                            .frame(width: 52, height: 52)
+                            .background(Theme.card, in: RoundedRectangle(cornerRadius: 10))
+                    }
+                    Text(media.type == "video" ? "Video attached" : "Photo attached")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.dimText)
+                    Spacer()
+                    Button {
+                        pendingMedia = nil
+                        pickedItem = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundStyle(Theme.dimText)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 16)
             }
-            .buttonStyle(.plain)
-            .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty || model.isSending)
+
+            HStack(spacing: 10) {
+                PhotosPicker(selection: $pickedItem, matching: .any(of: [.images, .videos])) {
+                    if isLoadingMedia {
+                        ProgressView().tint(Theme.accent).frame(width: 26)
+                    } else {
+                        Image(systemName: "photo.on.rectangle.angled")
+                            .font(.system(size: 21))
+                            .foregroundStyle(Theme.accent)
+                    }
+                }
+                .disabled(isLoadingMedia)
+
+                TextField("Say something…", text: $draft, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .focused($draftFocused)
+                    .lineLimit(1...4)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 18)
+                            .fill(Theme.card)
+                            .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Theme.cardStroke, lineWidth: 1))
+                    )
+                    .foregroundStyle(.white)
+                    .contentShape(Rectangle())
+                    .onTapGesture { draftFocused = true }
+
+                Button {
+                    let text = draft
+                    let media = pendingMedia.map { (url: $0.url, type: $0.type) }
+                    draft = ""
+                    pendingMedia = nil
+                    pickedItem = nil
+                    Task { await model.send(text, media: media) }
+                } label: {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 30))
+                        .foregroundStyle(canSend ? Theme.accent : Theme.dimText)
+                }
+                .buttonStyle(.plain)
+                .disabled(!canSend || model.isSending)
+            }
+            .padding(.horizontal, 16)
         }
-        .padding(.horizontal, 16)
         .padding(.vertical, 10)
+        .onChange(of: pickedItem) { _, item in
+            guard let item else { return }
+            isLoadingMedia = true
+            Task {
+                await loadPicked(item)
+                isLoadingMedia = false
+            }
+        }
+    }
+
+    /// Compresses the picked photo (max 1440 px JPEG) or accepts a video up
+    /// to 25 MB, staging it as a temp file ready to upload.
+    private func loadPicked(_ item: PhotosPickerItem) async {
+        let isVideo = item.supportedContentTypes.contains { $0.conforms(to: .audiovisualContent) }
+        guard let data = try? await item.loadTransferable(type: Data.self) else {
+            model.errorText = "Couldn't load that from your library."
+            return
+        }
+        let temp = FileManager.default.temporaryDirectory
+        if isVideo {
+            guard data.count <= 25 * 1024 * 1024 else {
+                model.errorText = "Videos up to 25 MB only — try a shorter clip."
+                return
+            }
+            let url = temp.appendingPathComponent("upload-\(UUID().uuidString).mov")
+            guard (try? data.write(to: url)) != nil else { return }
+            let thumb = await videoThumbnail(url: url)
+            pendingMedia = PendingMedia(url: url, type: "video", preview: thumb)
+        } else {
+            guard let image = UIImage(data: data) else {
+                model.errorText = "That image couldn't be read."
+                return
+            }
+            let scaled = image.scaledDown(maxDimension: 1440)
+            guard let jpeg = scaled.jpegData(compressionQuality: 0.75) else { return }
+            let url = temp.appendingPathComponent("upload-\(UUID().uuidString).jpg")
+            guard (try? jpeg.write(to: url)) != nil else { return }
+            pendingMedia = PendingMedia(url: url, type: "image", preview: scaled)
+        }
+    }
+
+    private func videoThumbnail(url: URL) async -> UIImage? {
+        let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 400, height: 400)
+        return await withCheckedContinuation { continuation in
+            generator.generateCGImageAsynchronously(for: .zero) { cg, _, _ in
+                continuation.resume(returning: cg.map(UIImage.init))
+            }
+        }
+    }
+}
+
+private extension UIImage {
+    func scaledDown(maxDimension: CGFloat) -> UIImage {
+        let longest = max(size.width, size.height)
+        guard longest > maxDimension else { return self }
+        let scale = maxDimension / longest
+        let newSize = CGSize(width: size.width * scale, height: size.height * scale)
+        return UIGraphicsImageRenderer(size: newSize).image { _ in
+            draw(in: CGRect(origin: .zero, size: newSize))
+        }
     }
 }
 
@@ -343,20 +469,82 @@ struct ChatBubble: View {
                     .font(.system(size: 10))
                     .foregroundStyle(Theme.faintText)
             }
-            Text(ChatModeration.cleaned(message.text))
-                .font(.system(size: 15))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(isMine ? Theme.accent.opacity(0.25) : Theme.card)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14)
-                                .strokeBorder(isMine ? Theme.accent.opacity(0.4) : Theme.cardStroke, lineWidth: 1)
-                        )
-                )
+            if let mediaType = message.mediaType {
+                MediaBubble(id: message.id, type: mediaType)
+            }
+
+            if !message.text.isEmpty {
+                Text(ChatModeration.cleaned(message.text))
+                    .font(.system(size: 15))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(isMine ? Theme.accent.opacity(0.25) : Theme.card)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .strokeBorder(isMine ? Theme.accent.opacity(0.4) : Theme.cardStroke, lineWidth: 1)
+                            )
+                    )
+            }
         }
         .frame(maxWidth: .infinity, alignment: isMine ? .trailing : .leading)
+    }
+}
+
+/// A photo or video inside a chat bubble: downloads lazily, photos open
+/// full screen, videos play in place.
+struct MediaBubble: View {
+    let id: CKRecord.ID
+    let type: String
+
+    @State private var fileURL: URL?
+    @State private var showFullImage = false
+
+    var body: some View {
+        Group {
+            if let fileURL {
+                if type == "video" {
+                    VideoPlayer(player: AVPlayer(url: fileURL))
+                        .frame(width: 240, height: 240)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                } else if let image = UIImage(contentsOfFile: fileURL.path) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: 240, maxHeight: 300)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .contentShape(RoundedRectangle(cornerRadius: 14))
+                        .onTapGesture { showFullImage = true }
+                        .fullScreenCover(isPresented: $showFullImage) {
+                            ZStack(alignment: .topTrailing) {
+                                Color.black.ignoresSafeArea()
+                                Image(uiImage: image)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                Button {
+                                    showFullImage = false
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.system(size: 30))
+                                        .foregroundStyle(.white.opacity(0.8))
+                                        .padding(16)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                }
+            } else {
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Theme.card)
+                    .frame(width: 220, height: 140)
+                    .overlay(ProgressView().tint(Theme.accent))
+            }
+        }
+        .task(id: id.recordName) {
+            fileURL = await ChatMediaCache.shared.url(for: id, type: type)
+        }
     }
 }

@@ -74,8 +74,8 @@ enum TrackSceneBuilder {
 
         // Glowing racing line in the three timing-sector colors.
         let sectorColors: [(UIColor, UIColor)] = [
-            (UIColor(red: 0, green: 0.91, blue: 0.99, alpha: 1),
-             UIColor(red: 0.3, green: 0.95, blue: 1.0, alpha: 1)),          // S1 cyan
+            (UIColor(red: 0.18, green: 0.70, blue: 1.0, alpha: 1),
+             UIColor(red: 0.4, green: 0.78, blue: 1.0, alpha: 1)),          // S1 cyan
             (UIColor(white: 0.95, alpha: 1), UIColor(white: 0.85, alpha: 1)), // S2 white
             (UIColor(red: 0.994, green: 0.297, blue: 0.16, alpha: 1),
              UIColor(red: 1.0, green: 0.4, blue: 0.25, alpha: 1)),          // S3 red
@@ -128,7 +128,7 @@ enum TrackSceneBuilder {
         let car = SCNNode(geometry: SCNSphere(radius: 0.085))
         car.geometry?.firstMaterial?.lightingModel = .constant
         car.geometry?.firstMaterial?.diffuse.contents = UIColor.white
-        car.geometry?.firstMaterial?.emission.contents = UIColor(red: 0.55, green: 0.97, blue: 1.0, alpha: 1)
+        car.geometry?.firstMaterial?.emission.contents = UIColor(red: 0.6, green: 0.85, blue: 1.0, alpha: 1)
         let path = stride(from: 0, to: points.count, by: 2).map { points[$0] } + [points[0]]
         var lapLength: Float = 0
         for i in 1..<path.count {
