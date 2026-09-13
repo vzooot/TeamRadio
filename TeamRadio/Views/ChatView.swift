@@ -10,6 +10,7 @@ struct ChatView: View {
     @State private var nicknameDraft = ""
     @State private var editingName = false
     @State private var pickedItem: PhotosPickerItem?
+    @State private var showGiphy = false
     @State private var pendingMedia: PendingMedia?
     @State private var isLoadingMedia = false
     @FocusState private var nicknameFocused: Bool
@@ -358,6 +359,29 @@ struct ChatView: View {
             }
 
             HStack(spacing: 10) {
+                if GiphyService.isAvailable {
+                    Button {
+                        showGiphy = true
+                    } label: {
+                        Text("GIF")
+                            .font(.f1(12).italic())
+                            .foregroundStyle(Theme.violet)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 4)
+                            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Theme.violet.opacity(0.7), lineWidth: 1.5))
+                    }
+                    .buttonStyle(.plain)
+                    .sheet(isPresented: $showGiphy) {
+                        GiphyPicker { item, kind in
+                            showGiphy = false
+                            let type = kind == .stickers ? "gifsticker" : "gif"
+                            Task { await model.send("", giphy: (url: item.url, type: type)) }
+                        }
+                        .presentationDetents([.medium, .large])
+                        .presentationBackground(Theme.background)
+                    }
+                }
+
                 PhotosPicker(selection: $pickedItem, matching: .any(of: [.images, .videos])) {
                     if isLoadingMedia {
                         ProgressView().tint(Theme.accent).frame(width: 26)
@@ -481,11 +505,16 @@ struct ChatBubble: View {
                     .font(.system(size: 10))
                     .foregroundStyle(Theme.faintText)
             }
-            if let mediaType = message.mediaType {
+            if message.isGiphy, let url = URL(string: message.text) {
+                AnimatedGIFView(url: url)
+                    .frame(width: 200, height: 200)
+                    .background(message.mediaType == "gif" ? Theme.card : .clear)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+            } else if let mediaType = message.mediaType {
                 MediaBubble(id: message.id, type: mediaType)
             }
 
-            if !message.text.isEmpty {
+            if !message.text.isEmpty && !message.isGiphy {
                 Text(ChatModeration.cleaned(message.text))
                     .font(.system(size: 15))
                     .foregroundStyle(.white)

@@ -18,3 +18,6 @@ fastlane/AuthKey_*.p8
 fastlane/report.xml
 fastlane/README.md
 .wrangler/
+
+# Client API keys (GIPHY) — bundled at build time, never committed
+TeamRadio/Resources/Secrets.plist

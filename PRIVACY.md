@@ -21,6 +21,10 @@ to your identity, and nothing is ever sold or shared.
   device for push delivery only, is linked to nothing else, and is deleted
   when it stops working. To opt out, disable notifications for Team Radio in
   iOS Settings.
+- **GIFs in chat.** GIF search inside the Paddock is provided by GIPHY: the
+  words you search for are sent to GIPHY to return results, and shared GIFs
+  are loaded from GIPHY's servers. GIPHY's own privacy policy applies to
+  those requests; Team Radio does not store your searches.
 - **Local preferences** (notification choices, spoiler mode, read state)
   stay on your device.
 - **Network requests** fetch public sports data: the Jolpica F1 API (race

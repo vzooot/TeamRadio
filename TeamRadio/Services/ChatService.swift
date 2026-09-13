@@ -7,8 +7,11 @@ struct ChatMessage: Identifiable, Equatable {
     let sender: String
     let senderId: String
     let date: Date
-    /// "image" or "video" when the message carries media.
+    /// "image" / "video" (CloudKit asset) or "gif" / "gifsticker" (the text
+    /// field holds the GIPHY URL) when the message carries media.
     var mediaType: String?
+
+    var isGiphy: Bool { mediaType == "gif" || mediaType == "gifsticker" }
 
     static func == (lhs: ChatMessage, rhs: ChatMessage) -> Bool { lhs.id == rhs.id }
 }
@@ -79,7 +82,8 @@ enum ChatService {
     /// Returns the sent message so the UI can echo it immediately.
     /// `media` attaches a photo or video file (already compressed by the UI).
     static func send(text: String, sender: String, round: String,
-                     media: (url: URL, type: String)? = nil) async throws -> ChatMessage {
+                     media: (url: URL, type: String)? = nil,
+                     giphy: (url: URL, type: String)? = nil) async throws -> ChatMessage {
         let record = CKRecord(recordType: "Message")
         let senderId = await currentUserId() ?? "unknown"
         let created = Date()
@@ -92,9 +96,15 @@ enum ChatService {
             record["media"] = CKAsset(fileURL: media.url)
             record["mediaType"] = media.type
         }
+        if let giphy {
+            // GIFs stream from GIPHY's CDN — the message only carries the link.
+            record["text"] = giphy.url.absoluteString
+            record["mediaType"] = giphy.type
+        }
         let saved = try await database.save(record)
-        return ChatMessage(id: saved.recordID, text: text, sender: sender, senderId: senderId,
-                           date: created, mediaType: media?.type)
+        return ChatMessage(id: saved.recordID, text: giphy?.url.absoluteString ?? text,
+                           sender: sender, senderId: senderId,
+                           date: created, mediaType: giphy?.type ?? media?.type)
     }
 
     // MARK: - Nickname registration
