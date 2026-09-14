@@ -33,10 +33,17 @@ enum Theme {
         colors: [Color(red: 1.0, green: 0.56, blue: 0.28), live],
         startPoint: .top, endPoint: .bottom
     )
-    /// Glass edge: bright where light hits, fading out below.
+    /// Card edge in the circuit's sector colours: cyan where the light hits
+    /// (top-left), through violet, to a red ember bottom-right.
     static let glassStroke = LinearGradient(
-        colors: [Color.white.opacity(0.34), Color.white.opacity(0.03)],
-        startPoint: .top, endPoint: .bottom
+        colors: [Color(red: 0.6, green: 0.92, blue: 1.0).opacity(0.7), accent.opacity(0.38),
+                 violet.opacity(0.3), live.opacity(0.5)],
+        startPoint: .topLeading, endPoint: .bottomTrailing
+    )
+    /// Stronger version of the same run, for glows behind hero cards.
+    static let trioStroke = LinearGradient(
+        colors: [accent, violet, live],
+        startPoint: .topLeading, endPoint: .bottomTrailing
     )
 
     /// Team colors keyed by Ergast constructorId.
@@ -59,6 +66,19 @@ enum Theme {
     static func teamColor(_ constructorId: String?) -> Color {
         guard let id = constructorId else { return .gray }
         return teamColors[id] ?? .gray
+    }
+}
+
+extension View {
+    /// Soft sector-coloured halo hugging a card's edge — cyan top-left,
+    /// red bottom-right — instead of a flat single-colour shadow.
+    func trioGlow(cornerRadius: CGFloat, opacity: Double = 0.55) -> some View {
+        background(
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .stroke(Theme.trioStroke, lineWidth: 3)
+                .blur(radius: 14)
+                .opacity(opacity)
+        )
     }
 }
 

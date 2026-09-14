@@ -19,7 +19,7 @@ struct RaceHeroView: View {
                     RoundedRectangle(cornerRadius: 20)
                         .strokeBorder(Theme.glassStroke, lineWidth: 1)
                 )
-                .shadow(color: Theme.violet.opacity(0.22), radius: 22, y: 6)
+                .trioGlow(cornerRadius: 20)
 
             Text(Flags.emoji(for: race.circuit.location.country))
                 .font(.system(size: 110))

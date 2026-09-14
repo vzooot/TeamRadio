@@ -73,7 +73,7 @@ struct TrackSectionView: View {
                         RoundedRectangle(cornerRadius: 20)
                             .strokeBorder(Theme.glassStroke, lineWidth: 1)
                     )
-                    .shadow(color: Theme.accent.opacity(0.2), radius: 22, y: 6)
+                    .trioGlow(cornerRadius: 20)
             )
 
             if let wiki = URL(string: circuit.url ?? "") {

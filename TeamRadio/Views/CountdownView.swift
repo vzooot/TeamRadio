@@ -88,7 +88,7 @@ struct CountdownView: View {
                         RoundedRectangle(cornerRadius: 20)
                             .strokeBorder(Theme.glassStroke, lineWidth: 1)
                     )
-                    .shadow(color: Theme.accent.opacity(0.25), radius: 24, y: 6)
+                    .trioGlow(cornerRadius: 20)
             )
         }
     }
