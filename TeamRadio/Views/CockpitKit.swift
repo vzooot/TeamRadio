@@ -269,47 +269,55 @@ struct DotMatrixBoard: View {
                     }
                 }
 
-                // lit LEDs, after the reference: a faint halo on the surface, the cavity
-                // rim glowing thinly in the LED colour, a dark gap, then the luminous
-                // disc at ~70% of the cavity — bright core, darkening toward its edge
+                // lit LEDs, after the reference — from the centre outward: luminous
+                // disc with a slightly darker edge, a thin dark gap, the cavity wall
+                // lit as a thin ring, a dark bevel line, then a thin glow outside
                 let glowing = lit.map { (center($0.key % 1000, $0.key / 1000), $0.value) }
                 let warm = page == 0
-                let rimColor = warm ? Color(red: 0.95, green: 0.3, blue: 0.1) : Color(red: 0.1, green: 0.65, blue: 0.75)
+                let rimColor = warm ? Color(red: 0.96, green: 0.34, blue: 0.1) : Color(red: 0.12, green: 0.68, blue: 0.78)
+                let edgeColor = warm ? Color(red: 0.9, green: 0.42, blue: 0.12) : Color(red: 0.18, green: 0.72, blue: 0.86)
+                // faint surface halo
                 ctx.drawLayer { layer in
                     layer.blendMode = .plusLighter
-                    layer.addFilter(.blur(radius: hole * 0.45))
-                    for (p, k) in glowing { disc(p, hole * 1.3, .color(rimColor.opacity(0.16 * k)), in: &layer) }
+                    layer.addFilter(.blur(radius: hole * 0.4))
+                    for (p, k) in glowing { disc(p, hole * 1.25, .color(rimColor.opacity(0.12 * k)), in: &layer) }
                 }
-                // the rim: blurred outward, then the cavity is re-cut so its inner edge is crisp
+                // thin outer glow, blurred outward only (the cavity is re-cut below)
                 ctx.drawLayer { layer in
-                    layer.addFilter(.blur(radius: 1.6))
+                    layer.addFilter(.blur(radius: 1.0))
                     for (p, k) in glowing {
-                        layer.stroke(Path(ellipseIn: rect(p, hole * 1.02)), with: .color(rimColor.opacity(0.85 * k)), lineWidth: 2.4)
+                        layer.stroke(Path(ellipseIn: rect(p, hole * 1.03)), with: .color(rimColor.opacity(0.8 * k)), lineWidth: 1.2)
                     }
                 }
                 for (p, k) in glowing {
-                    disc(p, hole * 0.93, .linearGradient(Gradient(colors: [Color.black.opacity(0.97), Color.black.opacity(0.72)]),
+                    // re-cut the cavity, then the lit wall ring and the dark bevel line
+                    disc(p, hole * 0.97, .linearGradient(Gradient(colors: [Color.black.opacity(0.97), Color.black.opacity(0.75)]),
                                                          startPoint: CGPoint(x: p.x, y: p.y - hole), endPoint: CGPoint(x: p.x, y: p.y + hole)), in: &ctx)
-                    disc(p, hole * 0.93, .color(rimColor.opacity(0.12 * k)), in: &ctx)
+                    ctx.stroke(Path(ellipseIn: rect(p, hole * 0.95)), with: .color(.black.opacity(0.85 * k)), lineWidth: 0.9)
+                    ctx.stroke(Path(ellipseIn: rect(p, hole * 0.86)), with: .color(rimColor.opacity(0.9 * k)), lineWidth: 1.1)
+                    disc(p, hole * 0.8, .color(rimColor.opacity(0.10 * k)), in: &ctx)
                 }
+                // the luminous disc: a long, even run from the pale core to the saturated edge
                 ctx.drawLayer { layer in
-                    layer.addFilter(.blur(radius: 0.25))
+                    layer.addFilter(.blur(radius: 0.3))
                     for (p, k) in glowing {
-                        let core = hole * 0.72
-                        // smooth run from the pale core to the saturated edge
+                        let core = hole * 0.7
                         let stops: [Gradient.Stop] = warm
-                            ? [.init(color: Color(red: 1.0, green: 0.87, blue: 0.52), location: 0),
-                               .init(color: Color(red: 1.0, green: 0.78, blue: 0.38), location: 0.3),
-                               .init(color: Color(red: 1.0, green: 0.66, blue: 0.26), location: 0.6),
-                               .init(color: Color(red: 1.0, green: 0.55, blue: 0.18), location: 0.85),
-                               .init(color: Color(red: 0.98, green: 0.47, blue: 0.14), location: 1)]
-                            : [.init(color: Color(red: 0.84, green: 1.0, blue: 1.0), location: 0),
-                               .init(color: Color(red: 0.62, green: 0.97, blue: 1.0), location: 0.3),
-                               .init(color: Color(red: 0.42, green: 0.92, blue: 1.0), location: 0.6),
-                               .init(color: Color(red: 0.28, green: 0.85, blue: 0.98), location: 0.85),
-                               .init(color: Color(red: 0.2, green: 0.78, blue: 0.92), location: 1)]
+                            ? [.init(color: Color(red: 1.0, green: 0.88, blue: 0.55), location: 0),
+                               .init(color: Color(red: 1.0, green: 0.83, blue: 0.46), location: 0.2),
+                               .init(color: Color(red: 1.0, green: 0.76, blue: 0.36), location: 0.4),
+                               .init(color: Color(red: 1.0, green: 0.68, blue: 0.28), location: 0.6),
+                               .init(color: Color(red: 1.0, green: 0.6, blue: 0.21), location: 0.8),
+                               .init(color: Color(red: 1.0, green: 0.52, blue: 0.16), location: 1)]
+                            : [.init(color: Color(red: 0.86, green: 1.0, blue: 1.0), location: 0),
+                               .init(color: Color(red: 0.74, green: 0.99, blue: 1.0), location: 0.2),
+                               .init(color: Color(red: 0.6, green: 0.96, blue: 1.0), location: 0.4),
+                               .init(color: Color(red: 0.46, green: 0.92, blue: 1.0), location: 0.6),
+                               .init(color: Color(red: 0.34, green: 0.87, blue: 0.99), location: 0.8),
+                               .init(color: Color(red: 0.25, green: 0.82, blue: 0.95), location: 1)]
                         layer.opacity = 0.35 + 0.65 * k
                         disc(p, core, .radialGradient(Gradient(stops: stops), center: CGPoint(x: p.x, y: p.y - core * 0.12), startRadius: 0, endRadius: core), in: &layer)
+                        layer.stroke(Path(ellipseIn: rect(p, core)), with: .color(edgeColor), lineWidth: 0.8)
                     }
                 }
             }
