@@ -33,13 +33,6 @@ struct CountdownView: View {
             VStack(spacing: 14) {
                 sessionPicker(now: now, selected: session)
 
-                if let session {
-                    Text("\(session.kind.rawValue.uppercased()) · \(session.date.formatted(.dateTime.weekday(.wide).hour().minute()).uppercased())")
-                        .font(.f1(12, weight: .bold))
-                        .tracking(2)
-                        .foregroundStyle(Theme.dimText)
-                }
-
                 // TEMP screenshot hooks: `-DemoLights 3` pretends race week is here,
                 // `-DemoLive YES` pretends the session has started.
                 let demoLights = UserDefaults.standard.integer(forKey: "DemoLights")
@@ -49,7 +42,8 @@ struct CountdownView: View {
                     let realLit = StartLightsView.litCount(secondsRemaining: remaining)
                     // TEMP preview: two lamps always on so lit vs. armed can be compared — revert later.
                     let lit = demoLights > 0 ? demoLights : max(2, realLit)
-                    DotMatrixBoard(litLights: lit)
+                    let ticker = session.map { $0.date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute()) } ?? ""
+                    DotMatrixBoard(text: ticker, litLights: lit)
                     if demoLights > 0 || realLit > 0 {
                         Text(lit >= 5 ? "FINAL 24 HOURS" : "IT'S RACE WEEK")
                             .font(.f1(11, weight: .bold))
@@ -77,7 +71,7 @@ struct CountdownView: View {
                     .padding(.bottom, 10)
                 } else if let session, demoLive || now < session.date.addingTimeInterval(session.kind.expectedDuration) {
                     // Lights out: the gantry goes dark the moment the session starts.
-                    DotMatrixBoard(litLights: 0)
+                    DotMatrixBoard(text: session.date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute()), litLights: 0)
                     liveBanner(session)
                 } else {
                     Text("🏁 \(session?.kind.rawValue.uppercased() ?? "SESSION") COMPLETE")
