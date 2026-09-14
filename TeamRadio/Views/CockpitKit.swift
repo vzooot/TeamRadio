@@ -157,7 +157,7 @@ struct DotMatrixBoard: View {
             Canvas { ctx, size in
                 // One uniform LED grid across the whole board; the ticker
                 // lights the left, the gantry lights the right.
-                let gantryCols = 5 * 2 + 1
+                let gantryCols = 5 * 3
                 let pitch = min(5.2, max(3.0, size.width / CGFloat(textColumns + 4 + gantryCols)))
                 let dot = pitch * 0.6
                 let rows = 7
@@ -192,16 +192,18 @@ struct DotMatrixBoard: View {
                     col += 6
                 }
 
-                // gantry: 5 lamp columns on the right, each lamp = 2 LEDs, lit from the left
+                // gantry: 5 columns on the right, two 2×2 lamps each, lit from the left
                 var orange: [CGPoint] = []
                 var dark: [CGPoint] = []
                 for c in 0..<5 {
-                    let gc = cols - 2 - (4 - c) * 2
-                    for row in [2, 4] {
-                        if c < litLights { orange.append(center(gc, row)) } else { dark.append(center(gc, row)) }
+                    let gc = cols - 3 - (4 - c) * 3
+                    for row in [1, 2, 4, 5] {
+                        for k in 0..<2 {
+                            if c < litLights { orange.append(center(gc + k, row)) } else { dark.append(center(gc + k, row)) }
+                        }
                     }
                 }
-                for p in dark { led(p, dot / 2, lightColor.opacity(0.22), in: &ctx) }
+                for p in dark { led(p, dot / 2, lightColor.opacity(0.42), in: &ctx) }
 
                 for (points, color) in [(cyan, textColor), (orange, lightColor)] where !points.isEmpty {
                     ctx.drawLayer { layer in
