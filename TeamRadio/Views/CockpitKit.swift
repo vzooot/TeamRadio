@@ -91,7 +91,7 @@ struct NeonTile: View {
     }
 }
 
-/// The LED matrix: 29×5 sockets. At rest it shows the five start lights
+/// The LED matrix: 24×4 sockets. At rest it shows the five start lights
 /// (rounded blocks, lit from the left through race week). Tap it and it
 /// scrambles like a sci-fi readout, resolves to the next info page (session
 /// time, date, days to go, round) in cyan, then falls back to the lights.
@@ -106,46 +106,46 @@ struct DotMatrixBoard: View {
     @State private var transitionStart: Date?
     @State private var settle: Task<Void, Never>?
 
-    private static let cols = 29, rows = 5
+    private static let cols = 24, rows = 4
     private static let scramble: TimeInterval = 0.9
     private static let hold: TimeInterval = 5
 
-    // 3 columns × 5 rows, top row first
+    // 3 columns × 4 rows, top row first
     private static let glyphs: [Character: String] = [
-        "0": ".#.#.##.##.#.#.", "1": ".#.##..#..#.###", "2": "###..#####..###", "3": "###..####..####",
-        "4": "#.##.####..#..#", "5": "####..###..####", "6": "####..####.####", "7": "###..#..#.#..#.",
-        "8": "####.#####.####", "9": "####.####..####", "A": ".#.#.#####.##.#", "B": "##.#.###.#.###.",
-        "C": "####..#..#..###", "D": "##.#.##.##.###.", "E": "####..##.#..###", "F": "####..##.#..#..",
-        "G": "####..#.##.####", "H": "#.##.#####.##.#", "I": "###.#..#..#.###", "J": "..#..#..##.####",
-        "K": "#.##.###.#.##.#", "L": "#..#..#..#..###", "M": "#.########.##.#", "N": "##.#.##.##.##.#",
-        "O": "####.##.##.####", "P": "####.#####..#..", "Q": "####.##.####..#", "R": "##.#.###.#.##.#",
-        "S": "####..###..####", "T": "###.#..#..#..#.", "U": "#.##.##.##.####", "V": "#.##.##.##.#.#.",
-        "W": "#.##.########.#", "X": "#.##.#.#.#.##.#", "Y": "#.##.#.#..#..#.", "Z": "###..#.#.#..###",
-        ":": "....#.....#....", "-": "......###......", ".": ".............#.", " ": "...............",
+        "0": "####.##.####", "1": ".#.##..#.###", "2": "###..##..###", "3": "###.##..####",
+        "4": "#.##.####..#", "5": "#####...####", "6": "#..####.####", "7": "###..#.#..#.",
+        "8": "#######.####", "9": "####.####..#", "A": ".#.#.#####.#", "B": "##.####.###.",
+        "C": "####..#..###", "D": "##.#.##.###.", "E": "#####.#..###", "F": "#####.#..#..",
+        "G": "##.#..#.####", "H": "#.#####.##.#", "I": "###.#..#.###", "J": "..#..##.####",
+        "K": "#.###.#.##.#", "L": "#..#..#..###", "M": "#.#####.##.#", "N": "##.#.##.##.#",
+        "O": "####.##.####", "P": "####.#####..", "Q": "####.####..#", "R": "##.#.###.#.#",
+        "S": ".###....###.", "T": "###.#..#..#.", "U": "#.##.##.####", "V": "#.##.##.#.#.",
+        "W": "#.##.#####.#", "X": "#.#.#..#.#.#", "Y": "#.#.#..#..#.", "Z": "###..##..###",
+        ":": "....#.....#.", "-": "...###......", ".": "..........#.", " ": "............",
     ]
 
     /// Cells lit by the current page: key row*1000+col → 1 (lit) or 0 (armed/dim).
     private func target(for page: Int) -> [Int: Double] {
         var cells: [Int: Double] = [:]
         if page == 0 {
-            // five round 5×5 discs (corners dark), one dark column between
+            // five round 4×4 blocks (corners dark), one dark column between
             for c in 0..<5 {
-                let c0 = c * 6
-                for dc in 0..<5 {
-                    for dr in 0..<5 {
-                        let corner = (dc == 0 || dc == 4) && (dr == 0 || dr == 4)
+                let c0 = c * 5
+                for dc in 0..<4 {
+                    for dr in 0..<4 {
+                        let corner = (dc == 0 || dc == 3) && (dr == 0 || dr == 3)
                         guard !corner else { continue }
                         cells[dr * 1000 + c0 + dc] = c < litLights ? 1 : 0
                     }
                 }
             }
         } else {
-            let text = Array(pages[page - 1].uppercased().prefix(7))
+            let text = Array(pages[page - 1].uppercased().prefix(6))
             let width = text.count * 4 - 1
             var col = max(0, (Self.cols - width) / 2)
             for ch in text {
                 let bits = Array(Self.glyphs[ch] ?? Self.glyphs[" "]!)
-                for row in 0..<5 {
+                for row in 0..<4 {
                     for k in 0..<3 where bits[row * 3 + k] == "#" && col + k < Self.cols {
                         cells[row * 1000 + col + k] = 1
                     }
@@ -196,7 +196,7 @@ struct DotMatrixBoard: View {
                 let pitch = size.width / (CGFloat(cols) + 0.8)
                 let left = pitch * 0.4
                 let top = (size.height - CGFloat(rows) * pitch) / 2
-                let hole = pitch * 0.42          // big, with a small clear gap
+                let hole = pitch * 0.31          // gap about 60% of the LED, like the reference
                 let die = hole * 0.21            // side of one grey square in an unlit socket
                 let dieStep = hole * 0.37
 
@@ -323,7 +323,7 @@ struct DotMatrixBoard: View {
             }
         }
         // a little taller than the grid so the halos aren't clipped
-        .frame(height: 92)
+        .frame(height: 84)
         .padding(.vertical, -8)
         .contentShape(Rectangle())
         .onTapGesture { advance() }
