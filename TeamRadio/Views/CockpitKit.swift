@@ -324,7 +324,8 @@ struct DotMatrixBoard: View {
         }
         // a little taller than the grid so the halos aren't clipped
         .frame(height: 84)
-        .padding(.vertical, -8)
+        .padding(.top, -20)
+        .padding(.bottom, -6)
         .contentShape(Rectangle())
         .onTapGesture { advance() }
         .onDisappear { settle?.cancel() }
