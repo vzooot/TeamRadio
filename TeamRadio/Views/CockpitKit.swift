@@ -91,39 +91,18 @@ struct NeonTile: View {
     }
 }
 
-/// Dot-matrix LED board: large LEDs in dark sockets on the carbon, a 3×5
-/// ticker lit cyan on the left, the five-column start gantry lit orange on
-/// the right. Lit LEDs bloom; unlit ones stay as dim sockets.
+/// The start gantry as a dot-matrix board: a field of round LED holes, with
+/// five big lamp columns (two 3×3 lamps each) burning red as race week
+/// counts down. Lights out — all dark — once the session is running.
 struct DotMatrixBoard: View {
-    let text: String
     let litLights: Int
-    var textColor: Color = Theme.accent
     var lightColor: Color = Theme.live
-
-    // 3 columns × 5 rows, top row first
-    private static let glyphs: [Character: String] = [
-        "0": "####.##.##.####", "1": ".#.##..#..#.###", "2": "###..#####..###", "3": "###..####..####",
-        "4": "#.##.####..#..#", "5": "####..###..####", "6": "####..####.####", "7": "###..#..#..#..#",
-        "8": "####.#####.####", "9": "####.####..####",
-        "A": "####.#####.##.#", "B": "##.#.###.#.###.", "C": "####..#..#..###", "D": "##.#.##.##.###.",
-        "E": "####..####..###", "F": "####..####..#..", "G": "####..#.##.####", "H": "#.##.#####.##.#",
-        "I": "###.#..#..#.###", "J": "..#..#..##.####", "K": "#.##.###.#.##.#", "L": "#..#..#..#..###",
-        "M": "#.########.##.#", "N": "##.#.##.##.##.#", "O": "####.##.##.####", "P": "####.#####..#..",
-        "Q": "####.##.####..#", "R": "####.###.#.##.#", "S": "####..###..####", "T": "###.#..#..#..#.",
-        "U": "#.##.##.##.####", "V": "#.##.##.##.#.#.", "W": "#.##.########.#", "X": "#.##.#.#.#.##.#",
-        "Y": "#.##.####.#..#.", "Z": "###..#.#.#..###", ":": "....#.....#....", "-": "......###......",
-        ".": "............#..", " ": "...............",
-    ]
 
     var body: some View {
         Canvas { ctx, size in
-            // ~25 big holes across, 5 down. Unlit holes show a faint 3×3 matrix
-            // of cells; a lit hole is one round bright LED with a bloom.
-            let textCols = text.count * 4 - 1
-            let gantryCols = 5                      // five adjacent lamp columns
-            let cols = max(24, textCols + 1 + gantryCols)
+            let cols = 25
+            let rows = 7
             let pitch = size.width / CGFloat(cols)
-            let rows = 5
             let top = (size.height - CGFloat(rows) * pitch) / 2
             let hole = pitch * 0.37
             let cellStep = pitch * 0.13
@@ -143,52 +122,55 @@ struct DotMatrixBoard: View {
                 }
             }
 
-            // ticker glyphs on the left, gantry lamps (two per column) at the right
-            var lit: [Int: Color] = [:]          // key: row * 1000 + col
-            var col = 0
-            for ch in text.uppercased() {
-                let bits = Array(Self.glyphs[ch] ?? Self.glyphs[" "]!)
-                for row in 0..<5 {
-                    for k in 0..<3 where row * 3 + k < bits.count && bits[row * 3 + k] == "#" && col + k < cols {
-                        lit[row * 1000 + col + k] = textColor
-                    }
-                }
-                col += 4
-            }
+            // lamp layout: columns of 3 holes, one dark column between; two lamps stacked
+            var lit: Set<Int> = []          // key: row * 1000 + col
             var armed: Set<Int> = []
+            var lampCenters: [(CGPoint, Bool)] = []
+            let first = (cols - (5 * 3 + 4)) / 2
             for c in 0..<5 {
-                let gc = cols - 5 + c
-                for row in [1, 3] {
-                    if c < litLights { lit[row * 1000 + gc] = lightColor } else { armed.insert(row * 1000 + gc) }
+                let c0 = first + c * 4
+                for r0 in [0, 4] {
+                    lampCenters.append((center(c0 + 1, r0 + 1), c < litLights))
+                    for dc in 0..<3 {
+                        for dr in 0..<3 {
+                            let key = (r0 + dr) * 1000 + c0 + dc
+                            if c < litLights { lit.insert(key) } else { armed.insert(key) }
+                        }
+                    }
                 }
             }
 
-            // every hole: dark recess with a rim, then its nine cells
+            // every hole: dark recess with a rim; unlit ones show their faint 3×3 cells
             for c in 0..<cols {
                 for r in 0..<rows {
                     let p = center(c, r)
                     ctx.stroke(Path(ellipseIn: CGRect(x: p.x - hole, y: p.y - hole + 0.6, width: 2 * hole, height: 2 * hole)),
                                with: .color(.white.opacity(0.07)), lineWidth: 0.8)
                     disc(p, hole, .color(.black.opacity(0.7)), in: &ctx)
-                    if lit[r * 1000 + c] == nil {
-                        let dim: Color = armed.contains(r * 1000 + c) ? lightColor.opacity(0.4) : .white.opacity(0.09)
-                        cells(p, cellR, .color(dim), in: &ctx)
+                    let key = r * 1000 + c
+                    if !lit.contains(key) {
+                        cells(p, cellR, .color(armed.contains(key) ? lightColor.opacity(0.22) : .white.opacity(0.09)), in: &ctx)
                     }
                 }
             }
 
-            // lit holes: one round LED — soft bloom past the rim, coloured disc, hot centre
-            let glowing = lit.map { (center($0.key % 1000, $0.key / 1000), $0.value) }
+            // lit lamps: one big bloom per lamp, then each hole as a round LED
             ctx.drawLayer { layer in
-                layer.addFilter(.blur(radius: pitch * 0.45))
-                for (p, color) in glowing { disc(p, hole * 1.1, .color(color.opacity(0.8)), in: &layer) }
+                layer.addFilter(.blur(radius: pitch * 0.9))
+                for (p, on) in lampCenters where on {
+                    disc(p, pitch * 1.7, .color(lightColor.opacity(0.75)), in: &layer)
+                }
             }
-            for (p, color) in glowing {
-                disc(p, hole * 0.95, .color(color.opacity(0.35)), in: &ctx)
-                disc(p, hole * 0.72, .color(color), in: &ctx)
-                disc(p, hole * 0.38, .color(.white.opacity(0.9)), in: &ctx)
+            for key in lit {
+                let col = key % 1000, row = key / 1000
+                let p = center(col, row)
+                // corner LEDs burn a little softer so each 3×3 lamp reads as a disc
+                let corner = (col - first) % 4 != 1 && row % 4 != 1
+                disc(p, hole * 0.95, .color(lightColor.opacity(corner ? 0.25 : 0.4)), in: &ctx)
+                disc(p, hole * (corner ? 0.6 : 0.72), .color(lightColor.opacity(corner ? 0.8 : 1)), in: &ctx)
+                disc(p, hole * (corner ? 0.26 : 0.36), .color(.white.opacity(corner ? 0.6 : 0.9)), in: &ctx)
             }
         }
-        .frame(height: 80)
+        .frame(height: 104)
     }
 }

@@ -33,16 +33,21 @@ struct CountdownView: View {
             VStack(spacing: 14) {
                 sessionPicker(now: now, selected: session)
 
-                if remaining > 0 {
-                    // LED ticker: session start time (the chip above names the
-                    // session) plus the start gantry — few, big LEDs
-                    let ticker = session.map {
-                        $0.date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute())
-                    } ?? ""
-                    // TEMP screenshot hook: `-DemoLights 3` pretends race week is here.
-                    let demoLights = UserDefaults.standard.integer(forKey: "DemoLights")
+                if let session {
+                    Text("\(session.kind.rawValue.uppercased()) · \(session.date.formatted(.dateTime.weekday(.wide).hour().minute()).uppercased())")
+                        .font(.f1(12, weight: .bold))
+                        .tracking(2)
+                        .foregroundStyle(Theme.dimText)
+                }
+
+                // TEMP screenshot hooks: `-DemoLights 3` pretends race week is here,
+                // `-DemoLive YES` pretends the session has started.
+                let demoLights = UserDefaults.standard.integer(forKey: "DemoLights")
+                let demoLive = UserDefaults.standard.bool(forKey: "DemoLive")
+
+                if remaining > 0 && !demoLive {
                     let lit = demoLights > 0 ? demoLights : StartLightsView.litCount(secondsRemaining: remaining)
-                    DotMatrixBoard(text: ticker, litLights: lit)
+                    DotMatrixBoard(litLights: lit)
                     if lit > 0 {
                         Text(lit >= 5 ? "FINAL 24 HOURS" : "IT'S RACE WEEK")
                             .font(.f1(11, weight: .bold))
@@ -68,7 +73,9 @@ struct CountdownView: View {
                         }
                     }
                     .padding(.bottom, 10)
-                } else if let session, now < session.date.addingTimeInterval(session.kind.expectedDuration) {
+                } else if let session, demoLive || now < session.date.addingTimeInterval(session.kind.expectedDuration) {
+                    // Lights out: the gantry goes dark the moment the session starts.
+                    DotMatrixBoard(litLights: 0)
                     liveBanner(session)
                 } else {
                     Text("🏁 \(session?.kind.rawValue.uppercased() ?? "SESSION") COMPLETE")
