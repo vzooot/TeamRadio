@@ -91,84 +91,86 @@ struct NeonTile: View {
     }
 }
 
-/// The start gantry: ten round lamps (five columns of two) mounted on a
-/// matrix of small LED holes. Lamps are dark red lenses until race week
-/// lights them column by column; lights out once the session is running.
+/// The start gantry as an LED matrix: five round lamps in a row, each a
+/// disc-shaped cluster of 21 LEDs. Dark red while armed, they light column
+/// by column through race week; lights out once the session is running.
 struct DotMatrixBoard: View {
     let litLights: Int
     var lightColor: Color = Theme.live
 
     var body: some View {
         Canvas { ctx, size in
-            let cols = 25
-            let rows = 6
+            let cols = 31                   // five 5-wide lamps, single gaps, one spare column each side
+            let rows = 5
             let pitch = size.width / CGFloat(cols)
             let top = (size.height - CGFloat(rows) * pitch) / 2
-            let hole = pitch * 0.34
-            let cellStep = pitch * 0.12
-            let cellR = pitch * 0.038
-            let lampR = pitch * 1.32
+            let hole = pitch * 0.36
+            let cellStep = pitch * 0.13
+            let cellR = pitch * 0.04
 
-            func center(_ col: CGFloat, _ row: CGFloat) -> CGPoint {
-                CGPoint(x: col * pitch + pitch / 2, y: top + row * pitch + pitch / 2)
+            func center(_ col: Int, _ row: Int) -> CGPoint {
+                CGPoint(x: CGFloat(col) * pitch + pitch / 2, y: top + CGFloat(row) * pitch + pitch / 2)
             }
             func disc(_ p: CGPoint, _ r: CGFloat, _ shading: GraphicsContext.Shading, in c: inout GraphicsContext) {
                 c.fill(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r)), with: shading)
             }
-            func ring(_ p: CGPoint, _ r: CGFloat, _ color: Color, _ width: CGFloat, in c: inout GraphicsContext) {
-                c.stroke(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r)), with: .color(color), lineWidth: width)
-            }
-
-            // the LED hole matrix
-            for c in 0..<cols {
-                for r in 0..<rows {
-                    let p = center(CGFloat(c), CGFloat(r))
-                    ring(CGPoint(x: p.x, y: p.y + 0.6), hole, .white.opacity(0.07), 0.8, in: &ctx)
-                    disc(p, hole, .color(.black.opacity(0.7)), in: &ctx)
-                    for dx in -1...1 {
-                        for dy in -1...1 {
-                            disc(CGPoint(x: p.x + CGFloat(dx) * cellStep, y: p.y + CGFloat(dy) * cellStep), cellR, .color(.white.opacity(0.09)), in: &ctx)
-                        }
+            func cells(_ p: CGPoint, _ r: CGFloat, _ shading: GraphicsContext.Shading, in c: inout GraphicsContext) {
+                for dx in -1...1 {
+                    for dy in -1...1 {
+                        disc(CGPoint(x: p.x + CGFloat(dx) * cellStep, y: p.y + CGFloat(dy) * cellStep), r, shading, in: &c)
                     }
                 }
             }
 
-            // lamp positions: five columns across, two rows
-            let first = CGFloat((cols - (5 * 3 + 4)) / 2)
-            var lamps: [(CGPoint, Bool)] = []
+            // lamp c: a 5×5 block with the corners cut — reads as a disc
+            var lit: Set<Int> = []          // key: row * 1000 + col
+            var armed: Set<Int> = []
+            var lampCenters: [(CGPoint, Bool)] = []
             for c in 0..<5 {
-                for rowCenter in [1.0, 4.0] as [CGFloat] {
-                    lamps.append((center(first + 1 + CGFloat(c) * 4, rowCenter), c < litLights))
+                let cc = 3 + c * 6
+                lampCenters.append((center(cc, 2), c < litLights))
+                for dc in -2...2 {
+                    for dr in -2...2 where abs(dc) + abs(dr) <= 3 {
+                        let key = (2 + dr) * 1000 + cc + dc
+                        if c < litLights { lit.insert(key) } else { armed.insert(key) }
+                    }
                 }
             }
 
-            // bloom first, so it sits under every lens
-            ctx.drawLayer { layer in
-                layer.addFilter(.blur(radius: pitch * 1.1))
-                for (p, on) in lamps where on {
-                    disc(p, lampR * 1.5, .color(lightColor.opacity(0.8)), in: &layer)
+            // every hole: dark recess with a rim; armed ones glow deep red, the rest stay grey
+            for c in 0..<cols {
+                for r in 0..<rows {
+                    let p = center(c, r)
+                    ctx.stroke(Path(ellipseIn: CGRect(x: p.x - hole, y: p.y - hole + 0.6, width: 2 * hole, height: 2 * hole)),
+                               with: .color(.white.opacity(0.07)), lineWidth: 0.8)
+                    disc(p, hole, .color(.black.opacity(0.7)), in: &ctx)
+                    let key = r * 1000 + c
+                    if armed.contains(key) {
+                        disc(p, hole * 0.9, .color(lightColor.opacity(0.14)), in: &ctx)
+                        cells(p, cellR * 1.1, .color(lightColor.opacity(0.5)), in: &ctx)
+                    } else if !lit.contains(key) {
+                        cells(p, cellR, .color(.white.opacity(0.09)), in: &ctx)
+                    }
                 }
             }
-            for (p, on) in lamps {
-                // housing
-                disc(p, lampR * 1.08, .color(.black.opacity(0.85)), in: &ctx)
-                ring(p, lampR * 1.08, .white.opacity(0.10), 1, in: &ctx)
-                if on {
-                    disc(p, lampR, .radialGradient(Gradient(colors: [Color(red: 1, green: 0.85, blue: 0.6), lightColor, lightColor.opacity(0.9)]),
-                                                   center: CGPoint(x: p.x - lampR * 0.2, y: p.y - lampR * 0.25), startRadius: 0, endRadius: lampR), in: &ctx)
-                    disc(CGPoint(x: p.x - lampR * 0.3, y: p.y - lampR * 0.35), lampR * 0.22, .color(.white.opacity(0.85)), in: &ctx)
-                } else {
-                    // dark lens: deep red glass, a faint rim, a whisper of reflection
-                    disc(p, lampR, .radialGradient(Gradient(colors: [lightColor.opacity(0.22), lightColor.opacity(0.10), Color.black.opacity(0.6)]),
-                                                   center: CGPoint(x: p.x - lampR * 0.2, y: p.y - lampR * 0.25), startRadius: 0, endRadius: lampR), in: &ctx)
-                    ring(p, lampR * 0.96, lightColor.opacity(0.22), 0.8, in: &ctx)
-                    disc(CGPoint(x: p.x - lampR * 0.32, y: p.y - lampR * 0.38), lampR * 0.16, .color(.white.opacity(0.10)), in: &ctx)
+
+            // lit lamps: one bloom per lamp, then every LED in the disc burns
+            ctx.drawLayer { layer in
+                layer.addFilter(.blur(radius: pitch * 1.0))
+                for (p, on) in lampCenters where on {
+                    disc(p, pitch * 2.6, .color(lightColor.opacity(0.7)), in: &layer)
                 }
+            }
+            for key in lit {
+                let p = center(key % 1000, key / 1000)
+                disc(p, hole * 0.95, .color(lightColor.opacity(0.4)), in: &ctx)
+                disc(p, hole * 0.72, .color(lightColor), in: &ctx)
+                disc(p, hole * 0.34, .color(.white.opacity(0.9)), in: &ctx)
             }
         }
         // taller than the grid so the bloom isn't clipped; the negative
         // padding hands the spare room back to the layout
-        .frame(height: 124)
-        .padding(.vertical, -14)
+        .frame(height: 100)
+        .padding(.vertical, -16)
     }
 }
