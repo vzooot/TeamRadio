@@ -152,16 +152,27 @@ struct DotMatrixBoard: View {
             // lit LEDs: a soft additive halo, a coloured point, a bright core
             let glowing = lit.map { (center($0.key % 1000, $0.key / 1000), $0.value) }
             // each lit LED: a small halo, a thin bright ring at the lens edge, a hot core
-            // a lit LED: one solid glowing disc with a soft edge, like the sample
+            // a lit LED: a glowing core in the middle of the cavity, its light
+            // catching the cavity wall as a thin reflected rim, plus a soft halo
             ctx.drawLayer { layer in
                 layer.blendMode = .plusLighter
-                layer.addFilter(.blur(radius: pitch * 0.16))
-                for (p, k) in glowing { disc(p, pitch * 0.3, .color(lightColor.opacity(0.55 * k)), in: &layer) }
+                layer.addFilter(.blur(radius: pitch * 0.14))
+                for (p, k) in glowing { disc(p, hole * 0.9, .color(lightColor.opacity(0.4 * k)), in: &layer) }
+            }
+            ctx.drawLayer { layer in
+                layer.blendMode = .plusLighter
+                layer.addFilter(.blur(radius: 0.7))
+                for (p, k) in glowing {
+                    let r = hole * 0.92
+                    layer.stroke(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r + 0.4, width: 2 * r, height: 2 * r)),
+                                 with: .color(lightColor.opacity(0.55 * k)), lineWidth: 1.1)
+                }
             }
             for (p, k) in glowing {
-                disc(p, pitch * 0.26, .radialGradient(
-                    Gradient(colors: [Color(red: 1.0, green: 0.6, blue: 0.3).opacity(k), Color(red: 1.0, green: 0.42, blue: 0.18).opacity(k), lightColor.opacity(0.85 * k)]),
-                    center: p, startRadius: 0, endRadius: pitch * 0.26), in: &ctx)
+                let core = hole * 0.56
+                disc(p, core, .radialGradient(
+                    Gradient(colors: [Color(red: 1.0, green: 0.7, blue: 0.4).opacity(k), Color(red: 1.0, green: 0.45, blue: 0.2).opacity(k), lightColor.opacity(0.9 * k)]),
+                    center: p, startRadius: 0, endRadius: core), in: &ctx)
             }
         }
         // a little taller than the grid so the halos aren't clipped
