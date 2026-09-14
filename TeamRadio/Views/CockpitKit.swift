@@ -122,20 +122,26 @@ struct DotMatrixBoard: View {
                     }
                 }
             }
-            /// Recessed hole with a faint lit lip along the bottom edge.
+            /// Deep recessed hole: lit lip along the bottom edge, shadow inside the
+            /// top, the floor darkest at the top where the wall shades it.
             func socket(_ p: CGPoint, in c: inout GraphicsContext) {
-                disc(CGPoint(x: p.x, y: p.y + 0.8), hole * 1.02, .color(.white.opacity(0.10)), in: &c)
-                disc(p, hole, .color(.black.opacity(0.78)), in: &c)
+                disc(CGPoint(x: p.x, y: p.y + 1.1), hole * 1.05, .color(.white.opacity(0.14)), in: &c)
+                disc(p, hole, .linearGradient(Gradient(colors: [Color.black.opacity(0.97), Color.black.opacity(0.62)]),
+                                              startPoint: CGPoint(x: p.x, y: p.y - hole), endPoint: CGPoint(x: p.x, y: p.y + hole)), in: &c)
+                c.stroke(Path(ellipseIn: rect(CGPoint(x: p.x, y: p.y - 0.5), hole * 0.9)), with: .color(.black.opacity(0.75)), lineWidth: 1.6)
             }
-            /// Flat LED: a plain disc, white-hot centre when lit, deep red when armed.
+            /// LED: white-hot centre falling off through orange to red — no hard dot.
             func lens(_ p: CGPoint, on: Bool, in c: inout GraphicsContext) {
                 if on {
-                    disc(p, hole * 0.9, .color(lightColor.opacity(0.45)), in: &c)
-                    disc(p, hole * 0.7, .color(lightColor), in: &c)
-                    disc(p, hole * 0.32, .color(.white.opacity(0.85)), in: &c)
+                    disc(p, hole * 0.86, .radialGradient(
+                        Gradient(stops: [.init(color: Color(red: 1, green: 0.96, blue: 0.85), location: 0),
+                                         .init(color: Color(red: 1, green: 0.62, blue: 0.35), location: 0.38),
+                                         .init(color: lightColor, location: 0.78),
+                                         .init(color: lightColor.opacity(0.55), location: 1)]),
+                        center: p, startRadius: 0, endRadius: hole * 0.86), in: &c)
                 } else {
-                    disc(p, hole * 0.82, .color(lightColor.opacity(0.09)), in: &c)
-                    cells(p, cellR * 1.1, .color(lightColor.opacity(0.28)), in: &c)
+                    disc(p, hole * 0.8, .radialGradient(Gradient(colors: [lightColor.opacity(0.3), lightColor.opacity(0.12), lightColor.opacity(0.03)]),
+                                                        center: p, startRadius: 0, endRadius: hole * 0.8), in: &c)
                 }
             }
 
@@ -154,22 +160,35 @@ struct DotMatrixBoard: View {
                 }
             }
 
-            // bloom under the lit lamps
-            ctx.drawLayer { layer in
-                layer.addFilter(.blur(radius: pitch * 1.0))
-                for (p, on) in lampCenters where on {
-                    disc(p, pitch * 2.5, .color(lightColor.opacity(0.5)), in: &layer)
+            // every hole is there; lamp holes carry an LED, the rest a faint cell matrix
+            for c in 0..<cols {
+                for r in 0..<rows {
+                    let p = center(c, r)
+                    socket(p, in: &ctx)
+                    let key = r * 1000 + c
+                    if armed.contains(key) {
+                        lens(p, on: false, in: &ctx)
+                    } else if !lit.contains(key) {
+                        cells(p, cellR, .color(.white.opacity(0.08)), in: &ctx)
+                    }
                 }
             }
 
-            for c in 0..<cols {
-                for r in 0..<rows {
-                    let key = r * 1000 + c
-                    guard lit.contains(key) || armed.contains(key) else { continue }
-                    let p = center(c, r)
-                    socket(p, in: &ctx)
-                    lens(p, on: lit.contains(key), in: &ctx)
+            // lit LEDs: each one blooms on its own, then a soft wash over the whole lamp
+            ctx.drawLayer { layer in
+                layer.addFilter(.blur(radius: pitch * 0.9))
+                for (p, on) in lampCenters where on {
+                    disc(p, pitch * 2.4, .color(lightColor.opacity(0.35)), in: &layer)
                 }
+            }
+            ctx.drawLayer { layer in
+                layer.addFilter(.blur(radius: hole * 0.7))
+                for key in lit {
+                    disc(center(key % 1000, key / 1000), hole * 1.05, .color(lightColor.opacity(0.9)), in: &layer)
+                }
+            }
+            for key in lit {
+                lens(center(key % 1000, key / 1000), on: true, in: &ctx)
             }
         }
         // taller than the grid so the bloom isn't clipped; the negative
