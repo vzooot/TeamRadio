@@ -100,19 +100,20 @@ struct DotMatrixBoard: View {
 
     var body: some View {
         Canvas { ctx, size in
-            let cols = 31                   // five 5-wide lamps, single gaps, one spare column each side
+            let cols = 29                   // five 5-wide lamps with single gaps, edge to edge
             let rows = 5
             let pitch = size.width / CGFloat(cols)
             let top = (size.height - CGFloat(rows) * pitch) / 2
-            let hole = pitch * 0.36
-            let cellStep = pitch * 0.13
-            let cellR = pitch * 0.04
+            let hole = pitch * 0.42
+            let cellStep = pitch * 0.14
+            let cellR = pitch * 0.042
 
             func center(_ col: Int, _ row: Int) -> CGPoint {
                 CGPoint(x: CGFloat(col) * pitch + pitch / 2, y: top + CGFloat(row) * pitch + pitch / 2)
             }
+            func rect(_ p: CGPoint, _ r: CGFloat) -> CGRect { CGRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r) }
             func disc(_ p: CGPoint, _ r: CGFloat, _ shading: GraphicsContext.Shading, in c: inout GraphicsContext) {
-                c.fill(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r)), with: shading)
+                c.fill(Path(ellipseIn: rect(p, r)), with: shading)
             }
             func cells(_ p: CGPoint, _ r: CGFloat, _ shading: GraphicsContext.Shading, in c: inout GraphicsContext) {
                 for dx in -1...1 {
@@ -121,13 +122,33 @@ struct DotMatrixBoard: View {
                     }
                 }
             }
+            /// Recessed hole: light from the top-left, so a shadow inside the top edge
+            /// and a thin lit lip along the bottom.
+            func socket(_ p: CGPoint, in c: inout GraphicsContext) {
+                disc(CGPoint(x: p.x, y: p.y + 0.9), hole * 1.02, .color(.white.opacity(0.11)), in: &c)
+                disc(p, hole, .color(.black.opacity(0.8)), in: &c)
+                c.stroke(Path(ellipseIn: rect(CGPoint(x: p.x, y: p.y + 0.7), hole * 0.86)), with: .color(.black.opacity(0.55)), lineWidth: 1.2)
+            }
+            func lens(_ p: CGPoint, on: Bool, in c: inout GraphicsContext) {
+                let r = hole * 0.78
+                let focus = CGPoint(x: p.x - r * 0.35, y: p.y - r * 0.4)
+                if on {
+                    disc(p, r, .radialGradient(Gradient(colors: [Color(red: 1, green: 0.8, blue: 0.55), lightColor, lightColor.opacity(0.75)]),
+                                               center: focus, startRadius: 0, endRadius: r * 1.15), in: &c)
+                    disc(CGPoint(x: p.x - r * 0.38, y: p.y - r * 0.42), r * 0.22, .color(.white.opacity(0.75)), in: &c)
+                } else {
+                    disc(p, r, .radialGradient(Gradient(colors: [lightColor.opacity(0.4), lightColor.opacity(0.16), Color.black.opacity(0.5)]),
+                                               center: focus, startRadius: 0, endRadius: r * 1.1), in: &c)
+                    disc(CGPoint(x: p.x - r * 0.38, y: p.y - r * 0.42), r * 0.2, .color(.white.opacity(0.12)), in: &c)
+                }
+            }
 
             // lamp c: a 5×5 block with the corners cut — reads as a disc
             var lit: Set<Int> = []          // key: row * 1000 + col
             var armed: Set<Int> = []
             var lampCenters: [(CGPoint, Bool)] = []
             for c in 0..<5 {
-                let cc = 3 + c * 6
+                let cc = 2 + c * 6
                 lampCenters.append((center(cc, 2), c < litLights))
                 for dc in -2...2 {
                     for dr in -2...2 where abs(dc) + abs(dr) <= 3 {
@@ -137,40 +158,32 @@ struct DotMatrixBoard: View {
                 }
             }
 
-            // every hole: dark recess with a rim; armed ones glow deep red, the rest stay grey
+            // bloom under the lit lamps
+            ctx.drawLayer { layer in
+                layer.addFilter(.blur(radius: pitch * 1.0))
+                for (p, on) in lampCenters where on {
+                    disc(p, pitch * 2.5, .color(lightColor.opacity(0.5)), in: &layer)
+                }
+            }
+
             for c in 0..<cols {
                 for r in 0..<rows {
                     let p = center(c, r)
-                    ctx.stroke(Path(ellipseIn: CGRect(x: p.x - hole, y: p.y - hole + 0.6, width: 2 * hole, height: 2 * hole)),
-                               with: .color(.white.opacity(0.07)), lineWidth: 0.8)
-                    disc(p, hole, .color(.black.opacity(0.7)), in: &ctx)
+                    socket(p, in: &ctx)
                     let key = r * 1000 + c
-                    if armed.contains(key) {
-                        disc(p, hole * 0.9, .color(lightColor.opacity(0.14)), in: &ctx)
-                        cells(p, cellR * 1.1, .color(lightColor.opacity(0.5)), in: &ctx)
-                    } else if !lit.contains(key) {
+                    if lit.contains(key) {
+                        lens(p, on: true, in: &ctx)
+                    } else if armed.contains(key) {
+                        lens(p, on: false, in: &ctx)
+                    } else {
                         cells(p, cellR, .color(.white.opacity(0.09)), in: &ctx)
                     }
                 }
             }
-
-            // lit lamps: one bloom per lamp, then every LED in the disc burns
-            ctx.drawLayer { layer in
-                layer.addFilter(.blur(radius: pitch * 1.0))
-                for (p, on) in lampCenters where on {
-                    disc(p, pitch * 2.6, .color(lightColor.opacity(0.7)), in: &layer)
-                }
-            }
-            for key in lit {
-                let p = center(key % 1000, key / 1000)
-                disc(p, hole * 0.95, .color(lightColor.opacity(0.4)), in: &ctx)
-                disc(p, hole * 0.72, .color(lightColor), in: &ctx)
-                disc(p, hole * 0.34, .color(.white.opacity(0.9)), in: &ctx)
-            }
         }
         // taller than the grid so the bloom isn't clipped; the negative
         // padding hands the spare room back to the layout
-        .frame(height: 100)
+        .frame(height: 104)
         .padding(.vertical, -16)
     }
 }
