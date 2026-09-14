@@ -46,9 +46,11 @@ struct CountdownView: View {
                 let demoLive = UserDefaults.standard.bool(forKey: "DemoLive")
 
                 if remaining > 0 && !demoLive {
-                    let lit = demoLights > 0 ? demoLights : StartLightsView.litCount(secondsRemaining: remaining)
+                    let realLit = StartLightsView.litCount(secondsRemaining: remaining)
+                    // TEMP preview: two lamps always on so lit vs. armed can be compared — revert later.
+                    let lit = demoLights > 0 ? demoLights : max(2, realLit)
                     DotMatrixBoard(litLights: lit)
-                    if lit > 0 {
+                    if demoLights > 0 || realLit > 0 {
                         Text(lit >= 5 ? "FINAL 24 HOURS" : "IT'S RACE WEEK")
                             .font(.f1(11, weight: .bold))
                             .tracking(3)

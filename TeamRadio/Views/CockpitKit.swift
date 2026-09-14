@@ -91,8 +91,8 @@ struct NeonTile: View {
     }
 }
 
-/// The start gantry as an LED matrix: five round lamps in a row, each a
-/// disc-shaped cluster of 21 LEDs. Dark red while armed, they light column
+/// The start gantry: five round lamps in a row, each a disc-shaped
+/// cluster of 21 LEDs. Dark red while armed, they light column
 /// by column through race week; lights out once the session is running.
 struct DotMatrixBoard: View {
     let litLights: Int
@@ -134,8 +134,8 @@ struct DotMatrixBoard: View {
                     disc(p, hole * 0.7, .color(lightColor), in: &c)
                     disc(p, hole * 0.32, .color(.white.opacity(0.85)), in: &c)
                 } else {
-                    disc(p, hole * 0.82, .color(lightColor.opacity(0.16)), in: &c)
-                    cells(p, cellR * 1.1, .color(lightColor.opacity(0.5)), in: &c)
+                    disc(p, hole * 0.82, .color(lightColor.opacity(0.09)), in: &c)
+                    cells(p, cellR * 1.1, .color(lightColor.opacity(0.28)), in: &c)
                 }
             }
 
@@ -164,16 +164,11 @@ struct DotMatrixBoard: View {
 
             for c in 0..<cols {
                 for r in 0..<rows {
+                    let key = r * 1000 + c
+                    guard lit.contains(key) || armed.contains(key) else { continue }
                     let p = center(c, r)
                     socket(p, in: &ctx)
-                    let key = r * 1000 + c
-                    if lit.contains(key) {
-                        lens(p, on: true, in: &ctx)
-                    } else if armed.contains(key) {
-                        lens(p, on: false, in: &ctx)
-                    } else {
-                        cells(p, cellR, .color(.white.opacity(0.09)), in: &ctx)
-                    }
+                    lens(p, on: lit.contains(key), in: &ctx)
                 }
             }
         }
