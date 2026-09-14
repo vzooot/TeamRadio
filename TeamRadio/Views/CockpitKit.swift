@@ -91,109 +91,85 @@ struct NeonTile: View {
     }
 }
 
-/// The start gantry: five round lamps in a row, each a disc-shaped
-/// cluster of 21 LEDs. Dark red while armed, they light column
-/// by column through race week; lights out once the session is running.
+/// The start gantry: five round lamps in a row, each a hexagonal cluster of
+/// 19 LEDs in deep sockets. Armed LEDs are dark red glass; lit ones are
+/// saturated red-orange points with an additive bloom, like a real lamp.
 struct DotMatrixBoard: View {
     let litLights: Int
     var lightColor: Color = Theme.live
 
     var body: some View {
         Canvas { ctx, size in
-            let cols = 29                   // five 5-wide lamps with single gaps, edge to edge
-            let rows = 5
-            let pitch = size.width / CGFloat(cols)
-            let top = (size.height - CGFloat(rows) * pitch) / 2
-            let hole = pitch * 0.42
-            let cellStep = pitch * 0.14
-            let cellR = pitch * 0.042
+            let s = size.width / 25                 // LED spacing: five lamps, five LEDs wide each
+            let ledR = s * 0.4
+            let midY = size.height / 2
 
-            func center(_ col: Int, _ row: Int) -> CGPoint {
-                CGPoint(x: CGFloat(col) * pitch + pitch / 2, y: top + CGFloat(row) * pitch + pitch / 2)
-            }
             func rect(_ p: CGPoint, _ r: CGFloat) -> CGRect { CGRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r) }
             func disc(_ p: CGPoint, _ r: CGFloat, _ shading: GraphicsContext.Shading, in c: inout GraphicsContext) {
                 c.fill(Path(ellipseIn: rect(p, r)), with: shading)
             }
-            func cells(_ p: CGPoint, _ r: CGFloat, _ shading: GraphicsContext.Shading, in c: inout GraphicsContext) {
-                for dx in -1...1 {
-                    for dy in -1...1 {
-                        disc(CGPoint(x: p.x + CGFloat(dx) * cellStep, y: p.y + CGFloat(dy) * cellStep), r, shading, in: &c)
-                    }
-                }
-            }
-            /// Deep recessed hole: lit lip along the bottom edge, shadow inside the
-            /// top, the floor darkest at the top where the wall shades it.
+            /// Deep socket: lit lip at the bottom, wall shadow inside the top.
             func socket(_ p: CGPoint, in c: inout GraphicsContext) {
-                disc(CGPoint(x: p.x, y: p.y + 1.1), hole * 1.05, .color(.white.opacity(0.14)), in: &c)
-                disc(p, hole, .linearGradient(Gradient(colors: [Color.black.opacity(0.97), Color.black.opacity(0.62)]),
-                                              startPoint: CGPoint(x: p.x, y: p.y - hole), endPoint: CGPoint(x: p.x, y: p.y + hole)), in: &c)
-                c.stroke(Path(ellipseIn: rect(CGPoint(x: p.x, y: p.y - 0.5), hole * 0.9)), with: .color(.black.opacity(0.75)), lineWidth: 1.6)
-            }
-            /// LED: white-hot centre falling off through orange to red — no hard dot.
-            func lens(_ p: CGPoint, on: Bool, in c: inout GraphicsContext) {
-                if on {
-                    disc(p, hole * 0.86, .radialGradient(
-                        Gradient(stops: [.init(color: Color(red: 1, green: 0.96, blue: 0.85), location: 0),
-                                         .init(color: Color(red: 1, green: 0.62, blue: 0.35), location: 0.38),
-                                         .init(color: lightColor, location: 0.78),
-                                         .init(color: lightColor.opacity(0.55), location: 1)]),
-                        center: p, startRadius: 0, endRadius: hole * 0.86), in: &c)
-                } else {
-                    disc(p, hole * 0.8, .radialGradient(Gradient(colors: [lightColor.opacity(0.3), lightColor.opacity(0.12), lightColor.opacity(0.03)]),
-                                                        center: p, startRadius: 0, endRadius: hole * 0.8), in: &c)
-                }
+                disc(CGPoint(x: p.x, y: p.y + 1.2), ledR * 1.12, .color(.white.opacity(0.13)), in: &c)
+                disc(p, ledR * 1.08, .linearGradient(Gradient(colors: [Color.black.opacity(0.97), Color.black.opacity(0.6)]),
+                                                     startPoint: CGPoint(x: p.x, y: p.y - ledR), endPoint: CGPoint(x: p.x, y: p.y + ledR)), in: &c)
+                c.stroke(Path(ellipseIn: rect(CGPoint(x: p.x, y: p.y - 0.6), ledR * 0.98)), with: .color(.black.opacity(0.7)), lineWidth: 1.6)
             }
 
-            // lamp c: a 5×5 block with the corners cut — reads as a disc
-            var lit: Set<Int> = []          // key: row * 1000 + col
-            var armed: Set<Int> = []
+            // 19 LEDs per lamp: centre, ring of 6 at s, ring of 12 at ~2s
+            var leds: [(CGPoint, Bool)] = []
             var lampCenters: [(CGPoint, Bool)] = []
-            for c in 0..<5 {
-                let cc = 2 + c * 6
-                lampCenters.append((center(cc, 2), c < litLights))
-                for dc in -2...2 {
-                    for dr in -2...2 where abs(dc) + abs(dr) <= 3 {
-                        let key = (2 + dr) * 1000 + cc + dc
-                        if c < litLights { lit.insert(key) } else { armed.insert(key) }
-                    }
+            for i in 0..<5 {
+                let on = i < litLights
+                let c = CGPoint(x: s * 2.5 + CGFloat(i) * 5 * s, y: midY)
+                lampCenters.append((c, on))
+                leds.append((c, on))
+                for k in 0..<6 {
+                    let a = CGFloat(k) * .pi / 3
+                    leds.append((CGPoint(x: c.x + s * cos(a), y: c.y + s * sin(a)), on))
+                    leds.append((CGPoint(x: c.x + 2 * s * cos(a), y: c.y + 2 * s * sin(a)), on))
+                    let b = a + .pi / 6
+                    leds.append((CGPoint(x: c.x + s * 1.732 * cos(b), y: c.y + s * 1.732 * sin(b)), on))
                 }
             }
 
-            // every hole is there; lamp holes carry an LED, the rest a faint cell matrix
-            for c in 0..<cols {
-                for r in 0..<rows {
-                    let p = center(c, r)
-                    socket(p, in: &ctx)
-                    let key = r * 1000 + c
-                    if armed.contains(key) {
-                        lens(p, on: false, in: &ctx)
-                    } else if !lit.contains(key) {
-                        cells(p, cellR, .color(.white.opacity(0.08)), in: &ctx)
-                    }
+            for (p, on) in leds {
+                socket(p, in: &ctx)
+                if !on {
+                    // dark red glass, a hint of the die inside
+                    disc(p, ledR * 0.82, .radialGradient(Gradient(colors: [lightColor.opacity(0.28), lightColor.opacity(0.1), Color.black.opacity(0.2)]),
+                                                         center: CGPoint(x: p.x, y: p.y - ledR * 0.15), startRadius: 0, endRadius: ledR * 0.82), in: &ctx)
                 }
             }
 
-            // lit LEDs: each one blooms on its own, then a soft wash over the whole lamp
+            // light is additive: wide lamp wash, then a tight halo per LED
+            let hot = Color(red: 1.0, green: 0.42, blue: 0.14)
             ctx.drawLayer { layer in
-                layer.addFilter(.blur(radius: pitch * 0.9))
-                for (p, on) in lampCenters where on {
-                    disc(p, pitch * 2.4, .color(lightColor.opacity(0.35)), in: &layer)
+                layer.blendMode = .plusLighter
+                layer.addFilter(.blur(radius: s * 1.4))
+                for (c, on) in lampCenters where on {
+                    disc(c, s * 2.8, .color(hot.opacity(0.32)), in: &layer)
                 }
             }
             ctx.drawLayer { layer in
-                layer.addFilter(.blur(radius: hole * 0.7))
-                for key in lit {
-                    disc(center(key % 1000, key / 1000), hole * 1.05, .color(lightColor.opacity(0.9)), in: &layer)
+                layer.blendMode = .plusLighter
+                layer.addFilter(.blur(radius: ledR * 0.9))
+                for (p, on) in leds where on {
+                    disc(p, ledR * 1.25, .color(hot.opacity(0.55)), in: &layer)
                 }
             }
-            for key in lit {
-                lens(center(key % 1000, key / 1000), on: true, in: &ctx)
+            for (p, on) in leds where on {
+                disc(p, ledR * 0.86, .radialGradient(
+                    Gradient(stops: [.init(color: Color(red: 1.0, green: 0.88, blue: 0.66), location: 0),
+                                     .init(color: Color(red: 1.0, green: 0.55, blue: 0.22), location: 0.3),
+                                     .init(color: Color(red: 1.0, green: 0.3, blue: 0.1), location: 0.75),
+                                     .init(color: Color(red: 0.85, green: 0.18, blue: 0.06), location: 1)]),
+                    center: CGPoint(x: p.x, y: p.y - ledR * 0.1), startRadius: 0, endRadius: ledR * 0.86), in: &ctx)
             }
         }
-        // taller than the grid so the bloom isn't clipped; the negative
+        // taller than the lamps so the bloom isn't clipped; the negative
         // padding hands the spare room back to the layout
-        .frame(height: 104)
-        .padding(.vertical, -16)
+        .frame(height: 112)
+        .padding(.vertical, -14)
     }
 }
