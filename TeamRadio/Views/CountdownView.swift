@@ -39,9 +39,12 @@ struct CountdownView: View {
                     let ticker = session.map {
                         $0.date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute())
                     } ?? ""
-                    DotMatrixBoard(text: ticker, litLights: StartLightsView.litCount(secondsRemaining: remaining))
-                    if remaining < 6 * 86400 {
-                        Text(remaining < 86400 ? "FINAL 24 HOURS" : "IT'S RACE WEEK")
+                    // TEMP screenshot hook: `-DemoLights 3` pretends race week is here.
+                    let demoLights = UserDefaults.standard.integer(forKey: "DemoLights")
+                    let lit = demoLights > 0 ? demoLights : StartLightsView.litCount(secondsRemaining: remaining)
+                    DotMatrixBoard(text: ticker, litLights: lit)
+                    if lit > 0 {
+                        Text(lit >= 5 ? "FINAL 24 HOURS" : "IT'S RACE WEEK")
                             .font(.f1(11, weight: .bold))
                             .tracking(3)
                             .foregroundStyle(Theme.live)
