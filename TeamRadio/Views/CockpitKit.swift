@@ -122,24 +122,20 @@ struct DotMatrixBoard: View {
                     }
                 }
             }
-            /// Recessed hole: light from the top-left, so a shadow inside the top edge
-            /// and a thin lit lip along the bottom.
+            /// Recessed hole with a faint lit lip along the bottom edge.
             func socket(_ p: CGPoint, in c: inout GraphicsContext) {
-                disc(CGPoint(x: p.x, y: p.y + 0.9), hole * 1.02, .color(.white.opacity(0.11)), in: &c)
-                disc(p, hole, .color(.black.opacity(0.8)), in: &c)
-                c.stroke(Path(ellipseIn: rect(CGPoint(x: p.x, y: p.y + 0.7), hole * 0.86)), with: .color(.black.opacity(0.55)), lineWidth: 1.2)
+                disc(CGPoint(x: p.x, y: p.y + 0.8), hole * 1.02, .color(.white.opacity(0.10)), in: &c)
+                disc(p, hole, .color(.black.opacity(0.78)), in: &c)
             }
+            /// Flat LED: a plain disc, white-hot centre when lit, deep red when armed.
             func lens(_ p: CGPoint, on: Bool, in c: inout GraphicsContext) {
-                let r = hole * 0.78
-                let focus = CGPoint(x: p.x - r * 0.35, y: p.y - r * 0.4)
                 if on {
-                    disc(p, r, .radialGradient(Gradient(colors: [Color(red: 1, green: 0.8, blue: 0.55), lightColor, lightColor.opacity(0.75)]),
-                                               center: focus, startRadius: 0, endRadius: r * 1.15), in: &c)
-                    disc(CGPoint(x: p.x - r * 0.38, y: p.y - r * 0.42), r * 0.22, .color(.white.opacity(0.75)), in: &c)
+                    disc(p, hole * 0.9, .color(lightColor.opacity(0.45)), in: &c)
+                    disc(p, hole * 0.7, .color(lightColor), in: &c)
+                    disc(p, hole * 0.32, .color(.white.opacity(0.85)), in: &c)
                 } else {
-                    disc(p, r, .radialGradient(Gradient(colors: [lightColor.opacity(0.4), lightColor.opacity(0.16), Color.black.opacity(0.5)]),
-                                               center: focus, startRadius: 0, endRadius: r * 1.1), in: &c)
-                    disc(CGPoint(x: p.x - r * 0.38, y: p.y - r * 0.42), r * 0.2, .color(.white.opacity(0.12)), in: &c)
+                    disc(p, hole * 0.82, .color(lightColor.opacity(0.16)), in: &c)
+                    cells(p, cellR * 1.1, .color(lightColor.opacity(0.5)), in: &c)
                 }
             }
 
