@@ -171,6 +171,9 @@ struct DotMatrixBoard: View {
                 disc(p, hole * (corner ? 0.26 : 0.36), .color(.white.opacity(corner ? 0.6 : 0.9)), in: &ctx)
             }
         }
-        .frame(height: 104)
+        // Taller than the grid so the lamp bloom isn't clipped; the negative
+        // padding hands the spare room back to the layout.
+        .frame(height: 156)
+        .padding(.vertical, -18)
     }
 }

@@ -39,12 +39,16 @@ struct ContentView: View {
         ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
+                if let race = model.nextRace {
+                    // Broadcast-style LIVE bar sits above everything, so the
+                    // helmet below still hangs over the race card.
+                    LiveSessionBanner(race: race)
+                }
+
                 HeaderView(onInfo: { showAbout = true })
                     .padding(.bottom, -6)
 
                 if let race = model.nextRace {
-                    LiveSessionBanner(race: race)
-
                     RaceHeroView(race: race)
 
                     CountdownView(race: race)
@@ -261,9 +265,11 @@ struct LiveSessionBanner: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
             let now = context.date
+            // TEMP screenshot hook: `-DemoLive YES` pretends the next session started 23 minutes ago.
+            let demoLive = UserDefaults.standard.bool(forKey: "DemoLive")
             let live = race.sessions.first {
                 $0.date <= now && now < $0.date.addingTimeInterval($0.kind.expectedDuration)
-            }
+            } ?? (demoLive ? race.sessions.first { $0.date > now } : nil)
 
             if let live {
                 HStack(spacing: 12) {
@@ -286,7 +292,7 @@ struct LiveSessionBanner: View {
                     Spacer()
 
                     VStack(alignment: .trailing, spacing: 1) {
-                        SessionClock(start: live.date)
+                        SessionClock(start: demoLive ? now.addingTimeInterval(-23 * 60 - 41) : live.date)
                             .font(.f1Digits(19))
                             .foregroundStyle(.white)
                         Text("SESSION TIME")
