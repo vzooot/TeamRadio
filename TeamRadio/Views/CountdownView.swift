@@ -104,13 +104,20 @@ struct CountdownView: View {
                 pinned = true
             }
         } label: {
-            BrushedBar(lit: pinned) {
-                HStack(spacing: 6) {
-                    Image(systemName: pinned ? "pin.slash.fill" : "pin.fill")
-                        .font(.system(size: 11, weight: .bold))
-                    Text(pinned ? "UNPIN FROM LOCK SCREEN" : "PIN \(session.kind.short) TO LOCK SCREEN")
-                }
+            HStack(spacing: 6) {
+                Image(systemName: pinned ? "pin.slash.fill" : "pin.fill")
+                    .font(.system(size: 11, weight: .bold))
+                Text(pinned ? "UNPIN FROM LOCK SCREEN" : "PIN \(session.kind.short) TO LOCK SCREEN")
+                    .font(.f1(12, weight: .bold))
+                    .tracking(1)
             }
+            .foregroundStyle(pinned ? Theme.dimText : Theme.accent)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 9)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(pinned ? Theme.cardStroke : Theme.accent.opacity(0.5), lineWidth: 1)
+            )
         }
         .buttonStyle(.plain)
     }
