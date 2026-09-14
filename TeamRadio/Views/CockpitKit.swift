@@ -19,10 +19,10 @@ enum Cockpit {
                 for j in 0..<n {
                     let rect = CGRect(x: CGFloat(i) * cell, y: CGFloat(j) * cell, width: cell, height: cell).insetBy(dx: 0.2, dy: 0.2)
                     let light = (i + j) % 2 == 0
-                    c.setFillColor(UIColor(white: light ? 0.075 : 0.058, alpha: 1).cgColor)
+                    c.setFillColor(UIColor(white: light ? 0.105 : 0.06, alpha: 1).cgColor)
                     c.fill(rect)
                     // sheen on the raised threads
-                    c.setStrokeColor(UIColor(white: 1, alpha: light ? 0.035 : 0.012).cgColor)
+                    c.setStrokeColor(UIColor(white: 1, alpha: light ? 0.06 : 0.015).cgColor)
                     c.setLineWidth(0.7)
                     c.move(to: CGPoint(x: rect.minX, y: light ? rect.maxY : rect.minY))
                     c.addLine(to: CGPoint(x: rect.maxX, y: light ? rect.minY : rect.maxY))
@@ -118,103 +118,93 @@ struct NeonTile: View {
     }
 }
 
-/// Dot-matrix LED board: a 5×7 pixel ticker on the left, the five-column
-/// start gantry on the right. Lit LEDs bloom, unlit ones sit dark in the grid.
+/// Dot-matrix LED board: large LEDs in dark sockets on the carbon, a 3×5
+/// ticker lit cyan on the left, the five-column start gantry lit orange on
+/// the right. Lit LEDs bloom; unlit ones stay as dim sockets.
 struct DotMatrixBoard: View {
     let text: String
     let litLights: Int
     var textColor: Color = Theme.accent
     var lightColor: Color = Theme.live
 
+    // 3 columns × 5 rows, top row first
     private static let glyphs: [Character: String] = [
-        "0": ".###.#...##..###.#.###..##...#.###.", "1": "..#...##....#....#....#....#...###.",
-        "2": ".###.#...#....#...#...#...#...#####", "3": "#####...#...#.....#.....##...#.###.",
-        "4": "...#...##..#.#.#..#.#####...#....#.", "5": "######....####.....#....##...#.###.",
-        "6": "..###.#...#....####.#...##...#.###.", "7": "#####....#...#...#...#....#....#...",
-        "8": ".###.#...##...#.###.#...##...#.###.", "9": ".###.#...##...#.####....#...#.###..",
-        "A": ".###.#...##...#######...##...##...#", "B": "####.#...##...#####.#...##...#####.",
-        "C": ".###.#...##....#....#....#...#.###.", "D": "###..#..#.#...##...##...##..#.###..",
-        "E": "######....#....####.#....#....#####", "F": "######....#....####.#....#....#....",
-        "G": ".###.#...##....#.####...##...#.####", "H": "#...##...##...#######...##...##...#",
-        "I": ".###...#....#....#....#....#...###.", "J": "..###...#....#....#....#.#..#..##..",
-        "K": "#...##..#.#.#..##...#.#..#..#.#...#", "L": "#....#....#....#....#....#....#####",
-        "M": "#...###.###.#.##.#.##...##...##...#", "N": "#...##...###..##.#.##..###...##...#",
-        "O": ".###.#...##...##...##...##...#.###.", "P": "####.#...##...#####.#....#....#....",
-        "Q": ".###.#...##...##...##.#.##..#..##.#", "R": "####.#...##...#####.#.#..#..#.#...#",
-        "S": ".#####....#.....###.....#....#####.", "T": "#####..#....#....#....#....#....#..",
-        "U": "#...##...##...##...##...##...#.###.", "V": "#...##...##...##...##...#.#.#...#..",
-        "W": "#...##...##...##.#.##.#.###.###...#", "X": "#...##...#.#.#...#...#.#.#...##...#",
-        "Y": "#...##...#.#.#...#....#....#....#..", "Z": "#####....#...#...#...#...#....#####",
-        ":": ".......#....#..........#....#......", ".": "..........................##...##..",
-        "-": "...............###.................", "/": "....#...#....#...#...#....#...#....",
-        " ": "...................................",
+        "0": "####.##.##.####", "1": ".#.##..#..#.###", "2": "###..#####..###", "3": "###..####..####",
+        "4": "#.##.####..#..#", "5": "####..###..####", "6": "####..####.####", "7": "###..#..#..#..#",
+        "8": "####.#####.####", "9": "####.####..####",
+        "A": "####.#####.##.#", "B": "##.#.###.#.###.", "C": "####..#..#..###", "D": "##.#.##.##.###.",
+        "E": "####..####..###", "F": "####..####..#..", "G": "####..#.##.####", "H": "#.##.#####.##.#",
+        "I": "###.#..#..#.###", "J": "..#..#..##.####", "K": "#.##.###.#.##.#", "L": "#..#..#..#..###",
+        "M": "#.########.##.#", "N": "##.#.##.##.##.#", "O": "####.##.##.####", "P": "####.#####..#..",
+        "Q": "####.##.####..#", "R": "####.###.#.##.#", "S": "####..###..####", "T": "###.#..#..#..#.",
+        "U": "#.##.##.##.####", "V": "#.##.##.##.#.#.", "W": "#.##.########.#", "X": "#.##.#.#.#.##.#",
+        "Y": "#.##.####.#..#.", "Z": "###..#.#.#..###", ":": "....#.....#....", "-": "......###......",
+        ".": "............#..", " ": "...............",
     ]
 
-    private var textColumns: Int { text.count * 6 - 1 }
-
     var body: some View {
-        GeometryReader { geo in
-            Canvas { ctx, size in
-                // One uniform LED grid across the whole board; the ticker
-                // lights the left, the gantry lights the right.
-                let gantryCols = 5 * 3
-                let pitch = min(5.2, max(3.0, size.width / CGFloat(textColumns + 4 + gantryCols)))
-                let dot = pitch * 0.6
-                let rows = 7
-                let cols = Int(size.width / pitch)
-                let x0 = (size.width - CGFloat(cols) * pitch) / 2
-                let top = (size.height - CGFloat(rows) * pitch) / 2
+        Canvas { ctx, size in
+            let textCols = text.count * 4 - 1
+            let gantryCols = 9                      // 5 lamps, one dark column between
+            let cols = textCols + 2 + gantryCols
+            let pitch = min(11, size.width / CGFloat(cols))
+            let rows = 7                            // 5 for glyphs + a blank socket row above and below
+            let gridCols = Int(size.width / pitch)
+            let x0 = (size.width - CGFloat(gridCols) * pitch) / 2
+            let top = (size.height - CGFloat(rows) * pitch) / 2
 
-                func center(_ col: Int, _ row: Int) -> CGPoint {
-                    CGPoint(x: x0 + CGFloat(col) * pitch + pitch / 2, y: top + CGFloat(row) * pitch + pitch / 2)
-                }
-                func led(_ p: CGPoint, _ r: CGFloat, _ color: Color, in c: inout GraphicsContext) {
-                    c.fill(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r)), with: .color(color))
-                }
+            func center(_ col: Int, _ row: Int) -> CGPoint {
+                CGPoint(x: x0 + CGFloat(col) * pitch + pitch / 2, y: top + CGFloat(row) * pitch + pitch / 2)
+            }
+            func disc(_ p: CGPoint, _ r: CGFloat, _ shading: GraphicsContext.Shading, in c: inout GraphicsContext) {
+                c.fill(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r)), with: shading)
+            }
 
-                // dark LEDs everywhere
-                for col in 0..<cols {
-                    for row in 0..<rows {
-                        led(center(col, row), dot / 2, Color.white.opacity(0.10), in: &ctx)
-                    }
-                }
-
-                // ticker glyphs
-                var cyan: [CGPoint] = []
-                var col = 0
-                for ch in text.uppercased() {
-                    let bits = Array(Self.glyphs[ch] ?? Self.glyphs[" "]!)
-                    for row in 0..<rows {
-                        for k in 0..<5 where bits[row * 5 + k] == "#" && col + k < cols {
-                            cyan.append(center(col + k, row))
-                        }
-                    }
-                    col += 6
-                }
-
-                // gantry: 5 columns on the right, two 2×2 lamps each, lit from the left
-                var orange: [CGPoint] = []
-                var dark: [CGPoint] = []
-                for c in 0..<5 {
-                    let gc = cols - 3 - (4 - c) * 3
-                    for row in [1, 2, 4, 5] {
-                        for k in 0..<2 {
-                            if c < litLights { orange.append(center(gc + k, row)) } else { dark.append(center(gc + k, row)) }
-                        }
-                    }
-                }
-                for p in dark { led(p, dot / 2, lightColor.opacity(0.42), in: &ctx) }
-
-                for (points, color) in [(cyan, textColor), (orange, lightColor)] where !points.isEmpty {
-                    ctx.drawLayer { layer in
-                        layer.addFilter(.blur(radius: pitch * 0.8))
-                        for p in points { led(p, dot * 0.9, color.opacity(0.9), in: &layer) }
-                    }
-                    for p in points { led(p, dot / 2, color, in: &ctx) }
-                    for p in points { led(p, dot / 4, .white.opacity(0.7), in: &ctx) }
+            // sockets: every LED position, dark with a faint rim
+            let socket = pitch * 0.32
+            for col in 0..<gridCols {
+                for row in 0..<rows {
+                    let p = center(col, row)
+                    disc(p, socket, .color(.black.opacity(0.55)), in: &ctx)
+                    ctx.stroke(Path(ellipseIn: CGRect(x: p.x - socket, y: p.y - socket, width: 2 * socket, height: 2 * socket)),
+                               with: .color(.white.opacity(0.07)), lineWidth: 0.8)
+                    disc(p, pitch * 0.11, .color(.white.opacity(0.10)), in: &ctx)
                 }
             }
+
+            // ticker glyphs, rows 1...5
+            var cyan: [CGPoint] = []
+            var col = 0
+            for ch in text.uppercased() {
+                let bits = Array(Self.glyphs[ch] ?? Self.glyphs[" "]!)
+                for row in 0..<5 {
+                    for k in 0..<3 where row * 3 + k < bits.count && bits[row * 3 + k] == "#" && col + k < gridCols {
+                        cyan.append(center(col + k, row + 1))
+                    }
+                }
+                col += 4
+            }
+
+            // gantry: 5 columns, one LED on row 2 and one on row 4, lit from the left
+            var orange: [CGPoint] = []
+            var off: [CGPoint] = []
+            for c in 0..<5 {
+                let gc = gridCols - 1 - (4 - c) * 2
+                for row in [2, 4] {
+                    if c < litLights { orange.append(center(gc, row)) } else { off.append(center(gc, row)) }
+                }
+            }
+            for p in off { disc(p, pitch * 0.16, .color(lightColor.opacity(0.35)), in: &ctx) }
+
+            for (points, color) in [(cyan, textColor), (orange, lightColor)] where !points.isEmpty {
+                ctx.drawLayer { layer in
+                    layer.addFilter(.blur(radius: pitch * 0.55))
+                    for p in points { disc(p, pitch * 0.34, .color(color.opacity(0.85)), in: &layer) }
+                }
+                for p in points { disc(p, pitch * 0.2, .color(color), in: &ctx) }
+                for p in points { disc(p, pitch * 0.09, .color(.white.opacity(0.85)), in: &ctx) }
+            }
         }
-        .frame(height: 46)
+        .frame(height: 64)
     }
 }

@@ -9,20 +9,8 @@ struct ContentView: View {
             Theme.background.ignoresSafeArea()
 
             RadialGradient(
-                colors: [Theme.accent.opacity(0.18), .clear],
-                center: .top, startRadius: 0, endRadius: 420
-            )
-            .ignoresSafeArea()
-
-            RadialGradient(
                 colors: [Theme.live.opacity(0.10), .clear],
                 center: .bottomTrailing, startRadius: 0, endRadius: 460
-            )
-            .ignoresSafeArea()
-
-            RadialGradient(
-                colors: [Theme.violet.opacity(0.08), .clear],
-                center: .leading, startRadius: 0, endRadius: 420
             )
             .ignoresSafeArea()
 
