@@ -233,59 +233,72 @@ struct DotMatrixBoard: View {
                     for (key, v) in goal { if v > 0 { lit[key] = 1 } else { armed.insert(key) } }
                 }
 
-                // sockets: dark cavity with a faint rim; unlit ones show the 3×3 grey die
+                // sockets, lit from above like the reference: a thin lip that brightens
+                // along the bottom edge, a cavity shaded dark at the top and lighter at
+                // the floor, soft shadow inside the top wall, soft light on the far wall
+                var sockets: [CGPoint] = []
+                for c in 0..<cols { for r in 0..<rows { sockets.append(center(c, r)) } }
+                for p in sockets {
+                    ctx.stroke(Path(ellipseIn: rect(p, hole * 1.03)),
+                               with: .linearGradient(Gradient(colors: [Color.white.opacity(0.03), Color.white.opacity(0.18)]),
+                                                     startPoint: CGPoint(x: p.x, y: p.y - hole), endPoint: CGPoint(x: p.x, y: p.y + hole)),
+                               lineWidth: 1.3)
+                    disc(p, hole, .linearGradient(Gradient(colors: [Color.black.opacity(0.97), Color.black.opacity(0.72)]),
+                                                  startPoint: CGPoint(x: p.x, y: p.y - hole), endPoint: CGPoint(x: p.x, y: p.y + hole)), in: &ctx)
+                }
+                ctx.drawLayer { layer in
+                    layer.addFilter(.blur(radius: 1.3))
+                    for p in sockets {
+                        layer.stroke(Path(ellipseIn: rect(CGPoint(x: p.x, y: p.y - 1.3), hole * 0.9)), with: .color(.black.opacity(0.8)), lineWidth: 2.2)
+                        layer.stroke(Path(ellipseIn: rect(CGPoint(x: p.x, y: p.y + 1.1), hole * 0.9)), with: .color(.white.opacity(0.12)), lineWidth: 1.6)
+                    }
+                }
+                // unlit: the 3×3 grey die
                 for c in 0..<cols {
                     for r in 0..<rows {
-                        let p = center(c, r)
                         let key = r * 1000 + c
-                        // bevelled cavity, lit from the top-left: bright lip and shadowed
-                        // wall on that side, shadowed lip and lit wall on the far side
-                        disc(CGPoint(x: p.x + 0.9, y: p.y + 0.9), hole * 1.1, .color(.black.opacity(0.6)), in: &ctx)
-                        disc(CGPoint(x: p.x - 0.8, y: p.y - 0.8), hole * 1.08, .color(.white.opacity(0.16)), in: &ctx)
-                        disc(p, hole * 1.02, .color(.black.opacity(0.95)), in: &ctx)
-                        disc(p, hole * 0.94, .linearGradient(Gradient(colors: [Color.black.opacity(0.95), Color.white.opacity(0.09)]),
-                                                             startPoint: CGPoint(x: p.x - hole, y: p.y - hole), endPoint: CGPoint(x: p.x + hole, y: p.y + hole)), in: &ctx)
-                        ctx.stroke(Path(ellipseIn: rect(CGPoint(x: p.x - 0.7, y: p.y - 0.7), hole * 0.9)), with: .color(.black.opacity(0.7)), lineWidth: 1.4)
-                        ctx.stroke(Path(ellipseIn: rect(CGPoint(x: p.x + 0.6, y: p.y + 0.6), hole * 0.86)), with: .color(.white.opacity(0.10)), lineWidth: 1.0)
-                        if lit[key] == nil {
-                            let tint: Color = armed.contains(key) ? lightColor.opacity(0.35) : .white.opacity(0.17)
-                            for dx in -1...1 {
-                                for dy in -1...1 {
-                                    let q = CGPoint(x: p.x + CGFloat(dx) * dieStep, y: p.y + CGFloat(dy) * dieStep)
-                                    ctx.fill(Path(roundedRect: CGRect(x: q.x - die / 2, y: q.y - die / 2, width: die, height: die), cornerRadius: die * 0.2), with: .color(tint))
-                                }
+                        guard lit[key] == nil else { continue }
+                        let p = center(c, r)
+                        let tint: Color = armed.contains(key) ? lightColor.opacity(0.4) : Color(white: 0.55).opacity(0.7)
+                        for dx in -1...1 {
+                            for dy in -1...1 {
+                                let q = CGPoint(x: p.x + CGFloat(dx) * dieStep, y: p.y + CGFloat(dy) * dieStep)
+                                ctx.fill(Path(roundedRect: CGRect(x: q.x - die / 2, y: q.y - die / 2, width: die, height: die), cornerRadius: die * 0.18), with: .color(tint))
                             }
                         }
                     }
                 }
 
-                // lit LEDs: soft halo outside, light caught on the cavity wall, a big soft-edged core
+                // lit LEDs: a soft halo on the surface, the cavity rim catching the
+                // colour, then the big soft-edged luminous disc
                 let glowing = lit.map { (center($0.key % 1000, $0.key / 1000), $0.value) }
                 ctx.drawLayer { layer in
                     layer.blendMode = .plusLighter
                     layer.addFilter(.blur(radius: hole * 0.7))
-                    for (p, k) in glowing { disc(p, hole * 1.1, .color(color.opacity(0.32 * k)), in: &layer) }
+                    for (p, k) in glowing { disc(p, hole * 1.1, .color(color.opacity(0.3 * k)), in: &layer) }
                 }
                 ctx.drawLayer { layer in
                     layer.blendMode = .plusLighter
-                    layer.addFilter(.blur(radius: 0.6))
+                    layer.addFilter(.blur(radius: 1.0))
                     for (p, k) in glowing {
-                        layer.stroke(Path(ellipseIn: rect(p, hole * 0.97)), with: .color(color.opacity(0.5 * k)), lineWidth: 1)
+                        layer.stroke(Path(ellipseIn: rect(p, hole * 1.02)), with: .color(color.opacity(0.6 * k)), lineWidth: 1.4)
                     }
                 }
                 let warm = page == 0
-                for (p, k) in glowing {
-                    let core = hole * 0.78
-                    let stops: [Gradient.Stop] = warm
-                        ? [.init(color: Color(red: 1.0, green: 0.88, blue: 0.55), location: 0),
-                           .init(color: Color(red: 1.0, green: 0.62, blue: 0.25), location: 0.55),
-                           .init(color: Color(red: 1.0, green: 0.4, blue: 0.15), location: 1)]
-                        : [.init(color: Color(red: 0.85, green: 1.0, blue: 1.0), location: 0),
-                           .init(color: Color(red: 0.45, green: 0.92, blue: 1.0), location: 0.55),
-                           .init(color: Color(red: 0.15, green: 0.75, blue: 0.95), location: 1)]
-                    ctx.opacity = 0.35 + 0.65 * k
-                    disc(p, core, .radialGradient(Gradient(stops: stops), center: p, startRadius: 0, endRadius: core), in: &ctx)
-                    ctx.opacity = 1
+                ctx.drawLayer { layer in
+                    layer.addFilter(.blur(radius: 0.5))
+                    for (p, k) in glowing {
+                        let core = hole * 0.8
+                        let stops: [Gradient.Stop] = warm
+                            ? [.init(color: Color(red: 1.0, green: 0.86, blue: 0.5), location: 0),
+                               .init(color: Color(red: 1.0, green: 0.62, blue: 0.25), location: 0.6),
+                               .init(color: Color(red: 1.0, green: 0.45, blue: 0.15), location: 1)]
+                            : [.init(color: Color(red: 0.85, green: 1.0, blue: 1.0), location: 0),
+                               .init(color: Color(red: 0.38, green: 0.9, blue: 1.0), location: 0.6),
+                               .init(color: Color(red: 0.18, green: 0.78, blue: 0.95), location: 1)]
+                        layer.opacity = 0.35 + 0.65 * k
+                        disc(p, core, .radialGradient(Gradient(stops: stops), center: CGPoint(x: p.x, y: p.y - core * 0.15), startRadius: 0, endRadius: core * 1.05), in: &layer)
+                    }
                 }
             }
         }
