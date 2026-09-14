@@ -33,6 +33,13 @@ struct CountdownView: View {
             VStack(spacing: 14) {
                 sessionPicker(now: now, selected: session)
 
+                if let session {
+                    Text("\(session.kind.rawValue.uppercased()) · \(session.date.formatted(.dateTime.weekday(.wide).hour().minute()).uppercased())")
+                        .font(.f1(12, weight: .bold))
+                        .tracking(2)
+                        .foregroundStyle(Theme.dimText)
+                }
+
                 // TEMP screenshot hooks: `-DemoLights 3` pretends race week is here,
                 // `-DemoLive YES` pretends the session has started.
                 let demoLights = UserDefaults.standard.integer(forKey: "DemoLights")
@@ -42,8 +49,7 @@ struct CountdownView: View {
                     let realLit = StartLightsView.litCount(secondsRemaining: remaining)
                     // TEMP preview: two lamps always on so lit vs. armed can be compared — revert later.
                     let lit = demoLights > 0 ? demoLights : max(2, realLit)
-                    let ticker = session.map { $0.date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute()) } ?? ""
-                    DotMatrixBoard(text: ticker, litLights: lit)
+                    DotMatrixBoard(litLights: lit)
                     if demoLights > 0 || realLit > 0 {
                         Text(lit >= 5 ? "FINAL 24 HOURS" : "IT'S RACE WEEK")
                             .font(.f1(11, weight: .bold))
@@ -71,7 +77,7 @@ struct CountdownView: View {
                     .padding(.bottom, 10)
                 } else if let session, demoLive || now < session.date.addingTimeInterval(session.kind.expectedDuration) {
                     // Lights out: the gantry goes dark the moment the session starts.
-                    DotMatrixBoard(text: session.date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute()), litLights: 0)
+                    DotMatrixBoard(litLights: 0)
                     liveBanner(session)
                 } else {
                     Text("🏁 \(session?.kind.rawValue.uppercased() ?? "SESSION") COMPLETE")
@@ -130,31 +136,23 @@ struct CountdownView: View {
     }
 
     private func sessionPicker(now: Date, selected: WeekendSession?) -> some View {
-        HStack(spacing: 6) {
-            ForEach(sessions) { session in
-                let isSelected = session.id == selected?.id
-                Button {
-                    selectedId = session.id
-                } label: {
-                    Text(session.kind.short)
-                        .font(.f1(13).italic())
-                        .foregroundStyle(isSelected ? .white : Theme.dimText)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 7)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(isSelected ? Theme.accent : Color.white.opacity(0.06))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .strokeBorder(
-                                    isSelected ? .clear : (session.date <= now ? .clear : Theme.cardStroke),
-                                    lineWidth: 1
-                                )
-                        )
-                        .opacity(session.date <= now && !isSelected ? 0.45 : 1)
+        GlassRow(spacing: 6) {
+            HStack(spacing: 6) {
+                ForEach(sessions) { session in
+                    let isSelected = session.id == selected?.id
+                    Button {
+                        selectedId = session.id
+                    } label: {
+                        Text(session.kind.short)
+                            .font(.f1(13).italic())
+                            .foregroundStyle(isSelected ? .white : Theme.dimText)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .modifier(GlassChip(selected: isSelected))
+                            .opacity(session.date <= now && !isSelected ? 0.45 : 1)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
         }
     }

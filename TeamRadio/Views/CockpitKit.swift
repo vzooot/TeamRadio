@@ -91,22 +91,13 @@ struct NeonTile: View {
     }
 }
 
-/// The LED board: a sparse matrix of small sockets. The session time is lit
-/// in pale cyan on the left; the five start-light columns sit at the right
-/// as small orange points (two per column), lit from the left as race week
-/// counts down. Lights out once the session runs.
+/// The LED board: a sparse matrix of small sockets carrying the five start
+/// lights — each a small round cluster of five LEDs, spread across the board
+/// and lit from the left as race week counts down. Lights out once the
+/// session runs.
 struct DotMatrixBoard: View {
-    let text: String
     let litLights: Int
-    var textColor: Color = Color(red: 0.62, green: 0.93, blue: 1.0)
     var lightColor: Color = Color(red: 1.0, green: 0.5, blue: 0.2)
-
-    // 3 columns × 5 rows, top row first
-    private static let glyphs: [Character: String] = [
-        "0": "####.##.##.####", "1": ".#.##..#..#.###", "2": "###..#####..###", "3": "###..####..####",
-        "4": "#.##.####..#..#", "5": "####..###..####", "6": "####..####.####", "7": "###..#..#..#..#",
-        "8": "####.#####.####", "9": "####.####..####", ":": "....#.....#....", " ": "...............",
-    ]
 
     var body: some View {
         Canvas { ctx, size in
@@ -125,23 +116,17 @@ struct DotMatrixBoard: View {
                 c.fill(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r)), with: shading)
             }
 
-            // which sockets are lit, and in what colour
-            var lit: [Int: Color] = [:]          // key: row * 1000 + col
-            var col = 0
-            for ch in text {
-                let bits = Array(Self.glyphs[ch] ?? Self.glyphs[" "]!)
-                for row in 0..<5 {
-                    for k in 0..<3 where bits[row * 3 + k] == "#" && col + k < cols - 6 {
-                        lit[row * 1000 + col + k] = textColor
-                    }
-                }
-                col += 4
-            }
+            // five lights, evenly spread: each a plus-shaped cluster of five LEDs
+            var lit: [Int: CGFloat] = [:]   // key: row * 1000 + col, value: intensity
             var armed: Set<Int> = []
             for c in 0..<5 {
-                let gc = cols - 5 + c
-                for row in [1, 3] {
-                    if c < litLights { lit[row * 1000 + gc] = lightColor } else { armed.insert(row * 1000 + gc) }
+                let cc = 2 + c * 5
+                for dc in -1...1 {
+                    for dr in -1...1 {
+                        let key = (2 + dr) * 1000 + cc + dc
+                        let corner = dc != 0 && dr != 0
+                        if c < litLights { lit[key] = corner ? 0.45 : 1 } else { armed.insert(key) }
+                    }
                 }
             }
 
@@ -168,15 +153,46 @@ struct DotMatrixBoard: View {
             ctx.drawLayer { layer in
                 layer.blendMode = .plusLighter
                 layer.addFilter(.blur(radius: pitch * 0.45))
-                for (p, color) in glowing { disc(p, pitch * 0.42, .color(color.opacity(0.5)), in: &layer) }
+                for (p, k) in glowing { disc(p, pitch * 0.42, .color(lightColor.opacity(0.5 * k)), in: &layer) }
             }
-            for (p, color) in glowing {
-                disc(p, pitch * 0.2, .color(color), in: &ctx)
-                disc(p, pitch * 0.09, .color(.white.opacity(0.9)), in: &ctx)
+            for (p, k) in glowing {
+                disc(p, pitch * 0.2 * (0.7 + 0.3 * k), .color(lightColor.opacity(0.6 + 0.4 * k)), in: &ctx)
+                disc(p, pitch * 0.09 * k, .color(.white.opacity(0.9)), in: &ctx)
             }
         }
         // a little taller than the grid so the halos aren't clipped
         .frame(height: 92)
         .padding(.vertical, -8)
+    }
+}
+
+/// Apple's Liquid Glass (iOS 26+) for a chip; the flat card style below that.
+struct GlassChip: ViewModifier {
+    let selected: Bool
+    var cornerRadius: CGFloat = 10
+
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.glassEffect(selected ? .regular.tint(Theme.accent.opacity(0.85)).interactive() : .regular.interactive(),
+                                in: .rect(cornerRadius: cornerRadius))
+        } else {
+            content
+                .background(RoundedRectangle(cornerRadius: cornerRadius).fill(selected ? Theme.accent : Color.white.opacity(0.06)))
+                .overlay(RoundedRectangle(cornerRadius: cornerRadius).strokeBorder(selected ? .clear : Theme.cardStroke, lineWidth: 1))
+        }
+    }
+}
+
+/// Lets neighbouring glass chips share one material (they blend when close).
+struct GlassRow<Content: View>: View {
+    var spacing: CGFloat = 6
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        if #available(iOS 26.0, *) {
+            GlassEffectContainer(spacing: spacing) { content }
+        } else {
+            content
+        }
     }
 }
