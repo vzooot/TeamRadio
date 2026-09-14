@@ -52,9 +52,7 @@ struct ContentView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 HeaderView(onInfo: { showAbout = true })
-                    // The banner art carries its own feathered margin — pull
-                    // the next card up so the gap reads as one clean beat.
-                    .padding(.bottom, -12)
+                    .padding(.bottom, -6)
 
                 if let race = model.nextRace {
                     LiveSessionBanner(race: race)
@@ -106,35 +104,42 @@ struct HeaderView: View {
     var onInfo: (() -> Void)? = nil
 
     var body: some View {
-        HStack(alignment: .center, spacing: 2) {
-            // Screen blend melts the artwork's black ground into the page
-            // gradient, leaving only the glowing parts.
-            Image("HeaderWordmark")
-                .resizable()
-                .scaledToFit()
-                .frame(height: 40)
-                .blendMode(.screen)
-                .accessibilityLabel("Team Radio")
+        ZStack {
+            HStack {
+                // Screen blend melts the wordmark's black ground into the
+                // page gradient, leaving only the glowing letters.
+                Image("HeaderWordmark")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 40)
+                    .blendMode(.screen)
+                    .accessibilityLabel("Team Radio")
+
+                Spacer()
+
+                if let onInfo {
+                    Button(action: onInfo) {
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 20))
+                            .foregroundStyle(Theme.dimText)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            // The helmet (transparent PNG) sits centre stage and hangs over
+            // the top edge of the race card below.
             Image("HeaderHelmet")
                 .resizable()
                 .scaledToFit()
-                .frame(height: 100)
-                .blendMode(.screen)
-                .padding(.vertical, -22)
+                .frame(height: 150)
+                .shadow(color: Theme.accent.opacity(0.35), radius: 24, y: 8)
+                .padding(.top, -6)
+                .padding(.bottom, -72)
                 .accessibilityHidden(true)
-
-            Spacer()
-
-            if let onInfo {
-                Button(action: onInfo) {
-                    Image(systemName: "info.circle")
-                        .font(.system(size: 20))
-                        .foregroundStyle(Theme.dimText)
-                }
-                .buttonStyle(.plain)
-            }
         }
         .padding(.top, 4)
+        .zIndex(1)
     }
 }
 
