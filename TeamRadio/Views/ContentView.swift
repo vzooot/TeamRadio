@@ -106,15 +106,22 @@ struct HeaderView: View {
     var onInfo: (() -> Void)? = nil
 
     var body: some View {
-        HStack(spacing: 10) {
-            Image("HeaderLogo")
+        HStack(alignment: .center, spacing: 2) {
+            // Screen blend melts the artwork's black ground into the page
+            // gradient, leaving only the glowing parts.
+            Image("HeaderWordmark")
                 .resizable()
                 .scaledToFit()
-                .frame(height: 66)
-                // Screen blend melts the banner's black ground into the
-                // page gradient, leaving only the glowing artwork.
+                .frame(height: 40)
                 .blendMode(.screen)
                 .accessibilityLabel("Team Radio")
+            Image("HeaderHelmet")
+                .resizable()
+                .scaledToFit()
+                .frame(height: 100)
+                .blendMode(.screen)
+                .padding(.vertical, -22)
+                .accessibilityHidden(true)
 
             Spacer()
 

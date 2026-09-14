@@ -33,22 +33,37 @@ struct CountdownView: View {
             VStack(spacing: 14) {
                 sessionPicker(now: now, selected: session)
 
-                if let session {
-                    Text("\(session.kind.rawValue.uppercased()) · \(session.date.formatted(.dateTime.weekday(.wide).hour().minute()).uppercased())")
-                        .font(.f1(12, weight: .bold))
-                        .tracking(2)
-                        .foregroundStyle(Theme.dimText)
-                }
-
                 if remaining > 0 {
-                    StartLightsView(secondsRemaining: remaining)
+                    // LED ticker: "FP1 THU 10:30" plus the start gantry
+                    let ticker = session.map {
+                        "\($0.kind.short) \($0.date.formatted(.dateTime.weekday(.abbreviated)).uppercased()) \($0.date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute()))"
+                    } ?? ""
+                    DotMatrixBoard(text: ticker, litLights: StartLightsView.litCount(secondsRemaining: remaining))
+                    if remaining < 6 * 86400 {
+                        Text(remaining < 86400 ? "FINAL 24 HOURS" : "IT'S RACE WEEK")
+                            .font(.f1(11, weight: .bold))
+                            .tracking(3)
+                            .foregroundStyle(Theme.live)
+                            .shadow(color: Theme.live.opacity(0.7), radius: 6)
+                    }
                     let parts = split(remaining)
                     HStack(spacing: 10) {
-                        tile(parts.days, "DAYS", tint: Theme.accent)
-                        tile(parts.hours, "HRS", tint: Theme.violet)
-                        tile(parts.minutes, "MIN", tint: Theme.violet)
-                        tile(parts.seconds, "SEC", hot: true)
+                        NeonTile(value: parts.days, label: "DAYS")
+                        NeonTile(value: parts.hours, label: "HRS")
+                        NeonTile(value: parts.minutes, label: "MIN")
+                        NeonTile(value: parts.seconds, label: "SEC", hot: true)
                     }
+                    .padding(.top, 4)
+                    .overlay(alignment: .bottom) {
+                        // chassis screws between the tiles
+                        GeometryReader { geo in
+                            ForEach([0.25, 0.75], id: \.self) { f in
+                                Screw(size: 9)
+                                    .position(x: geo.size.width * f, y: geo.size.height + 8)
+                            }
+                        }
+                    }
+                    .padding(.bottom, 10)
                 } else if let session, now < session.date.addingTimeInterval(session.kind.expectedDuration) {
                     liveBanner(session)
                 } else {
@@ -66,8 +81,8 @@ struct CountdownView: View {
             .onAppear { pinned = LiveActivityManager.hasPinIntent }
             .padding(18)
             .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Theme.card)
+                CarbonFiber()
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
                     .overlay(
                         RoundedRectangle(cornerRadius: 20)
                             .strokeBorder(Theme.glassStroke, lineWidth: 1)
@@ -89,20 +104,13 @@ struct CountdownView: View {
                 pinned = true
             }
         } label: {
-            HStack(spacing: 6) {
-                Image(systemName: pinned ? "pin.slash.fill" : "pin.fill")
-                    .font(.system(size: 11, weight: .bold))
-                Text(pinned ? "UNPIN FROM LOCK SCREEN" : "PIN \(session.kind.short) TO LOCK SCREEN")
-                    .font(.f1(12, weight: .bold))
-                    .tracking(1)
+            BrushedBar(lit: pinned) {
+                HStack(spacing: 6) {
+                    Image(systemName: pinned ? "pin.slash.fill" : "pin.fill")
+                        .font(.system(size: 11, weight: .bold))
+                    Text(pinned ? "UNPIN FROM LOCK SCREEN" : "PIN \(session.kind.short) TO LOCK SCREEN")
+                }
             }
-            .foregroundStyle(pinned ? Theme.dimText : Theme.accent)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 9)
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .strokeBorder(pinned ? Theme.cardStroke : Theme.accent.opacity(0.5), lineWidth: 1)
-            )
         }
         .buttonStyle(.plain)
     }
@@ -210,7 +218,9 @@ struct SessionClock: View {
 struct StartLightsView: View {
     let secondsRemaining: TimeInterval
 
-    private var litCount: Int {
+    private var litCount: Int { Self.litCount(secondsRemaining: secondsRemaining) }
+
+    static func litCount(secondsRemaining: TimeInterval) -> Int {
         let days = secondsRemaining / 86400
         if secondsRemaining <= 0 { return 0 }        // lights out — away we go
         if days >= 6 { return 0 }
