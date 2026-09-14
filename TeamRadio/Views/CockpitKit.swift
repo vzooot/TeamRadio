@@ -259,7 +259,7 @@ struct DotMatrixBoard: View {
                         let key = r * 1000 + c
                         guard lit[key] == nil else { continue }
                         let p = center(c, r)
-                        let tint: Color = armed.contains(key) ? lightColor.opacity(0.4) : Color(white: 0.55).opacity(0.7)
+                        let tint: Color = armed.contains(key) ? Color(red: 0.6, green: 0.25, blue: 0.18) : Color(red: 0.42, green: 0.47, blue: 0.49)
                         for dx in -1...1 {
                             for dy in -1...1 {
                                 let q = CGPoint(x: p.x + CGFloat(dx) * dieStep, y: p.y + CGFloat(dy) * dieStep)
@@ -269,35 +269,38 @@ struct DotMatrixBoard: View {
                     }
                 }
 
-                // lit LEDs: a soft halo on the surface, the cavity rim catching the
-                // colour, then the big soft-edged luminous disc
+                // lit LEDs, after the reference: a faint halo on the surface, the cavity
+                // rim glowing thinly in the LED colour, a dark gap, then the luminous
+                // disc at ~70% of the cavity — bright core, darkening toward its edge
                 let glowing = lit.map { (center($0.key % 1000, $0.key / 1000), $0.value) }
+                let warm = page == 0
+                let rimColor = warm ? Color(red: 0.95, green: 0.3, blue: 0.1) : Color(red: 0.1, green: 0.65, blue: 0.75)
                 ctx.drawLayer { layer in
                     layer.blendMode = .plusLighter
-                    layer.addFilter(.blur(radius: hole * 0.7))
-                    for (p, k) in glowing { disc(p, hole * 1.1, .color(color.opacity(0.3 * k)), in: &layer) }
+                    layer.addFilter(.blur(radius: hole * 0.6))
+                    for (p, k) in glowing { disc(p, hole * 1.35, .color(rimColor.opacity(0.16 * k)), in: &layer) }
                 }
                 ctx.drawLayer { layer in
-                    layer.blendMode = .plusLighter
-                    layer.addFilter(.blur(radius: 1.0))
+                    layer.addFilter(.blur(radius: 0.8))
                     for (p, k) in glowing {
-                        layer.stroke(Path(ellipseIn: rect(p, hole * 1.02)), with: .color(color.opacity(0.6 * k)), lineWidth: 1.4)
+                        layer.stroke(Path(ellipseIn: rect(p, hole * 0.98)), with: .color(rimColor.opacity(0.75 * k)), lineWidth: 1.3)
                     }
                 }
-                let warm = page == 0
                 ctx.drawLayer { layer in
-                    layer.addFilter(.blur(radius: 0.5))
+                    layer.addFilter(.blur(radius: 0.45))
                     for (p, k) in glowing {
-                        let core = hole * 0.8
+                        let core = hole * 0.72
                         let stops: [Gradient.Stop] = warm
-                            ? [.init(color: Color(red: 1.0, green: 0.86, blue: 0.5), location: 0),
-                               .init(color: Color(red: 1.0, green: 0.62, blue: 0.25), location: 0.6),
-                               .init(color: Color(red: 1.0, green: 0.45, blue: 0.15), location: 1)]
-                            : [.init(color: Color(red: 0.85, green: 1.0, blue: 1.0), location: 0),
-                               .init(color: Color(red: 0.38, green: 0.9, blue: 1.0), location: 0.6),
-                               .init(color: Color(red: 0.18, green: 0.78, blue: 0.95), location: 1)]
+                            ? [.init(color: Color(red: 1.0, green: 0.84, blue: 0.45), location: 0),
+                               .init(color: Color(red: 1.0, green: 0.66, blue: 0.25), location: 0.5),
+                               .init(color: Color(red: 1.0, green: 0.5, blue: 0.16), location: 0.85),
+                               .init(color: Color(red: 0.9, green: 0.38, blue: 0.12), location: 1)]
+                            : [.init(color: Color(red: 0.8, green: 1.0, blue: 1.0), location: 0),
+                               .init(color: Color(red: 0.45, green: 0.93, blue: 1.0), location: 0.5),
+                               .init(color: Color(red: 0.25, green: 0.85, blue: 0.98), location: 0.85),
+                               .init(color: Color(red: 0.15, green: 0.7, blue: 0.85), location: 1)]
                         layer.opacity = 0.35 + 0.65 * k
-                        disc(p, core, .radialGradient(Gradient(stops: stops), center: CGPoint(x: p.x, y: p.y - core * 0.15), startRadius: 0, endRadius: core * 1.05), in: &layer)
+                        disc(p, core, .radialGradient(Gradient(stops: stops), center: CGPoint(x: p.x, y: p.y - core * 0.12), startRadius: 0, endRadius: core), in: &layer)
                     }
                 }
             }
