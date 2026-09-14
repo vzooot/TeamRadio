@@ -1,7 +1,6 @@
 import CloudKit
 import Foundation
 import Observation
-import UIKit
 
 @Observable
 @MainActor
@@ -32,11 +31,6 @@ final class ChatViewModel {
     private var pollTask: Task<Void, Never>?
 
     func start() async {
-        // TEMP screenshot hook: `-DemoChat YES` fills the room with sample messages.
-        if UserDefaults.standard.bool(forKey: "DemoChat") {
-            seedDemo()
-            return
-        }
         guard await ChatService.accountAvailable() else {
             state = .needsICloud
             return
@@ -73,42 +67,6 @@ final class ChatViewModel {
     func stop() {
         pollTask?.cancel()
         pollTask = nil
-    }
-
-    private func seedDemo() {
-        state = .ready
-        agreedToRules = true
-        nickname = "PitWallPete"
-        currentUserId = "me"
-        round = "demo"
-        roundTitle = "Madrid Grand Prix"
-        let podium = "https://media0.giphy.com/media/v1.Y2lkPWQ4NTM2YzU1cjFyc3g2dmNsN3hxNjF3cXY5MnM5NGJsOTdrNnB1ZWwyenFwc2JmZyZlcD12MV9naWZzX3NlYXJjaCZjdD1n/1X8865dbCf8xNrDPG6/200w.gif"
-        let pitStop = "https://media2.giphy.com/media/v1.Y2lkPWQ4NTM2YzU1c2RpYXZzYmE2ZjRmazV0dG1vOWI2ZmlrZnZrOWVwaTNrYngxZXhtYyZlcD12MV9naWZzX3NlYXJjaCZjdD1n/sA50TO4Ew7QXu/200w.gif"
-        let base = Date().addingTimeInterval(-9 * 60)
-        let tall = UIDevice.current.userInterfaceIdiom == .pad
-        let script: [(String, String, String, String?)] = (tall ? [
-            ("Nico_Lap", "n1", "Anyone at the circuit today? Turn 1 grandstand here 🙌", nil),
-            ("BoxBoxBecca", "b1", "Yes! Sector 2 hill, view is unreal", nil),
-            ("me", "me", "Jealous. Watching from the sofa with the Lock Screen countdown running", nil),
-            ("BoxBoxBecca", "b1", "Track temp already 44°C, this is going to be a tyre race", nil),
-            ("Nico_Lap", "n1", "Two stops minimum, calling it", nil),
-        ] : []) + [
-            ("GravelTrapHero", "g1", "Lights out in 20 minutes 🔥 who's starting on softs?", nil),
-            ("me", "me", "Pole to P1, calling it now 🏁", nil),
-            ("Nico_Lap", "n1", "That pit stop was 1.9s?! 👀", nil),
-            ("Nico_Lap", "n1", pitStop, "gif"),
-            ("me", "me", "Champagne time 🍾", nil),
-            ("me", "me", podium, "gif"),
-            ("GravelTrapHero", "g1", "Madrid S1 is going to be chaos 😂", nil),
-        ]
-        messages = script.enumerated().map { i, m in
-            ChatMessage(id: CKRecord.ID(recordName: "demo-\(i)"),
-                        text: m.2,
-                        sender: m.0 == "me" ? nickname : m.0,
-                        senderId: m.1,
-                        date: base.addingTimeInterval(Double(i) * 70),
-                        mediaType: m.3)
-        }
     }
 
     func refresh() async {

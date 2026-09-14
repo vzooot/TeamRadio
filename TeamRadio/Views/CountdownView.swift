@@ -40,17 +40,10 @@ struct CountdownView: View {
                         .foregroundStyle(Theme.dimText)
                 }
 
-                // TEMP screenshot hooks: `-DemoLights 3` pretends race week is here,
-                // `-DemoLive YES` pretends the session has started.
-                let demoLights = UserDefaults.standard.integer(forKey: "DemoLights")
-                let demoLive = UserDefaults.standard.bool(forKey: "DemoLive")
-
-                if remaining > 0 && !demoLive {
-                    let realLit = StartLightsView.litCount(secondsRemaining: remaining)
-                    // TEMP preview: two lamps always on so lit vs. armed can be compared — revert later.
-                    let lit = demoLights > 0 ? demoLights : max(2, realLit)
+                if remaining > 0 {
+                    let lit = StartLightsView.litCount(secondsRemaining: remaining)
                     DotMatrixBoard(litLights: lit, pages: infoPages(session: session, remaining: remaining))
-                    if demoLights > 0 || realLit > 0 {
+                    if lit > 0 {
                         Text(lit >= 5 ? "FINAL 24 HOURS" : "IT'S RACE WEEK")
                             .font(.f1(11, weight: .bold))
                             .tracking(3)
@@ -75,7 +68,7 @@ struct CountdownView: View {
                         }
                     }
                     .padding(.bottom, 10)
-                } else if let session, demoLive || now < session.date.addingTimeInterval(session.kind.expectedDuration) {
+                } else if let session, now < session.date.addingTimeInterval(session.kind.expectedDuration) {
                     // Lights out: the gantry goes dark the moment the session starts.
                     DotMatrixBoard(litLights: 0)
                     liveBanner(session)

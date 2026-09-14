@@ -101,8 +101,7 @@ struct DotMatrixBoard: View {
     var lightColor: Color = Theme.live
     var infoColor: Color = Color(red: 0.45, green: 0.9, blue: 1.0)
 
-    // TEMP screenshot hook: `-DemoPage 1` opens on an info page.
-    @State private var page = UserDefaults.standard.integer(forKey: "DemoPage")
+    @State private var page = 0
     @State private var transitionStart: Date?
     @State private var settle: Task<Void, Never>?
 

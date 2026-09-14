@@ -80,12 +80,6 @@ struct ContentView: View {
             .padding(.bottom, 32)
         }
         .refreshable { await model.load() }
-        .task {
-            if UserDefaults.standard.bool(forKey: "ScrollTrack") {
-                try? await Task.sleep(for: .seconds(2.5))
-                withAnimation { proxy.scrollTo("trackSection", anchor: .top) }
-            }
-        }
         }
     }
 }
@@ -265,11 +259,9 @@ struct LiveSessionBanner: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
             let now = context.date
-            // TEMP screenshot hook: `-DemoLive YES` pretends the next session started 23 minutes ago.
-            let demoLive = UserDefaults.standard.bool(forKey: "DemoLive")
             let live = race.sessions.first {
                 $0.date <= now && now < $0.date.addingTimeInterval($0.kind.expectedDuration)
-            } ?? (demoLive ? race.sessions.first { $0.date > now } : nil)
+            }
 
             if let live {
                 HStack(spacing: 12) {
@@ -292,7 +284,7 @@ struct LiveSessionBanner: View {
                     Spacer()
 
                     VStack(alignment: .trailing, spacing: 1) {
-                        SessionClock(start: demoLive ? now.addingTimeInterval(-23 * 60 - 41) : live.date)
+                        SessionClock(start: live.date)
                             .font(.f1Digits(19))
                             .foregroundStyle(.white)
                         Text("SESSION TIME")
