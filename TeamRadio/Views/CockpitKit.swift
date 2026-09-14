@@ -196,7 +196,7 @@ struct DotMatrixBoard: View {
                 let pitch = size.width / (CGFloat(cols) + 1.2)
                 let left = pitch * 0.6
                 let top = (size.height - CGFloat(rows) * pitch) / 2
-                let hole = pitch * 0.42
+                let hole = pitch * 0.34          // clear gaps between sockets
                 let die = hole * 0.26            // side of one grey square in an unlit socket
                 let dieStep = hole * 0.34
 
@@ -247,7 +247,7 @@ struct DotMatrixBoard: View {
                                                   startPoint: CGPoint(x: p.x, y: p.y - hole), endPoint: CGPoint(x: p.x, y: p.y + hole)), in: &ctx)
                 }
                 ctx.drawLayer { layer in
-                    layer.addFilter(.blur(radius: 1.3))
+                    layer.addFilter(.blur(radius: 0.9))
                     for p in sockets {
                         layer.stroke(Path(ellipseIn: rect(CGPoint(x: p.x, y: p.y - 1.3), hole * 0.9)), with: .color(.black.opacity(0.8)), lineWidth: 2.2)
                         layer.stroke(Path(ellipseIn: rect(CGPoint(x: p.x, y: p.y + 1.1), hole * 0.9)), with: .color(.white.opacity(0.12)), lineWidth: 1.6)
@@ -277,17 +277,17 @@ struct DotMatrixBoard: View {
                 let rimColor = warm ? Color(red: 0.95, green: 0.3, blue: 0.1) : Color(red: 0.1, green: 0.65, blue: 0.75)
                 ctx.drawLayer { layer in
                     layer.blendMode = .plusLighter
-                    layer.addFilter(.blur(radius: hole * 0.6))
-                    for (p, k) in glowing { disc(p, hole * 1.35, .color(rimColor.opacity(0.16 * k)), in: &layer) }
+                    layer.addFilter(.blur(radius: hole * 0.45))
+                    for (p, k) in glowing { disc(p, hole * 1.3, .color(rimColor.opacity(0.16 * k)), in: &layer) }
                 }
                 ctx.drawLayer { layer in
-                    layer.addFilter(.blur(radius: 0.8))
+                    layer.addFilter(.blur(radius: 0.5))
                     for (p, k) in glowing {
                         layer.stroke(Path(ellipseIn: rect(p, hole * 0.98)), with: .color(rimColor.opacity(0.75 * k)), lineWidth: 1.3)
                     }
                 }
                 ctx.drawLayer { layer in
-                    layer.addFilter(.blur(radius: 0.45))
+                    layer.addFilter(.blur(radius: 0.25))
                     for (p, k) in glowing {
                         let core = hole * 0.72
                         let stops: [Gradient.Stop] = warm
