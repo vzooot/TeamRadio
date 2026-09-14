@@ -34,9 +34,10 @@ struct CountdownView: View {
                 sessionPicker(now: now, selected: session)
 
                 if remaining > 0 {
-                    // LED ticker: "FP1 10:30" plus the start gantry
+                    // LED ticker: session start time (the chip above names the
+                    // session) plus the start gantry — few, big LEDs
                     let ticker = session.map {
-                        "\($0.kind.short) \($0.date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute()))"
+                        $0.date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute())
                     } ?? ""
                     DotMatrixBoard(text: ticker, litLights: StartLightsView.litCount(secondsRemaining: remaining))
                     if remaining < 6 * 86400 {

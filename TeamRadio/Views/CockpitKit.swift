@@ -6,27 +6,37 @@ import UIKit
 enum Cockpit {
     /// One weave repeat, rendered once and tiled — cheap to redraw every tick.
     static let carbonTile: UIImage = {
-        let cell: CGFloat = 3        // fine 2×2 twill, barely there
+        // 2×2 twill: each cell is one strand, horizontal and vertical strands
+        // alternate in a checker, each shaded along its length like woven fibre.
+        let cell: CGFloat = 3.5
         let n = 2
         let size = CGSize(width: cell * CGFloat(n), height: cell * CGFloat(n))
         let format = UIGraphicsImageRendererFormat()
         format.scale = 3
         return UIGraphicsImageRenderer(size: size, format: format).image { ctx in
             let c = ctx.cgContext
-            c.setFillColor(UIColor(red: 0.04, green: 0.045, blue: 0.058, alpha: 1).cgColor)
+            c.setFillColor(UIColor(white: 0.04, alpha: 1).cgColor)
             c.fill(CGRect(origin: .zero, size: size))
+            let space = CGColorSpaceCreateDeviceGray()
             for i in 0..<n {
                 for j in 0..<n {
-                    let rect = CGRect(x: CGFloat(i) * cell, y: CGFloat(j) * cell, width: cell, height: cell).insetBy(dx: 0.2, dy: 0.2)
-                    let light = (i + j) % 2 == 0
-                    c.setFillColor(UIColor(white: light ? 0.105 : 0.06, alpha: 1).cgColor)
-                    c.fill(rect)
-                    // sheen on the raised threads
-                    c.setStrokeColor(UIColor(white: 1, alpha: light ? 0.06 : 0.015).cgColor)
-                    c.setLineWidth(0.7)
-                    c.move(to: CGPoint(x: rect.minX, y: light ? rect.maxY : rect.minY))
-                    c.addLine(to: CGPoint(x: rect.maxX, y: light ? rect.minY : rect.maxY))
+                    let rect = CGRect(x: CGFloat(i) * cell, y: CGFloat(j) * cell, width: cell, height: cell).insetBy(dx: 0.3, dy: 0.3)
+                    let horizontal = (i + j) % 2 == 0
+                    let shades: [CGFloat] = horizontal ? [0.21, 0.145, 0.085] : [0.125, 0.08, 0.05]
+                    let colors = shades.map { CGColor(gray: $0, alpha: 1) } as CFArray
+                    guard let grad = CGGradient(colorsSpace: space, colors: colors, locations: [0, 0.55, 1]) else { continue }
+                    c.saveGState()
+                    c.clip(to: rect)
+                    let start = horizontal ? CGPoint(x: rect.minX, y: rect.midY) : CGPoint(x: rect.midX, y: rect.minY)
+                    let end = horizontal ? CGPoint(x: rect.maxX, y: rect.midY) : CGPoint(x: rect.midX, y: rect.maxY)
+                    c.drawLinearGradient(grad, start: start, end: end, options: [])
+                    // specular edge on the raised strand
+                    c.setStrokeColor(UIColor(white: 1, alpha: horizontal ? 0.10 : 0.05).cgColor)
+                    c.setLineWidth(0.5)
+                    c.move(to: horizontal ? CGPoint(x: rect.minX, y: rect.minY + 0.3) : CGPoint(x: rect.minX + 0.3, y: rect.minY))
+                    c.addLine(to: horizontal ? CGPoint(x: rect.maxX, y: rect.minY + 0.3) : CGPoint(x: rect.minX + 0.3, y: rect.maxY))
                     c.strokePath()
+                    c.restoreGState()
                 }
             }
         }
@@ -39,7 +49,7 @@ struct CarbonFiber: View {
             .resizable(resizingMode: .tile)
             .overlay(
                 // vignette so the weave sinks away from the glowing parts
-                RadialGradient(colors: [.clear, .black.opacity(0.45)], center: .center, startRadius: 40, endRadius: 320)
+                RadialGradient(colors: [.clear, .black.opacity(0.28)], center: .center, startRadius: 60, endRadius: 340)
             )
     }
 }
@@ -146,8 +156,8 @@ struct DotMatrixBoard: View {
         Canvas { ctx, size in
             let textCols = text.count * 4 - 1
             let gantryCols = 9                      // 5 lamps, one dark column between
-            let cols = textCols + 2 + gantryCols
-            let pitch = min(11, size.width / CGFloat(cols))
+            let cols = textCols + 3 + gantryCols
+            let pitch = min(12, size.width / CGFloat(cols))
             let rows = 7                            // 5 for glyphs + a blank socket row above and below
             let gridCols = Int(size.width / pitch)
             let x0 = (size.width - CGFloat(gridCols) * pitch) / 2
@@ -160,15 +170,13 @@ struct DotMatrixBoard: View {
                 c.fill(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r)), with: shading)
             }
 
-            // sockets: every LED position, dark with a faint rim
-            let socket = pitch * 0.32
+            // sockets: a quiet dark recess at every LED position, lighter rim on the lower edge
+            let socket = pitch * 0.24
             for col in 0..<gridCols {
                 for row in 0..<rows {
                     let p = center(col, row)
-                    disc(p, socket, .color(.black.opacity(0.55)), in: &ctx)
-                    ctx.stroke(Path(ellipseIn: CGRect(x: p.x - socket, y: p.y - socket, width: 2 * socket, height: 2 * socket)),
-                               with: .color(.white.opacity(0.07)), lineWidth: 0.8)
-                    disc(p, pitch * 0.11, .color(.white.opacity(0.10)), in: &ctx)
+                    disc(CGPoint(x: p.x, y: p.y + 0.7), socket, .color(.white.opacity(0.10)), in: &ctx)
+                    disc(p, socket, .color(.black.opacity(0.6)), in: &ctx)
                 }
             }
 
@@ -194,15 +202,15 @@ struct DotMatrixBoard: View {
                     if c < litLights { orange.append(center(gc, row)) } else { off.append(center(gc, row)) }
                 }
             }
-            for p in off { disc(p, pitch * 0.16, .color(lightColor.opacity(0.35)), in: &ctx) }
+            for p in off { disc(p, pitch * 0.17, .color(lightColor.opacity(0.32)), in: &ctx) }
 
             for (points, color) in [(cyan, textColor), (orange, lightColor)] where !points.isEmpty {
                 ctx.drawLayer { layer in
-                    layer.addFilter(.blur(radius: pitch * 0.55))
-                    for p in points { disc(p, pitch * 0.34, .color(color.opacity(0.85)), in: &layer) }
+                    layer.addFilter(.blur(radius: pitch * 0.7))
+                    for p in points { disc(p, pitch * 0.42, .color(color.opacity(0.9)), in: &layer) }
                 }
-                for p in points { disc(p, pitch * 0.2, .color(color), in: &ctx) }
-                for p in points { disc(p, pitch * 0.09, .color(.white.opacity(0.85)), in: &ctx) }
+                for p in points { disc(p, pitch * 0.24, .color(color), in: &ctx) }
+                for p in points { disc(p, pitch * 0.11, .color(.white.opacity(0.9)), in: &ctx) }
             }
         }
         .frame(height: 64)
