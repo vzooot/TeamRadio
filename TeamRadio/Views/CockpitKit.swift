@@ -280,25 +280,34 @@ struct DotMatrixBoard: View {
                     layer.addFilter(.blur(radius: hole * 0.45))
                     for (p, k) in glowing { disc(p, hole * 1.3, .color(rimColor.opacity(0.16 * k)), in: &layer) }
                 }
+                // the rim: blurred outward, then the cavity is re-cut so its inner edge is crisp
                 ctx.drawLayer { layer in
-                    layer.addFilter(.blur(radius: 0.5))
+                    layer.addFilter(.blur(radius: 1.6))
                     for (p, k) in glowing {
-                        layer.stroke(Path(ellipseIn: rect(p, hole * 0.98)), with: .color(rimColor.opacity(0.75 * k)), lineWidth: 1.3)
+                        layer.stroke(Path(ellipseIn: rect(p, hole * 1.02)), with: .color(rimColor.opacity(0.85 * k)), lineWidth: 2.4)
                     }
+                }
+                for (p, k) in glowing {
+                    disc(p, hole * 0.93, .linearGradient(Gradient(colors: [Color.black.opacity(0.97), Color.black.opacity(0.72)]),
+                                                         startPoint: CGPoint(x: p.x, y: p.y - hole), endPoint: CGPoint(x: p.x, y: p.y + hole)), in: &ctx)
+                    disc(p, hole * 0.93, .color(rimColor.opacity(0.12 * k)), in: &ctx)
                 }
                 ctx.drawLayer { layer in
                     layer.addFilter(.blur(radius: 0.25))
                     for (p, k) in glowing {
                         let core = hole * 0.72
+                        // smooth run from the pale core to the saturated edge
                         let stops: [Gradient.Stop] = warm
-                            ? [.init(color: Color(red: 1.0, green: 0.84, blue: 0.45), location: 0),
-                               .init(color: Color(red: 1.0, green: 0.66, blue: 0.25), location: 0.5),
-                               .init(color: Color(red: 1.0, green: 0.5, blue: 0.16), location: 0.85),
-                               .init(color: Color(red: 0.9, green: 0.38, blue: 0.12), location: 1)]
-                            : [.init(color: Color(red: 0.8, green: 1.0, blue: 1.0), location: 0),
-                               .init(color: Color(red: 0.45, green: 0.93, blue: 1.0), location: 0.5),
-                               .init(color: Color(red: 0.25, green: 0.85, blue: 0.98), location: 0.85),
-                               .init(color: Color(red: 0.15, green: 0.7, blue: 0.85), location: 1)]
+                            ? [.init(color: Color(red: 1.0, green: 0.87, blue: 0.52), location: 0),
+                               .init(color: Color(red: 1.0, green: 0.78, blue: 0.38), location: 0.3),
+                               .init(color: Color(red: 1.0, green: 0.66, blue: 0.26), location: 0.6),
+                               .init(color: Color(red: 1.0, green: 0.55, blue: 0.18), location: 0.85),
+                               .init(color: Color(red: 0.98, green: 0.47, blue: 0.14), location: 1)]
+                            : [.init(color: Color(red: 0.84, green: 1.0, blue: 1.0), location: 0),
+                               .init(color: Color(red: 0.62, green: 0.97, blue: 1.0), location: 0.3),
+                               .init(color: Color(red: 0.42, green: 0.92, blue: 1.0), location: 0.6),
+                               .init(color: Color(red: 0.28, green: 0.85, blue: 0.98), location: 0.85),
+                               .init(color: Color(red: 0.2, green: 0.78, blue: 0.92), location: 1)]
                         layer.opacity = 0.35 + 0.65 * k
                         disc(p, core, .radialGradient(Gradient(stops: stops), center: CGPoint(x: p.x, y: p.y - core * 0.12), startRadius: 0, endRadius: core), in: &layer)
                     }
