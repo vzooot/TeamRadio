@@ -192,14 +192,16 @@ struct DotMatrixBoard: View {
         TimelineView(.animation(minimumInterval: 1 / 30, paused: transitionStart == nil)) { context in
             Canvas { ctx, size in
                 let cols = Self.cols, rows = Self.rows
-                let pitch = size.width / CGFloat(cols)
+                // a little side margin so the outer lamps' halos aren't clipped
+                let pitch = size.width / (CGFloat(cols) + 1.2)
+                let left = pitch * 0.6
                 let top = (size.height - CGFloat(rows) * pitch) / 2
                 let hole = pitch * 0.42
                 let die = hole * 0.26            // side of one grey square in an unlit socket
                 let dieStep = hole * 0.34
 
                 func center(_ col: Int, _ row: Int) -> CGPoint {
-                    CGPoint(x: CGFloat(col) * pitch + pitch / 2, y: top + CGFloat(row) * pitch + pitch / 2)
+                    CGPoint(x: left + CGFloat(col) * pitch + pitch / 2, y: top + CGFloat(row) * pitch + pitch / 2)
                 }
                 func rect(_ p: CGPoint, _ r: CGFloat) -> CGRect { CGRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r) }
                 func disc(_ p: CGPoint, _ r: CGFloat, _ shading: GraphicsContext.Shading, in c: inout GraphicsContext) {
@@ -236,8 +238,15 @@ struct DotMatrixBoard: View {
                     for r in 0..<rows {
                         let p = center(c, r)
                         let key = r * 1000 + c
-                        disc(p, hole, .color(.black.opacity(0.85)), in: &ctx)
-                        ctx.stroke(Path(ellipseIn: rect(CGPoint(x: p.x, y: p.y + 0.4), hole)), with: .color(.white.opacity(0.07)), lineWidth: 0.8)
+                        // bevelled cavity, lit from the top-left: bright lip and shadowed
+                        // wall on that side, shadowed lip and lit wall on the far side
+                        disc(CGPoint(x: p.x + 0.9, y: p.y + 0.9), hole * 1.1, .color(.black.opacity(0.6)), in: &ctx)
+                        disc(CGPoint(x: p.x - 0.8, y: p.y - 0.8), hole * 1.08, .color(.white.opacity(0.16)), in: &ctx)
+                        disc(p, hole * 1.02, .color(.black.opacity(0.95)), in: &ctx)
+                        disc(p, hole * 0.94, .linearGradient(Gradient(colors: [Color.black.opacity(0.95), Color.white.opacity(0.09)]),
+                                                             startPoint: CGPoint(x: p.x - hole, y: p.y - hole), endPoint: CGPoint(x: p.x + hole, y: p.y + hole)), in: &ctx)
+                        ctx.stroke(Path(ellipseIn: rect(CGPoint(x: p.x - 0.7, y: p.y - 0.7), hole * 0.9)), with: .color(.black.opacity(0.7)), lineWidth: 1.4)
+                        ctx.stroke(Path(ellipseIn: rect(CGPoint(x: p.x + 0.6, y: p.y + 0.6), hole * 0.86)), with: .color(.white.opacity(0.10)), lineWidth: 1.0)
                         if lit[key] == nil {
                             let tint: Color = armed.contains(key) ? lightColor.opacity(0.35) : .white.opacity(0.17)
                             for dx in -1...1 {
@@ -254,8 +263,8 @@ struct DotMatrixBoard: View {
                 let glowing = lit.map { (center($0.key % 1000, $0.key / 1000), $0.value) }
                 ctx.drawLayer { layer in
                     layer.blendMode = .plusLighter
-                    layer.addFilter(.blur(radius: hole * 0.9))
-                    for (p, k) in glowing { disc(p, hole * 1.3, .color(color.opacity(0.55 * k)), in: &layer) }
+                    layer.addFilter(.blur(radius: hole * 0.7))
+                    for (p, k) in glowing { disc(p, hole * 1.1, .color(color.opacity(0.32 * k)), in: &layer) }
                 }
                 ctx.drawLayer { layer in
                     layer.blendMode = .plusLighter
