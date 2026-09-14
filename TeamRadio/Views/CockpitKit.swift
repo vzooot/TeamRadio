@@ -101,7 +101,7 @@ struct DotMatrixBoard: View {
 
     var body: some View {
         Canvas { ctx, size in
-            let cols = 25
+            let cols = 29                   // five 5-wide lights with a spare column between
             let rows = 5
             let pitch = size.width / CGFloat(cols)
             let top = (size.height - CGFloat(rows) * pitch) / 2
@@ -117,15 +117,21 @@ struct DotMatrixBoard: View {
             }
 
             // five lights, evenly spread: each a plus-shaped cluster of five LEDs
+            // each light is a ring of 12 LEDs (radius 2) with a softer centre
             var lit: [Int: CGFloat] = [:]   // key: row * 1000 + col, value: intensity
             var armed: Set<Int> = []
+            var lampCenters: [(CGPoint, Bool)] = []
             for c in 0..<5 {
-                let cc = 2 + c * 5
-                for dc in -1...1 {
-                    for dr in -1...1 {
+                let cc = 2 + c * 6
+                lampCenters.append((center(cc, 2), c < litLights))
+                for dc in -2...2 {
+                    for dr in -2...2 {
+                        let d = (Double(dc * dc + dr * dr)).squareRoot()
+                        let ring = d > 1.9 && d < 2.4
+                        let centre = dc == 0 && dr == 0
+                        guard ring || centre else { continue }
                         let key = (2 + dr) * 1000 + cc + dc
-                        let corner = dc != 0 && dr != 0
-                        if c < litLights { lit[key] = corner ? 0.45 : 1 } else { armed.insert(key) }
+                        if c < litLights { lit[key] = ring ? 1 : 0.5 } else { armed.insert(key) }
                     }
                 }
             }
@@ -150,6 +156,12 @@ struct DotMatrixBoard: View {
 
             // lit LEDs: a soft additive halo, a coloured point, a bright core
             let glowing = lit.map { (center($0.key % 1000, $0.key / 1000), $0.value) }
+            ctx.drawLayer { layer in
+                layer.blendMode = .plusLighter
+                layer.addFilter(.blur(radius: pitch * 0.9))
+                // the ring's light fills the lamp
+                for (c, on) in lampCenters where on { disc(c, pitch * 1.6, .color(lightColor.opacity(0.28)), in: &layer) }
+            }
             ctx.drawLayer { layer in
                 layer.blendMode = .plusLighter
                 layer.addFilter(.blur(radius: pitch * 0.45))
