@@ -136,24 +136,26 @@ struct CountdownView: View {
     }
 
     private func sessionPicker(now: Date, selected: WeekendSession?) -> some View {
-        GlassRow(spacing: 6) {
-            HStack(spacing: 6) {
-                ForEach(sessions) { session in
-                    let isSelected = session.id == selected?.id
-                    Button {
-                        selectedId = session.id
-                    } label: {
-                        Text(session.kind.short)
-                            .font(.f1(13).italic())
-                            .foregroundStyle(isSelected ? .white : Theme.dimText)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                            .modifier(GlassChip(selected: isSelected))
-                            .opacity(session.date <= now && !isSelected ? 0.45 : 1)
-                    }
-                    .buttonStyle(.plain)
+        HStack(spacing: 6) {
+            ForEach(sessions) { session in
+                let isSelected = session.id == selected?.id
+                Button {
+                    selectedId = session.id
+                } label: {
+                    NeonChip(title: session.kind.short, tint: Self.tint(for: session.kind), selected: isSelected)
+                        .opacity(session.date <= now && !isSelected ? 0.45 : 1)
                 }
+                .buttonStyle(.plain)
             }
+        }
+    }
+
+    /// Sector colours, like the 3D circuit: practice cyan, qualifying violet, race red.
+    private static func tint(for kind: WeekendSession.Kind) -> Color {
+        switch kind {
+        case .practice1, .practice2, .practice3: Theme.accent
+        case .sprintQualifying, .qualifying: Theme.violet
+        case .sprint, .race: Theme.live
         }
     }
 

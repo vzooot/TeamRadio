@@ -158,11 +158,17 @@ struct SectionTitle: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Rectangle()
-                .fill(LinearGradient(colors: [Theme.accent, Theme.violet, Theme.live],
-                                     startPoint: .top, endPoint: .bottom))
-                .frame(width: 4, height: 18)
-                .rotationEffect(.degrees(12))
+            // three slashes in the sector colours, like the circuit
+            HStack(spacing: 3) {
+                ForEach([Theme.accent, Theme.violet, Theme.live], id: \.self) { color in
+                    Rectangle()
+                        .fill(color)
+                        .frame(width: 3.5, height: 18)
+                        .rotationEffect(.degrees(14))
+                        .shadow(color: color.opacity(0.6), radius: 3)
+                }
+            }
+            .padding(.leading, 2)
             Text(text)
                 .font(.f1(19).italic())
                 .foregroundStyle(Theme.chromeText)

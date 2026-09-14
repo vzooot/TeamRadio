@@ -91,18 +91,17 @@ struct NeonTile: View {
     }
 }
 
-/// The LED board: a sparse matrix of small sockets carrying the five start
-/// lights — each a small round cluster of five LEDs, spread across the board
-/// and lit from the left as race week counts down. Lights out once the
-/// session runs.
+/// The LED board: a sparse 24×4 matrix of small sockets carrying the five
+/// start lights — each a rounded block of 12 LEDs — lit from the left as race
+/// week counts down. Lights out once the session runs.
 struct DotMatrixBoard: View {
     let litLights: Int
-    var lightColor: Color = Color(red: 1.0, green: 0.5, blue: 0.2)
+    var lightColor: Color = Theme.live
 
     var body: some View {
         Canvas { ctx, size in
-            let cols = 29                   // five 5-wide lights with a spare column between
-            let rows = 5
+            let cols = 24                   // five 4-wide lights with one dark column between
+            let rows = 4
             let pitch = size.width / CGFloat(cols)
             let top = (size.height - CGFloat(rows) * pitch) / 2
             let hole = pitch * 0.3
@@ -117,21 +116,17 @@ struct DotMatrixBoard: View {
             }
 
             // five lights, evenly spread: each a plus-shaped cluster of five LEDs
-            // each light is a ring of 12 LEDs (radius 2) with a softer centre
+            // each light: a 4×4 block with the corners left dark — 12 LEDs, reads as a disc
             var lit: [Int: CGFloat] = [:]   // key: row * 1000 + col, value: intensity
             var armed: Set<Int> = []
-            var lampCenters: [(CGPoint, Bool)] = []
             for c in 0..<5 {
-                let cc = 2 + c * 6
-                lampCenters.append((center(cc, 2), c < litLights))
-                for dc in -2...2 {
-                    for dr in -2...2 {
-                        let d = (Double(dc * dc + dr * dr)).squareRoot()
-                        let ring = d > 1.9 && d < 2.4
-                        let centre = dc == 0 && dr == 0
-                        guard ring || centre else { continue }
-                        let key = (2 + dr) * 1000 + cc + dc
-                        if c < litLights { lit[key] = ring ? 1 : 0.5 } else { armed.insert(key) }
+                let c0 = c * 5
+                for dc in 0..<4 {
+                    for dr in 0..<4 {
+                        let corner = (dc == 0 || dc == 3) && (dr == 0 || dr == 3)
+                        guard !corner else { continue }
+                        let key = dr * 1000 + c0 + dc
+                        if c < litLights { lit[key] = 1 } else { armed.insert(key) }
                     }
                 }
             }
@@ -156,55 +151,56 @@ struct DotMatrixBoard: View {
 
             // lit LEDs: a soft additive halo, a coloured point, a bright core
             let glowing = lit.map { (center($0.key % 1000, $0.key / 1000), $0.value) }
+            // each lit LED: a small halo, a thin bright ring at the lens edge, a hot core
             ctx.drawLayer { layer in
                 layer.blendMode = .plusLighter
-                layer.addFilter(.blur(radius: pitch * 0.9))
-                // the ring's light fills the lamp
-                for (c, on) in lampCenters where on { disc(c, pitch * 1.6, .color(lightColor.opacity(0.28)), in: &layer) }
-            }
-            ctx.drawLayer { layer in
-                layer.blendMode = .plusLighter
-                layer.addFilter(.blur(radius: pitch * 0.45))
-                for (p, k) in glowing { disc(p, pitch * 0.42, .color(lightColor.opacity(0.5 * k)), in: &layer) }
+                layer.addFilter(.blur(radius: pitch * 0.32))
+                for (p, k) in glowing { disc(p, pitch * 0.34, .color(lightColor.opacity(0.42 * k)), in: &layer) }
             }
             for (p, k) in glowing {
-                disc(p, pitch * 0.2 * (0.7 + 0.3 * k), .color(lightColor.opacity(0.6 + 0.4 * k)), in: &ctx)
-                disc(p, pitch * 0.09 * k, .color(.white.opacity(0.9)), in: &ctx)
+                let r = pitch * 0.27
+                ctx.stroke(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r)),
+                           with: .color(lightColor.opacity(0.75 * k)), lineWidth: 1)
+                disc(p, pitch * 0.16, .color(lightColor.opacity(0.55 + 0.45 * k)), in: &ctx)
+                disc(p, pitch * 0.075, .color(Color(red: 1, green: 0.92, blue: 0.85).opacity(0.95 * k)), in: &ctx)
             }
         }
         // a little taller than the grid so the halos aren't clipped
-        .frame(height: 92)
+        .frame(height: 84)
         .padding(.vertical, -8)
     }
 }
 
-/// Apple's Liquid Glass (iOS 26+) for a chip; the flat card style below that.
-struct GlassChip: ViewModifier {
+/// Session chip in the countdown tiles' language: dark glass with a neon
+/// rim in the circuit's sector colours — cyan for practice, violet for
+/// qualifying, red for the race. Lit when selected, quiet otherwise.
+struct NeonChip: View {
+    let title: String
+    let tint: Color
     let selected: Bool
-    var cornerRadius: CGFloat = 10
-
-    func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
-            content.glassEffect(selected ? .regular.tint(Theme.accent.opacity(0.85)).interactive() : .regular.interactive(),
-                                in: .rect(cornerRadius: cornerRadius))
-        } else {
-            content
-                .background(RoundedRectangle(cornerRadius: cornerRadius).fill(selected ? Theme.accent : Color.white.opacity(0.06)))
-                .overlay(RoundedRectangle(cornerRadius: cornerRadius).strokeBorder(selected ? .clear : Theme.cardStroke, lineWidth: 1))
-        }
-    }
-}
-
-/// Lets neighbouring glass chips share one material (they blend when close).
-struct GlassRow<Content: View>: View {
-    var spacing: CGFloat = 6
-    @ViewBuilder let content: Content
 
     var body: some View {
-        if #available(iOS 26.0, *) {
-            GlassEffectContainer(spacing: spacing) { content }
-        } else {
-            content
-        }
+        Text(title)
+            .font(.f1(13).italic())
+            .foregroundStyle(selected ? Color.white : tint.opacity(0.8))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .background(
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(LinearGradient(colors: [Color(white: 0.03), Color(white: 0.085)], startPoint: .top, endPoint: .bottom))
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(LinearGradient(colors: [Color.white.opacity(0.09), .clear], startPoint: .top, endPoint: .center))
+                    if selected {
+                        RoundedRectangle(cornerRadius: 10)
+                            .strokeBorder(tint.opacity(0.9), lineWidth: 2.5)
+                            .blur(radius: 4)
+                    }
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(LinearGradient(colors: [selected ? Color.white.opacity(0.95) : tint.opacity(0.55), tint.opacity(selected ? 1 : 0.5), tint.opacity(selected ? 0.8 : 0.35)],
+                                                     startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: selected ? 1.6 : 1)
+                }
+            )
+            .shadow(color: tint.opacity(selected ? 0.5 : 0), radius: 8)
     }
 }
