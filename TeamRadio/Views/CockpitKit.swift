@@ -168,10 +168,10 @@ struct DotMatrixBoard: View {
                 for r in 0..<rows {
                     let p = center(c, r)
                     ctx.stroke(Path(ellipseIn: CGRect(x: p.x - hole, y: p.y - hole + 0.6, width: 2 * hole, height: 2 * hole)),
-                               with: .color(.white.opacity(0.10)), lineWidth: 0.9)
-                    disc(p, hole, .color(.black.opacity(0.78)), in: &ctx)
+                               with: .color(.white.opacity(0.07)), lineWidth: 0.8)
+                    disc(p, hole, .color(.black.opacity(0.7)), in: &ctx)
                     if lit[r * 1000 + c] == nil {
-                        let dim: Color = armed.contains(r * 1000 + c) ? lightColor.opacity(0.45) : .white.opacity(0.13)
+                        let dim: Color = armed.contains(r * 1000 + c) ? lightColor.opacity(0.4) : .white.opacity(0.09)
                         cells(p, cellR, .color(dim), in: &ctx)
                     }
                 }
@@ -179,14 +179,16 @@ struct DotMatrixBoard: View {
 
             // lit holes: bloom beyond the rim, colour floods the recess, cells burn white-hot
             let glowing = lit.map { (center($0.key % 1000, $0.key / 1000), $0.value) }
+            // lit: a bright point in the hole with a soft bloom, cells glowing under it
             ctx.drawLayer { layer in
-                layer.addFilter(.blur(radius: pitch * 0.45))
-                for (p, color) in glowing { disc(p, hole * 1.15, .color(color.opacity(0.85)), in: &layer) }
+                layer.addFilter(.blur(radius: pitch * 0.4))
+                for (p, color) in glowing { disc(p, hole * 0.9, .color(color.opacity(0.8)), in: &layer) }
             }
             for (p, color) in glowing {
-                disc(p, hole, .color(color.opacity(0.55)), in: &ctx)
-                cells(p, cellR * 1.5, .color(color), in: &ctx)
-                cells(p, cellR * 0.7, .color(.white.opacity(0.9)), in: &ctx)
+                disc(p, hole, .color(color.opacity(0.22)), in: &ctx)
+                cells(p, cellR * 1.3, .color(color.opacity(0.9)), in: &ctx)
+                disc(p, hole * 0.5, .color(color), in: &ctx)
+                disc(p, hole * 0.26, .color(.white.opacity(0.85)), in: &ctx)
             }
         }
         .frame(height: 84)
