@@ -50,7 +50,10 @@ struct StandingsTabView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("STANDINGS")
+                    HStack(spacing: 9) {
+                        TrioSlashes(height: 24)
+                        Text("STANDINGS")
+                    }
                         .font(.f1(30).italic())
                         .foregroundStyle(Theme.chromeText)
                     Text("WORLD CHAMPIONSHIP")

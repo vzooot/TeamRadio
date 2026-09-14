@@ -201,7 +201,10 @@ struct ChatView: View {
         VStack(spacing: 0) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("PADDOCK CHAT")
+                    HStack(spacing: 9) {
+                        TrioSlashes(height: 24)
+                        Text("PADDOCK CHAT")
+                    }
                         .font(.f1(30).italic())
                         .foregroundStyle(Theme.chromeText)
                     Text(model.roundTitle.uppercased())

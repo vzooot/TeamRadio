@@ -154,22 +154,21 @@ struct DotMatrixBoard: View {
             // each lit LED: a small halo, a thin bright ring at the lens edge, a hot core
             ctx.drawLayer { layer in
                 layer.blendMode = .plusLighter
-                layer.addFilter(.blur(radius: pitch * 0.32))
-                for (p, k) in glowing { disc(p, pitch * 0.34, .color(lightColor.opacity(0.42 * k)), in: &layer) }
+                layer.addFilter(.blur(radius: pitch * 0.22))
+                for (p, k) in glowing { disc(p, pitch * 0.27, .color(lightColor.opacity(0.4 * k)), in: &layer) }
             }
             // the outer ring glows rather than draws: a blurred additive stroke
             ctx.drawLayer { layer in
                 layer.blendMode = .plusLighter
-                layer.addFilter(.blur(radius: 1.4))
+                layer.addFilter(.blur(radius: 1.1))
                 for (p, k) in glowing {
-                    let r = pitch * 0.27
+                    let r = pitch * 0.25
                     layer.stroke(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r)),
-                                 with: .color(lightColor.opacity(0.9 * k)), lineWidth: 1.8)
+                                 with: .color(lightColor.opacity(0.85 * k)), lineWidth: 1.5)
                 }
             }
             for (p, k) in glowing {
-                disc(p, pitch * 0.16, .color(lightColor.opacity(0.55 + 0.45 * k)), in: &ctx)
-                disc(p, pitch * 0.075, .color(Color(red: 1, green: 0.92, blue: 0.85).opacity(0.95 * k)), in: &ctx)
+                disc(p, pitch * 0.16, .color(Color(red: 1.0, green: 0.42, blue: 0.24).opacity(0.6 + 0.4 * k)), in: &ctx)
             }
         }
         // a little taller than the grid so the halos aren't clipped

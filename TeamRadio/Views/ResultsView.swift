@@ -207,7 +207,10 @@ struct ResultsView: View {
     private func header(race: Race) -> some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("RESULTS")
+                HStack(spacing: 9) {
+                    TrioSlashes(height: 24)
+                    Text("RESULTS")
+                }
                     .font(.f1(30).italic())
                     .foregroundStyle(Theme.chromeText)
                 Text("\(Flags.emoji(for: race.circuit.location.country)) \(race.raceName.uppercased()) · ROUND \(race.roundNumber)")

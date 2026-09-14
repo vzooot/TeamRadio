@@ -42,7 +42,10 @@ struct NewsView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 12) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("PADDOCK NEWS")
+                            HStack(spacing: 9) {
+                                TrioSlashes(height: 24)
+                                Text("PADDOCK NEWS")
+                            }
                                 .font(.f1(30).italic())
                                 .foregroundStyle(Theme.chromeText)
                             Text("F1.COM · BBC SPORT · MOTORSPORT.COM")

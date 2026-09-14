@@ -158,20 +158,28 @@ struct SectionTitle: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            // three slashes in the sector colours, like the circuit
-            HStack(spacing: 3) {
-                ForEach([Theme.accent, Theme.violet, Theme.live], id: \.self) { color in
-                    Rectangle()
-                        .fill(color)
-                        .frame(width: 3.5, height: 18)
-                        .rotationEffect(.degrees(14))
-                        .shadow(color: color.opacity(0.6), radius: 3)
-                }
-            }
-            .padding(.leading, 2)
+            TrioSlashes(height: 18)
             Text(text)
                 .font(.f1(19).italic())
                 .foregroundStyle(Theme.chromeText)
         }
+    }
+}
+
+/// Three slashes in the sector colours, like the circuit — the app's title mark.
+struct TrioSlashes: View {
+    var height: CGFloat = 18
+
+    var body: some View {
+        HStack(spacing: height * 0.17) {
+            ForEach([Theme.accent, Theme.violet, Theme.live], id: \.self) { color in
+                Rectangle()
+                    .fill(color)
+                    .frame(width: height * 0.2, height: height)
+                    .rotationEffect(.degrees(14))
+                    .shadow(color: color.opacity(0.6), radius: height * 0.17)
+            }
+        }
+        .padding(.leading, 2)
     }
 }
