@@ -152,23 +152,35 @@ struct DotMatrixBoard: View {
             // lit LEDs: a soft additive halo, a coloured point, a bright core
             let glowing = lit.map { (center($0.key % 1000, $0.key / 1000), $0.value) }
             // each lit LED: a small halo, a thin bright ring at the lens edge, a hot core
+            // a faint ring at the lens edge
             ctx.drawLayer { layer in
                 layer.blendMode = .plusLighter
-                layer.addFilter(.blur(radius: pitch * 0.22))
-                for (p, k) in glowing { disc(p, pitch * 0.27, .color(lightColor.opacity(0.4 * k)), in: &layer) }
-            }
-            // the outer ring glows rather than draws: a blurred additive stroke
-            ctx.drawLayer { layer in
-                layer.blendMode = .plusLighter
-                layer.addFilter(.blur(radius: 1.1))
+                layer.addFilter(.blur(radius: 1.0))
                 for (p, k) in glowing {
                     let r = pitch * 0.25
                     layer.stroke(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r)),
-                                 with: .color(lightColor.opacity(0.85 * k)), lineWidth: 1.5)
+                                 with: .color(lightColor.opacity(0.3 * k)), lineWidth: 1.2)
+                }
+            }
+            // the LED's nine cells light individually, each with its own small halo
+            let hot = Color(red: 1.0, green: 0.45, blue: 0.25)
+            ctx.drawLayer { layer in
+                layer.blendMode = .plusLighter
+                layer.addFilter(.blur(radius: cellR * 1.6))
+                for (p, k) in glowing {
+                    for dx in -1...1 {
+                        for dy in -1...1 {
+                            disc(CGPoint(x: p.x + CGFloat(dx) * cellStep, y: p.y + CGFloat(dy) * cellStep), cellR * 2.2, .color(lightColor.opacity(0.55 * k)), in: &layer)
+                        }
+                    }
                 }
             }
             for (p, k) in glowing {
-                disc(p, pitch * 0.16, .color(Color(red: 1.0, green: 0.42, blue: 0.24).opacity(0.6 + 0.4 * k)), in: &ctx)
+                for dx in -1...1 {
+                    for dy in -1...1 {
+                        disc(CGPoint(x: p.x + CGFloat(dx) * cellStep, y: p.y + CGFloat(dy) * cellStep), cellR * 1.35, .color(hot.opacity(0.7 + 0.3 * k)), in: &ctx)
+                    }
+                }
             }
         }
         // a little taller than the grid so the halos aren't clipped
