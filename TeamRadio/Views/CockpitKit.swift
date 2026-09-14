@@ -193,10 +193,10 @@ struct DotMatrixBoard: View {
             Canvas { ctx, size in
                 let cols = Self.cols, rows = Self.rows
                 // a little side margin so the outer lamps' halos aren't clipped
-                let pitch = size.width / (CGFloat(cols) + 1.2)
-                let left = pitch * 0.6
+                let pitch = size.width / (CGFloat(cols) + 0.8)
+                let left = pitch * 0.4
                 let top = (size.height - CGFloat(rows) * pitch) / 2
-                let hole = pitch * 0.34          // clear gaps between sockets
+                let hole = pitch * 0.41          // as big as they can be with a clear gap
                 let die = hole * 0.26            // side of one grey square in an unlit socket
                 let dieStep = hole * 0.34
 
