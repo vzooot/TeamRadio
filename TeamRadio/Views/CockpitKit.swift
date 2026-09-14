@@ -148,8 +148,14 @@ struct DotMatrixBoard: View {
                                with: .color(.white.opacity(0.07)), lineWidth: 0.8)
                     disc(p, hole, .color(.black.opacity(0.7)), in: &ctx)
                     let key = r * 1000 + c
-                    if !lit.contains(key) {
-                        cells(p, cellR, .color(armed.contains(key) ? lightColor.opacity(0.22) : .white.opacity(0.09)), in: &ctx)
+                    if armed.contains(key) {
+                        // an unlit lamp: dark red lens with a faint rim, cells glowing low
+                        disc(p, hole * 0.9, .color(lightColor.opacity(0.2)), in: &ctx)
+                        ctx.stroke(Path(ellipseIn: CGRect(x: p.x - hole * 0.9, y: p.y - hole * 0.9, width: 1.8 * hole, height: 1.8 * hole)),
+                                   with: .color(lightColor.opacity(0.4)), lineWidth: 0.8)
+                        cells(p, cellR * 1.1, .color(lightColor.opacity(0.7)), in: &ctx)
+                    } else if !lit.contains(key) {
+                        cells(p, cellR, .color(.white.opacity(0.09)), in: &ctx)
                     }
                 }
             }
