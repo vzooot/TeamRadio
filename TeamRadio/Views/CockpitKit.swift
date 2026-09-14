@@ -196,7 +196,7 @@ struct DotMatrixBoard: View {
                 let pitch = size.width / (CGFloat(cols) + 0.8)
                 let left = pitch * 0.4
                 let top = (size.height - CGFloat(rows) * pitch) / 2
-                let hole = pitch * 0.41          // as big as they can be with a clear gap
+                let hole = pitch * 0.32          // roomy spacing, like the reference
                 let die = hole * 0.21            // side of one grey square in an unlit socket
                 let dieStep = hole * 0.37
 
