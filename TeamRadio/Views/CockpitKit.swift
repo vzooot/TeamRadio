@@ -259,7 +259,7 @@ struct DotMatrixBoard: View {
                         let key = r * 1000 + c
                         guard lit[key] == nil else { continue }
                         let p = center(c, r)
-                        let tint: Color = armed.contains(key) ? Color(red: 0.36, green: 0.13, blue: 0.09) : Color(red: 0.22, green: 0.25, blue: 0.27)
+                        let tint: Color = armed.contains(key) ? Color(red: 0.46, green: 0.17, blue: 0.12) : Color(red: 0.3, green: 0.34, blue: 0.36)
                         for dx in -1...1 {
                             for dy in -1...1 {
                                 let q = CGPoint(x: p.x + CGFloat(dx) * dieStep, y: p.y + CGFloat(dy) * dieStep)
