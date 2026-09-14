@@ -6,36 +6,28 @@ import UIKit
 enum Cockpit {
     /// One weave repeat, rendered once and tiled — cheap to redraw every tick.
     static let carbonTile: UIImage = {
-        // 2×2 twill: each cell is one strand, horizontal and vertical strands
-        // alternate in a checker, each shaded along its length like woven fibre.
-        let cell: CGFloat = 3.5
-        let n = 2
+        // 2×2 twill, near-black: the "over" strands step one cell per row, which
+        // is what gives real carbon its diagonal look. Low contrast on purpose.
+        let cell: CGFloat = 2.5
+        let n = 4
         let size = CGSize(width: cell * CGFloat(n), height: cell * CGFloat(n))
         let format = UIGraphicsImageRendererFormat()
         format.scale = 3
         return UIGraphicsImageRenderer(size: size, format: format).image { ctx in
             let c = ctx.cgContext
-            c.setFillColor(UIColor(white: 0.04, alpha: 1).cgColor)
+            c.setFillColor(UIColor(red: 0.035, green: 0.04, blue: 0.05, alpha: 1).cgColor)
             c.fill(CGRect(origin: .zero, size: size))
             let space = CGColorSpaceCreateDeviceGray()
             for i in 0..<n {
                 for j in 0..<n {
-                    let rect = CGRect(x: CGFloat(i) * cell, y: CGFloat(j) * cell, width: cell, height: cell).insetBy(dx: 0.3, dy: 0.3)
-                    let horizontal = (i + j) % 2 == 0
-                    let shades: [CGFloat] = horizontal ? [0.21, 0.145, 0.085] : [0.125, 0.08, 0.05]
+                    let rect = CGRect(x: CGFloat(i) * cell, y: CGFloat(j) * cell, width: cell, height: cell).insetBy(dx: 0.2, dy: 0.2)
+                    let over = (i + j) % 4 < 2
+                    let shades: [CGFloat] = over ? [0.125, 0.095, 0.065] : [0.075, 0.06, 0.045]
                     let colors = shades.map { CGColor(gray: $0, alpha: 1) } as CFArray
-                    guard let grad = CGGradient(colorsSpace: space, colors: colors, locations: [0, 0.55, 1]) else { continue }
+                    guard let grad = CGGradient(colorsSpace: space, colors: colors, locations: [0, 0.5, 1]) else { continue }
                     c.saveGState()
                     c.clip(to: rect)
-                    let start = horizontal ? CGPoint(x: rect.minX, y: rect.midY) : CGPoint(x: rect.midX, y: rect.minY)
-                    let end = horizontal ? CGPoint(x: rect.maxX, y: rect.midY) : CGPoint(x: rect.midX, y: rect.maxY)
-                    c.drawLinearGradient(grad, start: start, end: end, options: [])
-                    // specular edge on the raised strand
-                    c.setStrokeColor(UIColor(white: 1, alpha: horizontal ? 0.10 : 0.05).cgColor)
-                    c.setLineWidth(0.5)
-                    c.move(to: horizontal ? CGPoint(x: rect.minX, y: rect.minY + 0.3) : CGPoint(x: rect.minX + 0.3, y: rect.minY))
-                    c.addLine(to: horizontal ? CGPoint(x: rect.maxX, y: rect.minY + 0.3) : CGPoint(x: rect.minX + 0.3, y: rect.maxY))
-                    c.strokePath()
+                    c.drawLinearGradient(grad, start: CGPoint(x: rect.minX, y: rect.minY), end: CGPoint(x: rect.maxX, y: rect.maxY), options: [])
                     c.restoreGState()
                 }
             }
@@ -170,13 +162,10 @@ struct DotMatrixBoard: View {
                 c.fill(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r)), with: shading)
             }
 
-            // sockets: a quiet dark recess at every LED position, lighter rim on the lower edge
-            let socket = pitch * 0.24
+            // unlit LEDs: tiny dim dots, so the grid is only just there
             for col in 0..<gridCols {
                 for row in 0..<rows {
-                    let p = center(col, row)
-                    disc(CGPoint(x: p.x, y: p.y + 0.7), socket, .color(.white.opacity(0.10)), in: &ctx)
-                    disc(p, socket, .color(.black.opacity(0.6)), in: &ctx)
+                    disc(center(col, row), pitch * 0.09, .color(.white.opacity(0.13)), in: &ctx)
                 }
             }
 
@@ -202,15 +191,15 @@ struct DotMatrixBoard: View {
                     if c < litLights { orange.append(center(gc, row)) } else { off.append(center(gc, row)) }
                 }
             }
-            for p in off { disc(p, pitch * 0.17, .color(lightColor.opacity(0.32)), in: &ctx) }
+            for p in off { disc(p, pitch * 0.13, .color(lightColor.opacity(0.4)), in: &ctx) }
 
             for (points, color) in [(cyan, textColor), (orange, lightColor)] where !points.isEmpty {
                 ctx.drawLayer { layer in
-                    layer.addFilter(.blur(radius: pitch * 0.7))
-                    for p in points { disc(p, pitch * 0.42, .color(color.opacity(0.9)), in: &layer) }
+                    layer.addFilter(.blur(radius: pitch * 0.5))
+                    for p in points { disc(p, pitch * 0.3, .color(color.opacity(0.8)), in: &layer) }
                 }
-                for p in points { disc(p, pitch * 0.24, .color(color), in: &ctx) }
-                for p in points { disc(p, pitch * 0.11, .color(.white.opacity(0.9)), in: &ctx) }
+                for p in points { disc(p, pitch * 0.19, .color(color), in: &ctx) }
+                for p in points { disc(p, pitch * 0.08, .color(.white.opacity(0.85)), in: &ctx) }
             }
         }
         .frame(height: 64)
