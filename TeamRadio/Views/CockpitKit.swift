@@ -3,46 +3,17 @@ import UIKit
 
 /// Cockpit hardware look for the countdown: carbon weave, neon-edged glass
 /// tiles, hex screws and a dot-matrix LED board.
-enum Cockpit {
-    /// One weave repeat, rendered once and tiled — cheap to redraw every tick.
-    static let carbonTile: UIImage = {
-        // 2×2 twill, near-black: the "over" strands step one cell per row, which
-        // is what gives real carbon its diagonal look. Low contrast on purpose.
-        let cell: CGFloat = 2.5
-        let n = 4
-        let size = CGSize(width: cell * CGFloat(n), height: cell * CGFloat(n))
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = 3
-        return UIGraphicsImageRenderer(size: size, format: format).image { ctx in
-            let c = ctx.cgContext
-            c.setFillColor(UIColor(red: 0.035, green: 0.04, blue: 0.05, alpha: 1).cgColor)
-            c.fill(CGRect(origin: .zero, size: size))
-            let space = CGColorSpaceCreateDeviceGray()
-            for i in 0..<n {
-                for j in 0..<n {
-                    let rect = CGRect(x: CGFloat(i) * cell, y: CGFloat(j) * cell, width: cell, height: cell).insetBy(dx: 0.2, dy: 0.2)
-                    let over = (i + j) % 4 < 2
-                    let shades: [CGFloat] = over ? [0.125, 0.095, 0.065] : [0.075, 0.06, 0.045]
-                    let colors = shades.map { CGColor(gray: $0, alpha: 1) } as CFArray
-                    guard let grad = CGGradient(colorsSpace: space, colors: colors, locations: [0, 0.5, 1]) else { continue }
-                    c.saveGState()
-                    c.clip(to: rect)
-                    c.drawLinearGradient(grad, start: CGPoint(x: rect.minX, y: rect.minY), end: CGPoint(x: rect.maxX, y: rect.maxY), options: [])
-                    c.restoreGState()
-                }
-            }
-        }
-    }()
-}
 
+/// Pre-rendered carbon weave with a sweeping sheen (Assets/Carbon), so the
+/// surface reads as one lit panel rather than a repeating tile.
 struct CarbonFiber: View {
     var body: some View {
-        Image(uiImage: Cockpit.carbonTile)
-            .resizable(resizingMode: .tile)
-            .overlay(
-                // vignette so the weave sinks away from the glowing parts
-                RadialGradient(colors: [.clear, .black.opacity(0.28)], center: .center, startRadius: 60, endRadius: 340)
-            )
+        Color.black.overlay(
+            Image("Carbon")
+                .resizable()
+                .scaledToFill()
+        )
+        .clipped()
     }
 }
 
@@ -146,62 +117,78 @@ struct DotMatrixBoard: View {
 
     var body: some View {
         Canvas { ctx, size in
+            // ~28 holes across, 6 down. Each hole shows a 3×3 matrix of tiny
+            // cells; a lit hole floods its cells with colour and blooms.
             let textCols = text.count * 4 - 1
-            let gantryCols = 9                      // 5 lamps, one dark column between
-            let cols = textCols + 3 + gantryCols
-            let pitch = min(12, size.width / CGFloat(cols))
-            let rows = 7                            // 5 for glyphs + a blank socket row above and below
-            let gridCols = Int(size.width / pitch)
-            let x0 = (size.width - CGFloat(gridCols) * pitch) / 2
+            let gantryCols = 9
+            let cols = max(28, textCols + 2 + gantryCols)
+            let pitch = size.width / CGFloat(cols)
+            let rows = 6
             let top = (size.height - CGFloat(rows) * pitch) / 2
+            let hole = pitch * 0.36
+            let cellStep = pitch * 0.14
+            let cellR = pitch * 0.045
 
             func center(_ col: Int, _ row: Int) -> CGPoint {
-                CGPoint(x: x0 + CGFloat(col) * pitch + pitch / 2, y: top + CGFloat(row) * pitch + pitch / 2)
+                CGPoint(x: CGFloat(col) * pitch + pitch / 2, y: top + CGFloat(row) * pitch + pitch / 2)
             }
             func disc(_ p: CGPoint, _ r: CGFloat, _ shading: GraphicsContext.Shading, in c: inout GraphicsContext) {
                 c.fill(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r)), with: shading)
             }
-
-            // unlit LEDs: tiny dim dots, so the grid is only just there
-            for col in 0..<gridCols {
-                for row in 0..<rows {
-                    disc(center(col, row), pitch * 0.09, .color(.white.opacity(0.13)), in: &ctx)
+            func cells(_ p: CGPoint, _ r: CGFloat, _ shading: GraphicsContext.Shading, in c: inout GraphicsContext) {
+                for dx in -1...1 {
+                    for dy in -1...1 {
+                        disc(CGPoint(x: p.x + CGFloat(dx) * cellStep, y: p.y + CGFloat(dy) * cellStep), r, shading, in: &c)
+                    }
                 }
             }
 
-            // ticker glyphs, rows 1...5
-            var cyan: [CGPoint] = []
+            // ticker glyphs on rows 1...5 (row 0 stays dark), gantry lamps at the right
+            var lit: [Int: Color] = [:]          // key: row * 1000 + col
             var col = 0
             for ch in text.uppercased() {
                 let bits = Array(Self.glyphs[ch] ?? Self.glyphs[" "]!)
                 for row in 0..<5 {
-                    for k in 0..<3 where row * 3 + k < bits.count && bits[row * 3 + k] == "#" && col + k < gridCols {
-                        cyan.append(center(col + k, row + 1))
+                    for k in 0..<3 where row * 3 + k < bits.count && bits[row * 3 + k] == "#" && col + k < cols {
+                        lit[(row + 1) * 1000 + col + k] = textColor
                     }
                 }
                 col += 4
             }
-
-            // gantry: 5 columns, one LED on row 2 and one on row 4, lit from the left
-            var orange: [CGPoint] = []
-            var off: [CGPoint] = []
+            var armed: Set<Int> = []
             for c in 0..<5 {
-                let gc = gridCols - 1 - (4 - c) * 2
+                let gc = cols - 1 - (4 - c) * 2
                 for row in [2, 4] {
-                    if c < litLights { orange.append(center(gc, row)) } else { off.append(center(gc, row)) }
+                    if c < litLights { lit[row * 1000 + gc] = lightColor } else { armed.insert(row * 1000 + gc) }
                 }
             }
-            for p in off { disc(p, pitch * 0.13, .color(lightColor.opacity(0.4)), in: &ctx) }
 
-            for (points, color) in [(cyan, textColor), (orange, lightColor)] where !points.isEmpty {
-                ctx.drawLayer { layer in
-                    layer.addFilter(.blur(radius: pitch * 0.5))
-                    for p in points { disc(p, pitch * 0.3, .color(color.opacity(0.8)), in: &layer) }
+            // every hole: dark recess with a rim, then its nine cells
+            for c in 0..<cols {
+                for r in 0..<rows {
+                    let p = center(c, r)
+                    ctx.stroke(Path(ellipseIn: CGRect(x: p.x - hole, y: p.y - hole + 0.6, width: 2 * hole, height: 2 * hole)),
+                               with: .color(.white.opacity(0.10)), lineWidth: 0.9)
+                    disc(p, hole, .color(.black.opacity(0.78)), in: &ctx)
+                    if lit[r * 1000 + c] == nil {
+                        let dim: Color = armed.contains(r * 1000 + c) ? lightColor.opacity(0.45) : .white.opacity(0.13)
+                        cells(p, cellR, .color(dim), in: &ctx)
+                    }
                 }
-                for p in points { disc(p, pitch * 0.19, .color(color), in: &ctx) }
-                for p in points { disc(p, pitch * 0.08, .color(.white.opacity(0.85)), in: &ctx) }
+            }
+
+            // lit holes: bloom beyond the rim, colour floods the recess, cells burn white-hot
+            let glowing = lit.map { (center($0.key % 1000, $0.key / 1000), $0.value) }
+            ctx.drawLayer { layer in
+                layer.addFilter(.blur(radius: pitch * 0.45))
+                for (p, color) in glowing { disc(p, hole * 1.15, .color(color.opacity(0.85)), in: &layer) }
+            }
+            for (p, color) in glowing {
+                disc(p, hole, .color(color.opacity(0.55)), in: &ctx)
+                cells(p, cellR * 1.5, .color(color), in: &ctx)
+                cells(p, cellR * 0.7, .color(.white.opacity(0.9)), in: &ctx)
             }
         }
-        .frame(height: 64)
+        .frame(height: 84)
     }
 }

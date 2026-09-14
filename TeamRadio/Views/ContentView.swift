@@ -121,7 +121,14 @@ struct HeaderView: View {
                 .resizable()
                 .scaledToFit()
                 .frame(height: 172)
-                .shadow(color: Theme.accent.opacity(0.2), radius: 24, y: 8)
+                .background(
+                    // neon bloom: cyan off the visor side, red off the radio arcs
+                    ZStack {
+                        Circle().fill(Theme.accent.opacity(0.45)).frame(width: 130).offset(x: -34, y: 4).blur(radius: 36)
+                        Circle().fill(Theme.live.opacity(0.4)).frame(width: 110).offset(x: 46, y: 0).blur(radius: 34)
+                    }
+                )
+                .shadow(color: Theme.accent.opacity(0.45), radius: 18, y: 4)
                 .padding(.top, -10)
                 .padding(.bottom, -80)
                 .accessibilityHidden(true)
