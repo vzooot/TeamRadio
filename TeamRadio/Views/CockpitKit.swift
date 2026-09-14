@@ -91,93 +91,202 @@ struct NeonTile: View {
     }
 }
 
-/// The LED board: a sparse 24×4 matrix of small sockets carrying the five
-/// start lights — each a rounded block of 12 LEDs — lit from the left as race
-/// week counts down. Lights out once the session runs.
+/// The LED matrix: 24×5 sockets. At rest it shows the five start lights
+/// (rounded blocks, lit from the left through race week). Tap it and it
+/// scrambles like a sci-fi readout, resolves to the next info page (session
+/// time, date, days to go, round) in cyan, then falls back to the lights.
 struct DotMatrixBoard: View {
     let litLights: Int
+    var pages: [String] = []
     var lightColor: Color = Theme.live
+    var infoColor: Color = Color(red: 0.45, green: 0.9, blue: 1.0)
 
-    var body: some View {
-        Canvas { ctx, size in
-            let cols = 24                   // five 4-wide lights with one dark column between
-            let rows = 4
-            let pitch = size.width / CGFloat(cols)
-            let top = (size.height - CGFloat(rows) * pitch) / 2
-            let hole = pitch * 0.3
-            let cellStep = pitch * 0.11
-            let cellR = pitch * 0.032
+    // TEMP screenshot hook: `-DemoPage 1` opens on an info page.
+    @State private var page = UserDefaults.standard.integer(forKey: "DemoPage")
+    @State private var transitionStart: Date?
+    @State private var settle: Task<Void, Never>?
 
-            func center(_ col: Int, _ row: Int) -> CGPoint {
-                CGPoint(x: CGFloat(col) * pitch + pitch / 2, y: top + CGFloat(row) * pitch + pitch / 2)
-            }
-            func disc(_ p: CGPoint, _ r: CGFloat, _ shading: GraphicsContext.Shading, in c: inout GraphicsContext) {
-                c.fill(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r)), with: shading)
-            }
+    private static let cols = 24, rows = 5
+    private static let scramble: TimeInterval = 0.9
+    private static let hold: TimeInterval = 5
 
-            // five lights, evenly spread: each a plus-shaped cluster of five LEDs
-            // each light: a 4×4 block with the corners left dark — 12 LEDs, reads as a disc
-            var lit: [Int: CGFloat] = [:]   // key: row * 1000 + col, value: intensity
-            var armed: Set<Int> = []
+    // 3 columns × 5 rows, top row first
+    private static let glyphs: [Character: String] = [
+        "0": "####.##.##.####", "1": ".#.##..#..#.###", "2": "###..#####..###", "3": "###..####..####",
+        "4": "#.##.####..#..#", "5": "####..###..####", "6": "####..####.####", "7": "###..#..#..#..#",
+        "8": "####.#####.####", "9": "####.####..####",
+        "A": "####.#####.##.#", "B": "##.#.###.#.###.", "C": "####..#..#..###", "D": "##.#.##.##.###.",
+        "E": "####..####..###", "F": "####..####..#..", "G": "####..#.##.####", "H": "#.##.#####.##.#",
+        "I": "###.#..#..#.###", "J": "..#..#..##.####", "K": "#.##.###.#.##.#", "L": "#..#..#..#..###",
+        "M": "#.########.##.#", "N": "##.#.##.##.##.#", "O": "####.##.##.####", "P": "####.#####..#..",
+        "Q": "####.##.####..#", "R": "####.###.#.##.#", "S": "####..###..####", "T": "###.#..#..#..#.",
+        "U": "#.##.##.##.####", "V": "#.##.##.##.#.#.", "W": "#.##.########.#", "X": "#.##.#.#.#.##.#",
+        "Y": "#.##.####.#..#.", "Z": "###..#.#.#..###", ":": "....#.....#....", "-": "......###......",
+        ".": "............#..", "/": "..#..#.#.#..#..", " ": "...............",
+    ]
+
+    /// Cells lit by the current page: key row*1000+col → 1 (lit) or 0 (armed/dim).
+    private func target(for page: Int) -> [Int: Double] {
+        var cells: [Int: Double] = [:]
+        if page == 0 {
+            // five rounded 4×5 blocks, one dark column between
             for c in 0..<5 {
                 let c0 = c * 5
                 for dc in 0..<4 {
-                    for dr in 0..<4 {
-                        let corner = (dc == 0 || dc == 3) && (dr == 0 || dr == 3)
+                    for dr in 0..<5 {
+                        let corner = (dc == 0 || dc == 3) && (dr == 0 || dr == 4)
                         guard !corner else { continue }
-                        let key = dr * 1000 + c0 + dc
-                        if c < litLights { lit[key] = 1 } else { armed.insert(key) }
+                        cells[dr * 1000 + c0 + dc] = c < litLights ? 1 : 0
                     }
                 }
             }
+        } else {
+            let text = Array(pages[page - 1].uppercased().prefix(6))
+            let width = text.count * 4 - 1
+            var col = max(0, (Self.cols - width) / 2)
+            for ch in text {
+                let bits = Array(Self.glyphs[ch] ?? Self.glyphs[" "]!)
+                for row in 0..<5 {
+                    for k in 0..<3 where bits[row * 3 + k] == "#" && col + k < Self.cols {
+                        cells[row * 1000 + col + k] = 1
+                    }
+                }
+                col += 4
+            }
+        }
+        return cells
+    }
 
-            // sockets: a dark recess with a faint lip below and a 3×3 hint of the die
-            for c in 0..<cols {
-                for r in 0..<rows {
-                    let p = center(c, r)
-                    let key = r * 1000 + c
-                    disc(CGPoint(x: p.x, y: p.y + 0.8), hole * 1.05, .color(.white.opacity(0.09)), in: &ctx)
-                    disc(p, hole, .color(.black.opacity(0.72)), in: &ctx)
-                    if lit[key] == nil {
-                        let dieColor: Color = armed.contains(key) ? lightColor.opacity(0.3) : .white.opacity(0.09)
-                        for dx in -1...1 {
-                            for dy in -1...1 {
-                                disc(CGPoint(x: p.x + CGFloat(dx) * cellStep, y: p.y + CGFloat(dy) * cellStep), cellR, .color(dieColor), in: &ctx)
+    /// Cheap deterministic noise in 0..<1 for the scramble frames.
+    private static func noise(_ a: Int, _ b: Int) -> Double {
+        var h = UInt64(truncatingIfNeeded: a) &* 0x9E37_79B9_7F4A_7C15
+        h ^= UInt64(truncatingIfNeeded: b) &* 0xBF58_476D_1CE4_E5B9
+        h ^= h >> 29; h &*= 0x94D0_49BB_1331_11EB; h ^= h >> 32
+        return Double(h % 10_000) / 10_000
+    }
+
+    private func advance() {
+        guard !pages.isEmpty else { return }
+        page = (page + 1) % (pages.count + 1)
+        show()
+    }
+
+    private func show() {
+        transitionStart = Date()
+        settle?.cancel()
+        settle = Task {
+            try? await Task.sleep(for: .seconds(Self.scramble))
+            guard !Task.isCancelled else { return }
+            transitionStart = nil
+            guard page != 0 else { return }
+            try? await Task.sleep(for: .seconds(Self.hold))
+            guard !Task.isCancelled else { return }
+            page = 0
+            transitionStart = Date()
+            try? await Task.sleep(for: .seconds(Self.scramble))
+            guard !Task.isCancelled else { return }
+            transitionStart = nil
+        }
+    }
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1 / 30, paused: transitionStart == nil)) { context in
+            Canvas { ctx, size in
+                let cols = Self.cols, rows = Self.rows
+                let pitch = size.width / CGFloat(cols)
+                let top = (size.height - CGFloat(rows) * pitch) / 2
+                let hole = pitch * 0.36
+                let die = hole * 0.26            // side of one grey square in an unlit socket
+                let dieStep = hole * 0.34
+
+                func center(_ col: Int, _ row: Int) -> CGPoint {
+                    CGPoint(x: CGFloat(col) * pitch + pitch / 2, y: top + CGFloat(row) * pitch + pitch / 2)
+                }
+                func rect(_ p: CGPoint, _ r: CGFloat) -> CGRect { CGRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r) }
+                func disc(_ p: CGPoint, _ r: CGFloat, _ shading: GraphicsContext.Shading, in c: inout GraphicsContext) {
+                    c.fill(Path(ellipseIn: rect(p, r)), with: shading)
+                }
+
+                // what's lit right now: the page, or the scramble resolving into it
+                let goal = target(for: page)
+                let color = page == 0 ? lightColor : infoColor
+                var lit: [Int: Double] = [:]
+                var armed: Set<Int> = []
+                if let start = transitionStart {
+                    let t = min(1, max(0, context.date.timeIntervalSince(start) / Self.scramble))
+                    let frame = Int(context.date.timeIntervalSinceReferenceDate * 24)
+                    let density = 0.45 * pow(1 - t, 1.6)
+                    for r in 0..<rows {
+                        for c in 0..<cols {
+                            let key = r * 1000 + c
+                            if let v = goal[key], v > 0, Self.noise(key, 7) < t * 1.3 {
+                                lit[key] = 1
+                            } else if Self.noise(key, frame) < density {
+                                lit[key] = 0.6 + 0.4 * Self.noise(key, frame + 1)
+                            } else if goal[key] == 0 {
+                                armed.insert(key)
+                            }
+                        }
+                    }
+                } else {
+                    for (key, v) in goal { if v > 0 { lit[key] = 1 } else { armed.insert(key) } }
+                }
+
+                // sockets: dark cavity with a faint rim; unlit ones show the 3×3 grey die
+                for c in 0..<cols {
+                    for r in 0..<rows {
+                        let p = center(c, r)
+                        let key = r * 1000 + c
+                        disc(p, hole, .color(.black.opacity(0.85)), in: &ctx)
+                        ctx.stroke(Path(ellipseIn: rect(CGPoint(x: p.x, y: p.y + 0.4), hole)), with: .color(.white.opacity(0.07)), lineWidth: 0.8)
+                        if lit[key] == nil {
+                            let tint: Color = armed.contains(key) ? lightColor.opacity(0.35) : .white.opacity(0.17)
+                            for dx in -1...1 {
+                                for dy in -1...1 {
+                                    let q = CGPoint(x: p.x + CGFloat(dx) * dieStep, y: p.y + CGFloat(dy) * dieStep)
+                                    ctx.fill(Path(roundedRect: CGRect(x: q.x - die / 2, y: q.y - die / 2, width: die, height: die), cornerRadius: die * 0.2), with: .color(tint))
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            // lit LEDs: a soft additive halo, a coloured point, a bright core
-            let glowing = lit.map { (center($0.key % 1000, $0.key / 1000), $0.value) }
-            // each lit LED: a small halo, a thin bright ring at the lens edge, a hot core
-            // a lit LED: a glowing core in the middle of the cavity, its light
-            // catching the cavity wall as a thin reflected rim, plus a soft halo
-            ctx.drawLayer { layer in
-                layer.blendMode = .plusLighter
-                layer.addFilter(.blur(radius: pitch * 0.14))
-                for (p, k) in glowing { disc(p, hole * 0.9, .color(lightColor.opacity(0.4 * k)), in: &layer) }
-            }
-            ctx.drawLayer { layer in
-                layer.blendMode = .plusLighter
-                layer.addFilter(.blur(radius: 0.7))
-                for (p, k) in glowing {
-                    let r = hole * 0.92
-                    layer.stroke(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r + 0.4, width: 2 * r, height: 2 * r)),
-                                 with: .color(lightColor.opacity(0.55 * k)), lineWidth: 1.1)
+                // lit LEDs: soft halo outside, light caught on the cavity wall, a big soft-edged core
+                let glowing = lit.map { (center($0.key % 1000, $0.key / 1000), $0.value) }
+                ctx.drawLayer { layer in
+                    layer.blendMode = .plusLighter
+                    layer.addFilter(.blur(radius: hole * 0.9))
+                    for (p, k) in glowing { disc(p, hole * 1.3, .color(color.opacity(0.55 * k)), in: &layer) }
                 }
-            }
-            for (p, k) in glowing {
-                let core = hole * 0.56
-                disc(p, core, .radialGradient(
-                    Gradient(colors: [Color(red: 1.0, green: 0.7, blue: 0.4).opacity(k), Color(red: 1.0, green: 0.45, blue: 0.2).opacity(k), lightColor.opacity(0.9 * k)]),
-                    center: p, startRadius: 0, endRadius: core), in: &ctx)
+                ctx.drawLayer { layer in
+                    layer.blendMode = .plusLighter
+                    layer.addFilter(.blur(radius: 0.6))
+                    for (p, k) in glowing {
+                        layer.stroke(Path(ellipseIn: rect(p, hole * 0.97)), with: .color(color.opacity(0.5 * k)), lineWidth: 1)
+                    }
+                }
+                let warm = page == 0
+                for (p, k) in glowing {
+                    let core = hole * 0.78
+                    let stops: [Gradient.Stop] = warm
+                        ? [.init(color: Color(red: 1.0, green: 0.88, blue: 0.55), location: 0),
+                           .init(color: Color(red: 1.0, green: 0.62, blue: 0.25), location: 0.55),
+                           .init(color: Color(red: 1.0, green: 0.4, blue: 0.15), location: 1)]
+                        : [.init(color: Color(red: 0.85, green: 1.0, blue: 1.0), location: 0),
+                           .init(color: Color(red: 0.45, green: 0.92, blue: 1.0), location: 0.55),
+                           .init(color: Color(red: 0.15, green: 0.75, blue: 0.95), location: 1)]
+                    ctx.opacity = 0.35 + 0.65 * k
+                    disc(p, core, .radialGradient(Gradient(stops: stops), center: p, startRadius: 0, endRadius: core), in: &ctx)
+                    ctx.opacity = 1
+                }
             }
         }
         // a little taller than the grid so the halos aren't clipped
-        .frame(height: 84)
+        .frame(height: 96)
         .padding(.vertical, -8)
+        .contentShape(Rectangle())
+        .onTapGesture { advance() }
+        .onDisappear { settle?.cancel() }
     }
 }
 

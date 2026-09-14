@@ -49,7 +49,7 @@ struct CountdownView: View {
                     let realLit = StartLightsView.litCount(secondsRemaining: remaining)
                     // TEMP preview: two lamps always on so lit vs. armed can be compared — revert later.
                     let lit = demoLights > 0 ? demoLights : max(2, realLit)
-                    DotMatrixBoard(litLights: lit)
+                    DotMatrixBoard(litLights: lit, pages: infoPages(session: session, remaining: remaining))
                     if demoLights > 0 || realLit > 0 {
                         Text(lit >= 5 ? "FINAL 24 HOURS" : "IT'S RACE WEEK")
                             .font(.f1(11, weight: .bold))
@@ -148,6 +148,19 @@ struct CountdownView: View {
                 .buttonStyle(.plain)
             }
         }
+    }
+
+    /// What the matrix screen shows when tapped, one page per tap.
+    private func infoPages(session: WeekendSession?, remaining: TimeInterval) -> [String] {
+        guard let session else { return [] }
+        let days = Int(remaining) / 86400
+        let hours = (Int(remaining) % 86400) / 3600
+        return [
+            session.date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute()),
+            session.date.formatted(.dateTime.weekday(.abbreviated).day()).uppercased(),
+            days > 0 ? "\(days) DAYS" : "\(hours) HRS",
+            "RND \(race.round)",
+        ]
     }
 
     /// Sector colours, like the 3D circuit: practice cyan, qualifying violet, race red.
