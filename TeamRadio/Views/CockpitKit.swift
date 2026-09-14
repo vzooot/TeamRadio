@@ -274,9 +274,9 @@ struct DotMatrixBoard: View {
                 // lit as a thin ring, a dark bevel line, then a thin glow outside
                 let glowing = lit.map { (center($0.key % 1000, $0.key / 1000), $0.value) }
                 let warm = page == 0
-                let rimColor = warm ? Color(red: 0.96, green: 0.34, blue: 0.1) : Color(red: 0.12, green: 0.68, blue: 0.78)
-                let wallColor = warm ? Color(red: 0.55, green: 0.16, blue: 0.04) : Color(red: 0.05, green: 0.4, blue: 0.48)
-                let edgeColor = warm ? Color(red: 0.72, green: 0.3, blue: 0.08) : Color(red: 0.12, green: 0.6, blue: 0.72)
+                let rimColor = warm ? Color(red: 0.95, green: 0.25, blue: 0.08) : Color(red: 0.12, green: 0.68, blue: 0.78)
+                let wallColor = warm ? Color(red: 0.38, green: 0.08, blue: 0.02) : Color(red: 0.04, green: 0.3, blue: 0.38)
+                let edgeColor = warm ? Color(red: 0.62, green: 0.2, blue: 0.05) : Color(red: 0.12, green: 0.6, blue: 0.72)
                 // faint surface halo
                 ctx.drawLayer { layer in
                     layer.blendMode = .plusLighter
@@ -304,12 +304,11 @@ struct DotMatrixBoard: View {
                     for (p, k) in glowing {
                         let core = hole * 0.7
                         let stops: [Gradient.Stop] = warm
-                            ? [.init(color: Color(red: 1.0, green: 0.88, blue: 0.55), location: 0),
-                               .init(color: Color(red: 1.0, green: 0.83, blue: 0.46), location: 0.2),
-                               .init(color: Color(red: 1.0, green: 0.76, blue: 0.36), location: 0.4),
-                               .init(color: Color(red: 1.0, green: 0.68, blue: 0.28), location: 0.6),
-                               .init(color: Color(red: 1.0, green: 0.6, blue: 0.21), location: 0.8),
-                               .init(color: Color(red: 1.0, green: 0.52, blue: 0.16), location: 1)]
+                            ? [.init(color: Color(red: 1.0, green: 0.68, blue: 0.36), location: 0),
+                               .init(color: Color(red: 1.0, green: 0.62, blue: 0.3), location: 0.3),
+                               .init(color: Color(red: 1.0, green: 0.55, blue: 0.24), location: 0.6),
+                               .init(color: Color(red: 1.0, green: 0.47, blue: 0.18), location: 0.85),
+                               .init(color: Color(red: 0.98, green: 0.4, blue: 0.14), location: 1)]
                             : [.init(color: Color(red: 0.86, green: 1.0, blue: 1.0), location: 0),
                                .init(color: Color(red: 0.74, green: 0.99, blue: 1.0), location: 0.2),
                                .init(color: Color(red: 0.6, green: 0.96, blue: 1.0), location: 0.4),
@@ -317,7 +316,7 @@ struct DotMatrixBoard: View {
                                .init(color: Color(red: 0.34, green: 0.87, blue: 0.99), location: 0.8),
                                .init(color: Color(red: 0.25, green: 0.82, blue: 0.95), location: 1)]
                         layer.opacity = 0.35 + 0.65 * k
-                        disc(p, core, .radialGradient(Gradient(stops: stops), center: CGPoint(x: p.x, y: p.y - core * 0.12), startRadius: 0, endRadius: core), in: &layer)
+                        disc(p, core, .radialGradient(Gradient(stops: stops), center: p, startRadius: 0, endRadius: core), in: &layer)
                         layer.stroke(Path(ellipseIn: rect(p, core)), with: .color(edgeColor), lineWidth: 0.8)
                     }
                 }
