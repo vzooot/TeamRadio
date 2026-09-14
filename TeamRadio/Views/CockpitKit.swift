@@ -157,10 +157,17 @@ struct DotMatrixBoard: View {
                 layer.addFilter(.blur(radius: pitch * 0.32))
                 for (p, k) in glowing { disc(p, pitch * 0.34, .color(lightColor.opacity(0.42 * k)), in: &layer) }
             }
+            // the outer ring glows rather than draws: a blurred additive stroke
+            ctx.drawLayer { layer in
+                layer.blendMode = .plusLighter
+                layer.addFilter(.blur(radius: 1.4))
+                for (p, k) in glowing {
+                    let r = pitch * 0.27
+                    layer.stroke(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r)),
+                                 with: .color(lightColor.opacity(0.9 * k)), lineWidth: 1.8)
+                }
+            }
             for (p, k) in glowing {
-                let r = pitch * 0.27
-                ctx.stroke(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r)),
-                           with: .color(lightColor.opacity(0.75 * k)), lineWidth: 1)
                 disc(p, pitch * 0.16, .color(lightColor.opacity(0.55 + 0.45 * k)), in: &ctx)
                 disc(p, pitch * 0.075, .color(Color(red: 1, green: 0.92, blue: 0.85).opacity(0.95 * k)), in: &ctx)
             }
