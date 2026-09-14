@@ -157,9 +157,9 @@ struct CountdownView: View {
         let hours = (Int(remaining) % 86400) / 3600
         return [
             session.date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute()),
-            session.date.formatted(.dateTime.day().month(.abbreviated)).uppercased().replacingOccurrences(of: " ", with: ""),
-            days > 0 ? "\(days)DAYS" : "\(hours)HRS",
-            "RND\(race.round)",
+            session.date.formatted(.dateTime.day().month(.abbreviated)).uppercased(),
+            days > 0 ? "\(days) DAYS" : "\(hours) HRS",
+            "RND \(race.round)",
         ]
     }
 

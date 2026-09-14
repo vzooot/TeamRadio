@@ -91,7 +91,7 @@ struct NeonTile: View {
     }
 }
 
-/// The LED matrix: 19×4 sockets. At rest it shows the five start lights
+/// The LED matrix: 24×4 sockets. At rest it shows the five start lights
 /// (rounded blocks, lit from the left through race week). Tap it and it
 /// scrambles like a sci-fi readout, resolves to the next info page (session
 /// time, date, days to go, round) in cyan, then falls back to the lights.
@@ -106,7 +106,7 @@ struct DotMatrixBoard: View {
     @State private var transitionStart: Date?
     @State private var settle: Task<Void, Never>?
 
-    private static let cols = 19, rows = 4
+    private static let cols = 24, rows = 4
     private static let scramble: TimeInterval = 0.9
     private static let hold: TimeInterval = 5
 
@@ -128,19 +128,19 @@ struct DotMatrixBoard: View {
     private func target(for page: Int) -> [Int: Double] {
         var cells: [Int: Double] = [:]
         if page == 0 {
-            // five rounded 3×4 blocks, one dark column between
+            // five round 4×4 blocks (corners dark), one dark column between
             for c in 0..<5 {
-                let c0 = c * 4
-                for dc in 0..<3 {
+                let c0 = c * 5
+                for dc in 0..<4 {
                     for dr in 0..<4 {
-                        let corner = dc != 1 && (dr == 0 || dr == 3)
+                        let corner = (dc == 0 || dc == 3) && (dr == 0 || dr == 3)
                         guard !corner else { continue }
                         cells[dr * 1000 + c0 + dc] = c < litLights ? 1 : 0
                     }
                 }
             }
         } else {
-            let text = Array(pages[page - 1].uppercased().prefix(5))
+            let text = Array(pages[page - 1].uppercased().prefix(6))
             let width = text.count * 4 - 1
             var col = max(0, (Self.cols - width) / 2)
             for ch in text {
