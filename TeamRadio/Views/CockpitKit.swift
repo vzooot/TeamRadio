@@ -197,8 +197,8 @@ struct DotMatrixBoard: View {
                 let left = pitch * 0.4
                 let top = (size.height - CGFloat(rows) * pitch) / 2
                 let hole = pitch * 0.41          // as big as they can be with a clear gap
-                let die = hole * 0.26            // side of one grey square in an unlit socket
-                let dieStep = hole * 0.34
+                let die = hole * 0.21            // side of one grey square in an unlit socket
+                let dieStep = hole * 0.37
 
                 func center(_ col: Int, _ row: Int) -> CGPoint {
                     CGPoint(x: left + CGFloat(col) * pitch + pitch / 2, y: top + CGFloat(row) * pitch + pitch / 2)
@@ -275,7 +275,8 @@ struct DotMatrixBoard: View {
                 let glowing = lit.map { (center($0.key % 1000, $0.key / 1000), $0.value) }
                 let warm = page == 0
                 let rimColor = warm ? Color(red: 0.96, green: 0.34, blue: 0.1) : Color(red: 0.12, green: 0.68, blue: 0.78)
-                let edgeColor = warm ? Color(red: 0.9, green: 0.42, blue: 0.12) : Color(red: 0.18, green: 0.72, blue: 0.86)
+                let wallColor = warm ? Color(red: 0.55, green: 0.16, blue: 0.04) : Color(red: 0.05, green: 0.4, blue: 0.48)
+                let edgeColor = warm ? Color(red: 0.72, green: 0.3, blue: 0.08) : Color(red: 0.12, green: 0.6, blue: 0.72)
                 // faint surface halo
                 ctx.drawLayer { layer in
                     layer.blendMode = .plusLighter
@@ -294,8 +295,8 @@ struct DotMatrixBoard: View {
                     disc(p, hole * 0.97, .linearGradient(Gradient(colors: [Color.black.opacity(0.97), Color.black.opacity(0.75)]),
                                                          startPoint: CGPoint(x: p.x, y: p.y - hole), endPoint: CGPoint(x: p.x, y: p.y + hole)), in: &ctx)
                     ctx.stroke(Path(ellipseIn: rect(p, hole * 0.95)), with: .color(.black.opacity(0.85 * k)), lineWidth: 0.9)
-                    ctx.stroke(Path(ellipseIn: rect(p, hole * 0.86)), with: .color(rimColor.opacity(0.9 * k)), lineWidth: 1.1)
-                    disc(p, hole * 0.8, .color(rimColor.opacity(0.10 * k)), in: &ctx)
+                    ctx.stroke(Path(ellipseIn: rect(p, hole * 0.86)), with: .color(wallColor.opacity(0.95 * k)), lineWidth: 1.1)
+                    disc(p, hole * 0.8, .color(rimColor.opacity(0.06 * k)), in: &ctx)
                 }
                 // the luminous disc: a long, even run from the pale core to the saturated edge
                 ctx.drawLayer { layer in
