@@ -155,11 +155,11 @@ struct DotMatrixBoard: View {
             // the red glowing ring at the lens edge — bright, but with a tight blur
             ctx.drawLayer { layer in
                 layer.blendMode = .plusLighter
-                layer.addFilter(.blur(radius: 0.8))
+                layer.addFilter(.blur(radius: 0.6))
                 for (p, k) in glowing {
                     let r = pitch * 0.26
                     layer.stroke(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r)),
-                                 with: .color(lightColor.opacity(0.85 * k)), lineWidth: 1.6)
+                                 with: .color(lightColor.opacity(0.9 * k)), lineWidth: 0.6)
                 }
             }
             // the LED's nine cells light individually, each with its own small halo
