@@ -6,6 +6,7 @@
                                keywords, subtitle; replace both screenshot sets
   submit VERSION BUILD         wait for BUILD to process, attach it, submit for review
   release VERSION              release an approved version (Pending Developer Release)
+  next-build                   print the highest build number on App Store Connect + 1
 
 Options for prepare:
   --notes FILE        release notes (default fastlane/metadata/en-US/release_notes.txt)
@@ -154,6 +155,11 @@ def cmd_submit(a):
     log("SUBMITTED", a.version, "->", version_id(a.version)[1])
 
 
+def cmd_next_build(_):
+    builds = call("GET", f"/v1/builds?filter[app]={APP}&sort=-uploadedDate&limit=50&fields[builds]=version")["data"]
+    print(max((int(b["attributes"]["version"]) for b in builds if b["attributes"]["version"].isdigit()), default=0) + 1)
+
+
 def cmd_release(a):
     vid, state = version_id(a.version)
     if state != "PENDING_DEVELOPER_RELEASE":
@@ -170,4 +176,5 @@ pp = sub.add_parser("prepare"); pp.add_argument("version"); pp.add_argument("--n
 pp.add_argument("--subtitle"); pp.add_argument("--no-screenshots", action="store_true"); pp.set_defaults(fn=cmd_prepare)
 ps = sub.add_parser("submit"); ps.add_argument("version"); ps.add_argument("build"); ps.set_defaults(fn=cmd_submit)
 pr = sub.add_parser("release"); pr.add_argument("version"); pr.set_defaults(fn=cmd_release)
+sub.add_parser("next-build").set_defaults(fn=cmd_next_build)
 args = p.parse_args(); args.fn(args)

@@ -1,15 +1,19 @@
 #!/bin/sh
 # Archive the app for the App Store and upload it to App Store Connect.
 #
-#   scripts/release.sh            build number = git commit count (monotonic, same for
-#                                 the same commit on any machine)
+# Xcode Cloud is the normal uploader (every push to main lands on TestFlight); this
+# is the fallback for when the cloud is down. The build number is the highest build
+# already on App Store Connect + 1, so it never collides with the cloud's numbering.
+# After using it, raise the workflow's "Next Build Number" in Xcode Cloud past it.
+#
+#   scripts/release.sh            highest build on App Store Connect + 1
 #   scripts/release.sh 130        explicit build number
 #
 # Needs the Admin API key fastlane/AuthKey_4Q3R87G48X.p8 (gitignored) — cloud-managed
 # signing refuses App Manager keys. The marketing version comes from the project.
 set -e
 cd "$(dirname "$0")/.."
-BUILD=${1:-$(git rev-list --count HEAD)}
+BUILD=${1:-$(python3 scripts/asc/release.py next-build)}
 KEY=fastlane/AuthKey_4Q3R87G48X.p8
 KEY_ID=4Q3R87G48X
 ISSUER=69a6de77-4ce8-47e3-e053-5b8c7c11a4d1

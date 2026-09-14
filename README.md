@@ -117,15 +117,18 @@ TeamRadio/
 No fastlane, no CI dependency — three scripts talk to App Store Connect directly
 (credentials in `fastlane/asc_key.json` and `fastlane/AuthKey_*.p8`, both gitignored).
 
-1. Bump `MARKETING_VERSION` in the project (a released version's train is closed).
-2. `scripts/release.sh` — archives and uploads a build; the build number is the git
-   commit count, so it is monotonic and identical for the same commit anywhere.
-   Xcode Cloud numbers its own builds: keep its "Next Build Number" above this count.
-3. `python3 scripts/asc/release.py prepare 1.2.0 --keywords "…" --subtitle "…"` —
+1. Bump `MARKETING_VERSION` in the project (a released version's train is closed) and
+   push to main — Xcode Cloud ("Release to TestFlight") builds, lints, uploads the build
+   and hands it to the internal testers. Note the build number it produced.
+2. `python3 scripts/asc/release.py prepare 1.2.0 --keywords "…" --subtitle "…"` —
    creates the version (manual release), sets notes from
    `fastlane/metadata/en-US/release_notes.txt`, uploads `fastlane/screenshots/`.
-4. `python3 scripts/asc/release.py submit 1.2.0 <build>` — waits for processing,
+3. `python3 scripts/asc/release.py submit 1.2.0 <build>` — waits for processing,
    attaches the build, submits for review. `… release 1.2.0` once approved.
+
+If Xcode Cloud is down, `scripts/release.sh` archives and uploads from this Mac with
+the highest build number on App Store Connect + 1; afterwards raise the workflow's
+"Next Build Number" in Xcode Cloud past it.
 
 Screenshots: capture the six screens into `Marketing/raw/` (`panel-*.png` from an
 iPhone 6.9" simulator, `ipad-*.png` from a 13" iPad), then `scripts/store/compose_panels.py`
