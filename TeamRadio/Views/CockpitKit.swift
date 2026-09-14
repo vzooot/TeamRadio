@@ -117,17 +117,17 @@ struct DotMatrixBoard: View {
 
     var body: some View {
         Canvas { ctx, size in
-            // ~28 holes across, 6 down. Each hole shows a 3×3 matrix of tiny
-            // cells; a lit hole floods its cells with colour and blooms.
+            // ~25 big holes across, 5 down. Unlit holes show a faint 3×3 matrix
+            // of cells; a lit hole is one round bright LED with a bloom.
             let textCols = text.count * 4 - 1
-            let gantryCols = 9
-            let cols = max(28, textCols + 2 + gantryCols)
+            let gantryCols = 5                      // five adjacent lamp columns
+            let cols = max(24, textCols + 1 + gantryCols)
             let pitch = size.width / CGFloat(cols)
-            let rows = 6
+            let rows = 5
             let top = (size.height - CGFloat(rows) * pitch) / 2
-            let hole = pitch * 0.36
-            let cellStep = pitch * 0.14
-            let cellR = pitch * 0.045
+            let hole = pitch * 0.37
+            let cellStep = pitch * 0.13
+            let cellR = pitch * 0.04
 
             func center(_ col: Int, _ row: Int) -> CGPoint {
                 CGPoint(x: CGFloat(col) * pitch + pitch / 2, y: top + CGFloat(row) * pitch + pitch / 2)
@@ -143,22 +143,22 @@ struct DotMatrixBoard: View {
                 }
             }
 
-            // ticker glyphs on rows 1...5 (row 0 stays dark), gantry lamps at the right
+            // ticker glyphs on the left, gantry lamps (two per column) at the right
             var lit: [Int: Color] = [:]          // key: row * 1000 + col
             var col = 0
             for ch in text.uppercased() {
                 let bits = Array(Self.glyphs[ch] ?? Self.glyphs[" "]!)
                 for row in 0..<5 {
                     for k in 0..<3 where row * 3 + k < bits.count && bits[row * 3 + k] == "#" && col + k < cols {
-                        lit[(row + 1) * 1000 + col + k] = textColor
+                        lit[row * 1000 + col + k] = textColor
                     }
                 }
                 col += 4
             }
             var armed: Set<Int> = []
             for c in 0..<5 {
-                let gc = cols - 1 - (4 - c) * 2
-                for row in [2, 4] {
+                let gc = cols - 5 + c
+                for row in [1, 3] {
                     if c < litLights { lit[row * 1000 + gc] = lightColor } else { armed.insert(row * 1000 + gc) }
                 }
             }
@@ -177,20 +177,18 @@ struct DotMatrixBoard: View {
                 }
             }
 
-            // lit holes: bloom beyond the rim, colour floods the recess, cells burn white-hot
+            // lit holes: one round LED — soft bloom past the rim, coloured disc, hot centre
             let glowing = lit.map { (center($0.key % 1000, $0.key / 1000), $0.value) }
-            // lit: a bright point in the hole with a soft bloom, cells glowing under it
             ctx.drawLayer { layer in
-                layer.addFilter(.blur(radius: pitch * 0.4))
-                for (p, color) in glowing { disc(p, hole * 0.9, .color(color.opacity(0.8)), in: &layer) }
+                layer.addFilter(.blur(radius: pitch * 0.45))
+                for (p, color) in glowing { disc(p, hole * 1.1, .color(color.opacity(0.8)), in: &layer) }
             }
             for (p, color) in glowing {
-                disc(p, hole, .color(color.opacity(0.22)), in: &ctx)
-                cells(p, cellR * 1.3, .color(color.opacity(0.9)), in: &ctx)
-                disc(p, hole * 0.5, .color(color), in: &ctx)
-                disc(p, hole * 0.26, .color(.white.opacity(0.85)), in: &ctx)
+                disc(p, hole * 0.95, .color(color.opacity(0.35)), in: &ctx)
+                disc(p, hole * 0.72, .color(color), in: &ctx)
+                disc(p, hole * 0.38, .color(.white.opacity(0.9)), in: &ctx)
             }
         }
-        .frame(height: 84)
+        .frame(height: 80)
     }
 }
