@@ -100,7 +100,7 @@ struct DotMatrixBoard: View {
 
     var body: some View {
         Canvas { ctx, size in
-            let cols = 25
+            let cols = 21                   // five 3-wide lamps, single gaps, one spare column each side
             let rows = 7
             let pitch = size.width / CGFloat(cols)
             let top = (size.height - CGFloat(rows) * pitch) / 2
@@ -179,7 +179,7 @@ struct DotMatrixBoard: View {
         }
         // Taller than the grid so the lamp bloom isn't clipped; the negative
         // padding hands the spare room back to the layout.
-        .frame(height: 156)
-        .padding(.vertical, -18)
+        .frame(height: 168)
+        .padding(.vertical, -16)
     }
 }
