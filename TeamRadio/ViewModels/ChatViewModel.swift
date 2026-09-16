@@ -45,6 +45,15 @@ final class ChatViewModel {
             UserDefaults.standard.set(profile.name, forKey: "chatNickname")
         }
 
+        // Private messages: make us reachable (public key) and let CloudKit
+        // push new ones to this device.
+        if let me = currentUserId {
+            Task.detached(priority: .utility) {
+                await DirectMessageService.publishKey(me: me)
+                await DirectMessageService.subscribeToInbox(me: me)
+            }
+        }
+
         // Chat room is scoped to the upcoming race weekend.
         if let race = try? await F1API.nextRace() {
             round = "\(race.season)-\(race.round)"

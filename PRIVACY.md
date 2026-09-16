@@ -21,6 +21,14 @@ to your identity, and nothing is ever sold or shared.
   device for push delivery only, is linked to nothing else, and is deleted
   when it stops working. To opt out, disable notifications for Team Radio in
   iOS Settings.
+- **Private messages.** One-to-one messages are stored in the same CloudKit
+  public database but are end-to-end encrypted on your device: each
+  participant holds a key that never leaves their devices, and only the two
+  of you can read the text. The sender and recipient paddock names and the
+  time of each message are not encrypted. Reporting a private message sends
+  its decrypted text to the developer for review; blocking hides all messages
+  from that person. New-message notifications are delivered by Apple's
+  CloudKit; the notification carries only the sender's name.
 - **GIFs in chat.** GIF search inside the Paddock is provided by GIPHY: the
   words you search for are sent to GIPHY to return results, and shared GIFs
   are loaded from GIPHY's servers. GIPHY's own privacy policy applies to

@@ -40,6 +40,9 @@ struct RootView: View {
         .onAppear {
             chatBadge.start()
             PushSync.start()
+            // CloudKit delivers private-message notifications through APNs;
+            // registering is all it needs (the token stays with Apple).
+            UIApplication.shared.registerForRemoteNotifications()
         }
         // teamradio://countdown|results|standings|paddock|news
         .onOpenURL { url in

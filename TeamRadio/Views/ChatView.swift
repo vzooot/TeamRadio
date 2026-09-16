@@ -13,6 +13,19 @@ struct ChatView: View {
     @State private var showGiphy = false
     @State private var pendingMedia: PendingMedia?
     @State private var isLoadingMedia = false
+    @State private var inbox = InboxViewModel()
+    @State private var dmSheet: DMSheet?
+
+    enum DMSheet: Identifiable {
+        case inbox
+        case thread(id: String, name: String)
+        var id: String {
+            switch self {
+            case .inbox: "inbox"
+            case .thread(let id, _): "thread-\(id)"
+            }
+        }
+    }
     @FocusState private var nicknameFocused: Bool
     @FocusState private var draftFocused: Bool
 
@@ -60,7 +73,16 @@ struct ChatView: View {
             }
         }
         .task { await model.start() }
+        .task { await inbox.load() }
         .onDisappear { model.stop() }
+        .sheet(item: $dmSheet, onDismiss: { Task { await inbox.load() } }) { sheet in
+            switch sheet {
+            case .inbox:
+                InboxView(myName: model.nickname)
+            case .thread(let id, let name):
+                InboxView(myName: model.nickname, openWith: (id, name))
+            }
+        }
     }
 
     // MARK: - Gates
@@ -215,6 +237,29 @@ struct ChatView: View {
 
                 Spacer()
 
+                // Private messages, with the unread count.
+                Button {
+                    dmSheet = .inbox
+                } label: {
+                    Image(systemName: inbox.totalUnread > 0 ? "envelope.badge.fill" : "envelope.fill")
+                        .font(.system(size: 18))
+                        .foregroundStyle(inbox.totalUnread > 0 ? Theme.accent : Theme.dimText)
+                        .overlay(alignment: .topTrailing) {
+                            if inbox.totalUnread > 0 {
+                                Text("\(inbox.totalUnread)")
+                                    .font(.system(size: 9, weight: .black))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 1)
+                                    .background(Theme.live, in: Capsule())
+                                    .offset(x: 8, y: -8)
+                            }
+                        }
+                        .padding(8)
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, 2)
+
                 // Current paddock name; tap to change it.
                 Button {
                     nicknameDraft = model.nickname
@@ -280,6 +325,11 @@ struct ChatView: View {
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
                                 .contextMenu {
                                     if !model.isMine(message) {
+                                        Button {
+                                            dmSheet = .thread(id: message.senderId, name: message.sender)
+                                        } label: {
+                                            Label("Message \(message.sender) privately", systemImage: "envelope")
+                                        }
                                         Button(role: .destructive) {
                                             model.report(message)
                                         } label: {

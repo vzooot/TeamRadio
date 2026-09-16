@@ -7,6 +7,8 @@ import Observation
 @Observable
 final class ChatBadge {
     private(set) var unread = 0
+    /// Unread private messages (part of `unread`).
+    private(set) var unreadDMs = 0
     /// Newest unread message, for the "new message" toast.
     private(set) var latestSender = ""
     private(set) var latestText = ""
@@ -44,9 +46,11 @@ final class ChatBadge {
         pollTask = nil
     }
 
+    /// Opening the Paddock tab catches up on the room; private threads stay
+    /// unread until each one is opened.
     func markRead() {
         Self.lastReadAt = .now
-        unread = 0
+        unread = unreadDMs
     }
 
     private func recount(round: String, userId: String?) async {
@@ -63,6 +67,16 @@ final class ChatBadge {
                 ? (newest.mediaType == "video" ? "🎬 Video" : "📷 Photo")
                 : newest.text
         }
-        unread = fresh.count
+        var dms: [DirectMessage] = []
+        if let userId, let inbox = try? await DirectMessageService.inbox(me: userId, limit: 40) {
+            dms = DMReadState.unread(in: inbox, me: userId)
+        }
+        if let newestDM = dms.max(by: { $0.date < $1.date }),
+           newestDM.date > (fresh.map(\.date).max() ?? .distantPast) {
+            latestSender = "✉️ \(newestDM.fromName)"
+            latestText = newestDM.text
+        }
+        unreadDMs = dms.count
+        unread = fresh.count + dms.count
     }
 }
