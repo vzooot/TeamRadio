@@ -1,3 +1,5 @@
+import AVKit
+import PhotosUI
 import SwiftUI
 
 /// Private messages: the inbox list (embedded in the Paddock tab) with
@@ -142,11 +144,21 @@ struct InboxView: View {
     }
 }
 
-/// One private conversation.
+/// One private conversation — same toolkit as the room: text, photos,
+/// videos and GIFs, all encrypted with the thread key.
 struct DMThreadView: View {
     @State var model: ThreadViewModel
     @State private var draft = ""
+    @State private var pickedItem: PhotosPickerItem?
+    @State private var pendingMedia: StagedMedia?
+    @State private var isLoadingMedia = false
+    @State private var showGiphy = false
+    @State private var decrypt: (@Sendable (Data) -> Data?)?
     @FocusState private var focused: Bool
+
+    private var canSend: Bool {
+        !draft.trimmingCharacters(in: .whitespaces).isEmpty || pendingMedia != nil
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -182,6 +194,7 @@ struct DMThreadView: View {
                     .padding(.bottom, 8)
                 }
                 .scrollDismissesKeyboard(.interactively)
+                .onTapGesture { focused = false }
                 .onChange(of: model.messages) { old, new in
                     if let last = new.last, old.last?.id != last.id {
                         withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
@@ -198,7 +211,60 @@ struct DMThreadView: View {
                     .padding(.top, 4)
             }
 
+            inputBar
+        }
+        .background(Theme.background.ignoresSafeArea())
+        .navigationTitle(model.otherName)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(Theme.background, for: .navigationBar)
+        .onAppear { model.start() }
+        .onDisappear { model.stop() }
+        .task { decrypt = await model.decryptor() }
+    }
+
+    private var inputBar: some View {
+        VStack(spacing: 8) {
+            if let media = pendingMedia {
+                PendingMediaRow(media: media) {
+                    pendingMedia = nil
+                    pickedItem = nil
+                }
+            }
+
             HStack(spacing: 10) {
+                if GiphyService.isAvailable {
+                    Button {
+                        showGiphy = true
+                    } label: {
+                        Text("GIF")
+                            .font(.f1(12).italic())
+                            .foregroundStyle(Theme.violet)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 4)
+                            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Theme.violet.opacity(0.7), lineWidth: 1.5))
+                    }
+                    .buttonStyle(.plain)
+                    .sheet(isPresented: $showGiphy) {
+                        GiphyPicker { item, kind in
+                            showGiphy = false
+                            Task { await model.send("", giphy: (url: item.url, type: kind == .stickers ? "gifsticker" : "gif")) }
+                        }
+                        .presentationDetents([.medium, .large])
+                        .presentationBackground(Theme.background)
+                    }
+                }
+
+                PhotosPicker(selection: $pickedItem, matching: .any(of: [.images, .videos])) {
+                    if isLoadingMedia {
+                        ProgressView().tint(Theme.accent).frame(width: 26)
+                    } else {
+                        Image(systemName: "photo.on.rectangle.angled")
+                            .font(.system(size: 21))
+                            .foregroundStyle(Theme.accent)
+                    }
+                }
+                .disabled(isLoadingMedia)
+
                 TextField("Message \(model.otherName)…", text: $draft, axis: .vertical)
                     .textFieldStyle(.plain)
                     .focused($focused)
@@ -211,43 +277,61 @@ struct DMThreadView: View {
                             .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Theme.glassStroke, lineWidth: 1))
                     )
                     .foregroundStyle(.white)
+                    .contentShape(Rectangle())
+                    .onTapGesture { focused = true }
+
                 Button {
                     let text = draft
+                    let media = pendingMedia.map { (url: $0.url, type: $0.type) }
                     draft = ""
-                    Task { await model.send(text) }
+                    pendingMedia = nil
+                    pickedItem = nil
+                    Task { await model.send(text, media: media) }
                 } label: {
                     Image(systemName: "arrow.up.circle.fill")
                         .font(.system(size: 30))
-                        .foregroundStyle(draft.trimmingCharacters(in: .whitespaces).isEmpty ? Theme.dimText : Theme.accent)
+                        .foregroundStyle(canSend ? Theme.accent : Theme.dimText)
                 }
                 .buttonStyle(.plain)
-                .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty || model.isSending)
+                .disabled(!canSend || model.isSending)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 10)
         }
-        .background(Theme.background.ignoresSafeArea())
-        .navigationTitle(model.otherName)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(Theme.background, for: .navigationBar)
-        .onAppear { model.start() }
-        .onDisappear { model.stop() }
+        .padding(.vertical, 10)
+        .onChange(of: pickedItem) { _, item in
+            guard let item else { return }
+            isLoadingMedia = true
+            Task {
+                do { pendingMedia = try await MediaStaging.stage(item) } catch { model.errorText = error.localizedDescription }
+                isLoadingMedia = false
+            }
+        }
     }
 
     private func bubble(_ message: DirectMessage) -> some View {
         let mine = message.fromId == model.me
         return VStack(alignment: mine ? .trailing : .leading, spacing: 2) {
-            Text(message.text)
-                .font(.system(size: 15))
-                .foregroundStyle(message.readable ? .white : Theme.dimText)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(mine ? Theme.accent.opacity(0.25) : Theme.card)
-                        .overlay(RoundedRectangle(cornerRadius: 14)
-                            .strokeBorder(mine ? Theme.accent.opacity(0.4) : Theme.cardStroke, lineWidth: 1))
-                )
+            if message.isGiphy, let url = URL(string: message.text) {
+                AnimatedGIFView(url: url)
+                    .frame(width: 200, height: 200)
+                    .background(message.mediaType == "gif" ? Theme.card : .clear)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+            } else if let mediaType = message.mediaType {
+                MediaBubble(id: message.id, type: mediaType, decrypt: decrypt)
+            }
+            if !message.text.isEmpty && !message.isGiphy {
+                Text(message.text)
+                    .font(.system(size: 15))
+                    .foregroundStyle(message.readable ? .white : Theme.dimText)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(mine ? Theme.accent.opacity(0.25) : Theme.card)
+                            .overlay(RoundedRectangle(cornerRadius: 14)
+                                .strokeBorder(mine ? Theme.accent.opacity(0.4) : Theme.cardStroke, lineWidth: 1))
+                    )
+            }
             Text(message.date.formatted(date: .omitted, time: .shortened))
                 .font(.system(size: 10))
                 .foregroundStyle(Theme.faintText)

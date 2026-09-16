@@ -35,11 +35,7 @@ struct ChatView: View {
     @FocusState private var nicknameFocused: Bool
     @FocusState private var draftFocused: Bool
 
-    struct PendingMedia {
-        let url: URL
-        let type: String        // "image" | "video"
-        let preview: UIImage?
-    }
+    typealias PendingMedia = StagedMedia
 
     var body: some View {
         ZStack {
@@ -403,35 +399,10 @@ struct ChatView: View {
     private var inputBar: some View {
         VStack(spacing: 8) {
             if let media = pendingMedia {
-                HStack(spacing: 10) {
-                    if let preview = media.preview {
-                        Image(uiImage: preview)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 52, height: 52)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                    } else {
-                        Image(systemName: media.type == "video" ? "video.fill" : "photo.fill")
-                            .font(.system(size: 20))
-                            .foregroundStyle(Theme.accent)
-                            .frame(width: 52, height: 52)
-                            .background(Theme.card, in: RoundedRectangle(cornerRadius: 10))
-                    }
-                    Text(media.type == "video" ? "Video attached" : "Photo attached")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Theme.dimText)
-                    Spacer()
-                    Button {
-                        pendingMedia = nil
-                        pickedItem = nil
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 20))
-                            .foregroundStyle(Theme.dimText)
-                    }
-                    .buttonStyle(.plain)
+                PendingMediaRow(media: media) {
+                    pendingMedia = nil
+                    pickedItem = nil
                 }
-                .padding(.horizontal, 16)
             }
 
             HStack(spacing: 10) {
@@ -512,57 +483,11 @@ struct ChatView: View {
         }
     }
 
-    /// Compresses the picked photo (max 1440 px JPEG) or accepts a video up
-    /// to 25 MB, staging it as a temp file ready to upload.
     private func loadPicked(_ item: PhotosPickerItem) async {
-        let isVideo = item.supportedContentTypes.contains { $0.conforms(to: .audiovisualContent) }
-        guard let data = try? await item.loadTransferable(type: Data.self) else {
-            model.errorText = "Couldn't load that from your library."
-            return
-        }
-        let temp = FileManager.default.temporaryDirectory
-        if isVideo {
-            guard data.count <= 25 * 1024 * 1024 else {
-                model.errorText = "Videos up to 25 MB only — try a shorter clip."
-                return
-            }
-            let url = temp.appendingPathComponent("upload-\(UUID().uuidString).mov")
-            guard (try? data.write(to: url)) != nil else { return }
-            let thumb = await videoThumbnail(url: url)
-            pendingMedia = PendingMedia(url: url, type: "video", preview: thumb)
-        } else {
-            guard let image = UIImage(data: data) else {
-                model.errorText = "That image couldn't be read."
-                return
-            }
-            let scaled = image.scaledDown(maxDimension: 1440)
-            guard let jpeg = scaled.jpegData(compressionQuality: 0.75) else { return }
-            let url = temp.appendingPathComponent("upload-\(UUID().uuidString).jpg")
-            guard (try? jpeg.write(to: url)) != nil else { return }
-            pendingMedia = PendingMedia(url: url, type: "image", preview: scaled)
-        }
-    }
-
-    private func videoThumbnail(url: URL) async -> UIImage? {
-        let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
-        generator.appliesPreferredTrackTransform = true
-        generator.maximumSize = CGSize(width: 400, height: 400)
-        return await withCheckedContinuation { continuation in
-            generator.generateCGImageAsynchronously(for: .zero) { cg, _, _ in
-                continuation.resume(returning: cg.map(UIImage.init))
-            }
-        }
-    }
-}
-
-private extension UIImage {
-    func scaledDown(maxDimension: CGFloat) -> UIImage {
-        let longest = max(size.width, size.height)
-        guard longest > maxDimension else { return self }
-        let scale = maxDimension / longest
-        let newSize = CGSize(width: size.width * scale, height: size.height * scale)
-        return UIGraphicsImageRenderer(size: newSize).image { _ in
-            draw(in: CGRect(origin: .zero, size: newSize))
+        do {
+            pendingMedia = try await MediaStaging.stage(item)
+        } catch {
+            model.errorText = error.localizedDescription
         }
     }
 }
@@ -703,6 +628,8 @@ struct MemberCard: View {
 struct MediaBubble: View {
     let id: CKRecord.ID
     let type: String
+    /// Private threads pass the thread key's decryptor.
+    var decrypt: (@Sendable (Data) -> Data?)? = nil
 
     @State private var fileURL: URL?
     @State private var showFullImage = false
@@ -749,7 +676,7 @@ struct MediaBubble: View {
             }
         }
         .task(id: id.recordName) {
-            fileURL = await ChatMediaCache.shared.url(for: id, type: type)
+            fileURL = await ChatMediaCache.shared.url(for: id, type: type, decrypt: decrypt)
         }
     }
 }

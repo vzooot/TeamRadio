@@ -13,9 +13,14 @@ struct DirectMessage: Identifiable, Equatable {
     let fromName: String
     let toName: String
     let date: Date
-    /// Decrypted text, or a lock notice when this device lacks the key.
+    /// Decrypted text (a GIPHY URL for GIFs), or a lock notice when this
+    /// device lacks the key.
     let text: String
     let readable: Bool
+    /// "image" / "video" (encrypted CloudKit asset) or "gif" / "gifsticker".
+    var mediaType: String?
+
+    var isGiphy: Bool { mediaType == "gif" || mediaType == "gifsticker" }
 
     static func == (lhs: DirectMessage, rhs: DirectMessage) -> Bool { lhs.id == rhs.id }
 
@@ -56,16 +61,22 @@ enum DMKeys {
                                               sharedInfo: Data("teamradio-dm-v1".utf8), outputByteCount: 32)
     }
 
-    static func seal(_ text: String, with key: SymmetricKey) throws -> Data {
-        guard let combined = try AES.GCM.seal(Data(text.utf8), using: key).combined else {
-            throw DMError.encryption
-        }
+    static func seal(_ data: Data, with key: SymmetricKey) throws -> Data {
+        guard let combined = try AES.GCM.seal(data, using: key).combined else { throw DMError.encryption }
         return combined
     }
 
+    static func seal(_ text: String, with key: SymmetricKey) throws -> Data {
+        try seal(Data(text.utf8), with: key)
+    }
+
+    static func openData(_ payload: Data, with key: SymmetricKey) -> Data? {
+        guard let box = try? AES.GCM.SealedBox(combined: payload) else { return nil }
+        return try? AES.GCM.open(box, using: key)
+    }
+
     static func open(_ payload: Data, with key: SymmetricKey) -> String? {
-        guard let box = try? AES.GCM.SealedBox(combined: payload),
-              let plain = try? AES.GCM.open(box, using: key) else { return nil }
+        guard let plain = openData(payload, with: key) else { return nil }
         return String(data: plain, encoding: .utf8)
     }
 
@@ -136,22 +147,42 @@ enum DirectMessageService {
         return data
     }
 
-    static func send(text: String, from me: String, myName: String, to other: String, otherName: String) async throws -> DirectMessage {
-        guard let theirKey = await publicKey(of: other) else { throw DMError.noKey }
+    /// The symmetric key for a conversation, if the other side has published a key.
+    static func threadKey(me: String, other: String) async -> SymmetricKey? {
+        guard let theirKey = await publicKey(of: other) else { return nil }
+        return try? DMKeys.sharedKey(with: theirKey, thread: threadId(me, other))
+    }
+
+    /// Text, a photo/video (encrypted with the thread key before upload), or a GIF link.
+    static func send(text: String, from me: String, myName: String, to other: String, otherName: String,
+                     media: (url: URL, type: String)? = nil,
+                     giphy: (url: URL, type: String)? = nil) async throws -> DirectMessage {
+        guard let key = await threadKey(me: me, other: other) else { throw DMError.noKey }
         let thread = threadId(me, other)
-        let key = try DMKeys.sharedKey(with: theirKey, thread: thread)
         let record = CKRecord(recordType: "DirectMessage")
         let created = Date()
+        let body = giphy?.url.absoluteString ?? text
         record["thread"] = thread
         record["fromId"] = me
         record["toId"] = other
         record["fromName"] = myName
         record["toName"] = otherName
         record["created"] = created
-        record["payload"] = try DMKeys.seal(text, with: key)
+        record["payload"] = try DMKeys.seal(body, with: key)
+        if let media {
+            let sealed = try DMKeys.seal(try Data(contentsOf: media.url), with: key)
+            let sealedURL = FileManager.default.temporaryDirectory.appendingPathComponent("dm-\(UUID().uuidString).bin")
+            try sealed.write(to: sealedURL)
+            record["media"] = CKAsset(fileURL: sealedURL)
+            record["mediaType"] = media.type
+        }
+        if let giphy {
+            record["mediaType"] = giphy.type
+        }
         let saved = try await database.save(record)
         return DirectMessage(id: saved.recordID, thread: thread, fromId: me, toId: other,
-                             fromName: myName, toName: otherName, date: created, text: text, readable: true)
+                             fromName: myName, toName: otherName, date: created, text: body, readable: true,
+                             mediaType: giphy?.type ?? media?.type)
     }
 
     /// Everything sent to or by me, newest first. Two queries: CloudKit's OR
@@ -170,7 +201,10 @@ enum DirectMessageService {
         let query = CKQuery(recordType: "DirectMessage", predicate: predicate)
         query.sortDescriptors = [NSSortDescriptor(key: "created", ascending: false)]
         do {
-            let (results, _) = try await database.records(matching: query, resultsLimit: limit)
+            // attachments are fetched lazily by the bubble, never with the list
+            let (results, _) = try await database.records(
+                matching: query, desiredKeys: ["thread", "fromId", "toId", "fromName", "toName", "created", "payload", "mediaType"],
+                resultsLimit: limit)
             return results.compactMap { try? $0.1.get() }
         } catch let error as CKError where error.code == .unknownItem || error.code == .invalidArguments {
             return []   // record type not created yet — nobody has written a DM
@@ -196,7 +230,8 @@ enum DirectMessageService {
                 fromName: record["fromName"] as? String ?? "?", toName: record["toName"] as? String ?? "?",
                 date: (record["created"] as? Date) ?? record.creationDate ?? .now,
                 text: text ?? "🔒 Sent from another device — can't be read here",
-                readable: text != nil))
+                readable: text != nil,
+                mediaType: record["mediaType"] as? String))
         }
         return messages.sorted { $0.date > $1.date }
     }

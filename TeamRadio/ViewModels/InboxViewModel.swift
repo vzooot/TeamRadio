@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Observation
 import UIKit
@@ -107,19 +108,31 @@ final class ThreadViewModel {
         }
     }
 
-    func send(_ text: String) async {
+    func send(_ text: String, media: (url: URL, type: String)? = nil,
+              giphy: (url: URL, type: String)? = nil) async {
         let trimmed = ChatModeration.cleaned(text.trimmingCharacters(in: .whitespacesAndNewlines))
-        guard !trimmed.isEmpty else { return }
+        guard !trimmed.isEmpty || media != nil || giphy != nil else { return }
         isSending = true
         defer { isSending = false }
         do {
             let sent = try await DirectMessageService.send(text: String(trimmed.prefix(500)), from: me, myName: myName,
-                                                           to: otherId, otherName: otherName)
+                                                           to: otherId, otherName: otherName, media: media, giphy: giphy)
+            if let media {
+                ChatMediaCache.shared.seed(id: sent.id, type: media.type, url: media.url)
+            }
             messages.append(sent)
             errorText = nil
         } catch {
             errorText = error.localizedDescription
         }
+    }
+
+    /// Turns a stored (encrypted) attachment into its real bytes.
+    private var key: SymmetricKey?
+    func decryptor() async -> (@Sendable (Data) -> Data?)? {
+        if key == nil { key = await DirectMessageService.threadKey(me: me, other: otherId) }
+        guard let key else { return nil }
+        return { DMKeys.openData($0, with: key) }
     }
 
     func report(_ message: DirectMessage) {

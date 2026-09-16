@@ -30,7 +30,9 @@ final class ChatMediaCache {
     }
 
     /// Local file for a message's media, downloading it on first request.
-    func url(for id: CKRecord.ID, type: String) async -> URL? {
+    /// `decrypt` turns the stored bytes into the real file (private threads
+    /// keep their attachments encrypted at rest).
+    func url(for id: CKRecord.ID, type: String, decrypt: (@Sendable (Data) -> Data?)? = nil) async -> URL? {
         let key = id.recordName
         if let u = urls[key], FileManager.default.fileExists(atPath: u.path) { return u }
         let cached = dir.appendingPathComponent(fileName(id, type))
@@ -48,7 +50,12 @@ final class ChatMediaCache {
                   let file = asset.fileURL else { return nil }
             let dest = dir.appendingPathComponent(self.fileName(id, type))
             try? FileManager.default.removeItem(at: dest)
-            try? FileManager.default.copyItem(at: file, to: dest)
+            if let decrypt {
+                guard let sealed = try? Data(contentsOf: file), let plain = decrypt(sealed) else { return nil }
+                try? plain.write(to: dest)
+            } else {
+                try? FileManager.default.copyItem(at: file, to: dest)
+            }
             return FileManager.default.fileExists(atPath: dest.path) ? dest : nil
         }
         inflight[key] = task
