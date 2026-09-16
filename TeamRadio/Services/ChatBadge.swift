@@ -12,6 +12,10 @@ final class ChatBadge {
     /// Newest unread message, for the "new message" toast.
     private(set) var latestSender = ""
     private(set) var latestText = ""
+    private(set) var latestIsPrivate = false
+    @ObservationIgnored private var pushObserver: NSObjectProtocol?
+    @ObservationIgnored private var round: String?
+    @ObservationIgnored private var userId: String?
 
     private static let lastReadKey = "chatLastReadAt"
     @ObservationIgnored private var pollTask: Task<Void, Never>?
@@ -26,24 +30,30 @@ final class ChatBadge {
     func start() {
         guard pollTask == nil else { return }
         pollTask = Task { [weak self] in
-            var round: String?
-            var userId: String?
             while !Task.isCancelled {
-                if round == nil, let race = try? await F1API.nextRace() {
-                    round = "\(race.season)-\(race.round)"
-                    userId = await ChatService.currentUserId()
-                }
-                if let round {
-                    await self?.recount(round: round, userId: userId)
-                }
-                try? await Task.sleep(for: .seconds(45))
+                await self?.recountNow()
+                try? await Task.sleep(for: .seconds(20))
             }
+        }
+        pushObserver = NotificationCenter.default.addObserver(forName: .chatPushReceived, object: nil, queue: .main) { [weak self] _ in
+            Task { await self?.recountNow() }
         }
     }
 
     func stop() {
         pollTask?.cancel()
         pollTask = nil
+        if let pushObserver { NotificationCenter.default.removeObserver(pushObserver) }
+        pushObserver = nil
+    }
+
+    private func recountNow() async {
+        if round == nil, let race = try? await F1API.nextRace() {
+            round = "\(race.season)-\(race.round)"
+        }
+        if userId == nil { userId = await ChatService.currentUserId() }
+        guard let round else { return }
+        await recount(round: round, userId: userId)
     }
 
     /// Opening the Paddock tab catches up on the room; private threads stay
@@ -71,12 +81,20 @@ final class ChatBadge {
         if let userId, let inbox = try? await DirectMessageService.inbox(me: userId, limit: 40) {
             dms = DMReadState.unread(in: inbox, me: userId)
         }
+        latestIsPrivate = false
         if let newestDM = dms.max(by: { $0.date < $1.date }),
            newestDM.date > (fresh.map(\.date).max() ?? .distantPast) {
-            latestSender = "✉️ \(newestDM.fromName)"
-            latestText = newestDM.text
+            latestSender = newestDM.fromName
+            latestText = newestDM.isGiphy ? "🎞️ GIF" : newestDM.mediaType == nil ? newestDM.text
+                : newestDM.mediaType == "video" ? "🎬 Video" : "📷 Photo"
+            latestIsPrivate = true
         }
+        let before = unread
         unreadDMs = dms.count
         unread = fresh.count + dms.count
+        if unread > before, before >= 0, !firstCount { MessageSounds.playReceived() }
+        firstCount = false
     }
+
+    @ObservationIgnored private var firstCount = true
 }

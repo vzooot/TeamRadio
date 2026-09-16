@@ -322,9 +322,11 @@ struct DotMatrixBoard: View {
             }
         }
         // a little taller than the grid so the halos aren't clipped
-        .frame(height: 84)
-        .padding(.top, -20)
-        .padding(.bottom, -6)
+        // height follows width (4 rows + a little room for halos); capped so
+        // iPad keeps iPhone-sized LEDs instead of a wall of them
+        .aspectRatio(CGFloat(Self.cols + 1) / 4.7, contentMode: .fit)
+        .frame(maxWidth: 440)
+        .padding(.top, -8)
         .contentShape(Rectangle())
         .onTapGesture { advance() }
         .onDisappear { settle?.cancel() }

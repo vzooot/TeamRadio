@@ -99,8 +99,11 @@ final class ThreadViewModel {
         do {
             let fetched = try await DirectMessageService.thread(me: me, other: otherId)
             let ids = Set(fetched.map(\.id))
+            let known = Set(messages.map(\.id))
+            let arrived = !messages.isEmpty && fetched.contains { !known.contains($0.id) && $0.fromId != me }
             messages = (fetched + messages.filter { !ids.contains($0.id) }).sorted { $0.date < $1.date }
             DMReadState.markRead(thread)
+            if arrived { MessageSounds.playReceived() }
             errorText = nil
         } catch is CancellationError {
         } catch {
@@ -121,6 +124,7 @@ final class ThreadViewModel {
                 ChatMediaCache.shared.seed(id: sent.id, type: media.type, url: media.url)
             }
             messages.append(sent)
+            MessageSounds.playSent()
             errorText = nil
         } catch {
             errorText = error.localizedDescription

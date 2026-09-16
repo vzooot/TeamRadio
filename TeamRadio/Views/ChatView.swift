@@ -77,6 +77,13 @@ struct ChatView: View {
         .task { await model.start() }
         .task { await inbox.load() }
         .onDisappear { model.stop() }
+        .onReceive(NotificationCenter.default.publisher(for: .openPaddockMessages)) { _ in
+            mode = .messages
+            Task { await inbox.load() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .chatPushReceived)) { _ in
+            Task { await inbox.load() }
+        }
         .sheet(item: $memberCard) { member in
             MemberCard(member: member) {
                 openThread(id: member.id, name: member.name)
@@ -278,8 +285,10 @@ struct ChatView: View {
                 }
                 .buttonStyle(.plain)
                 Button { mode = .messages } label: {
+                    // burns red with the count while something is unread
                     NeonChip(title: inbox.totalUnread > 0 ? "MESSAGES · \(inbox.totalUnread)" : "MESSAGES",
-                             tint: Theme.violet, selected: mode == .messages)
+                             tint: inbox.totalUnread > 0 ? Theme.live : Theme.violet,
+                             selected: mode == .messages || inbox.totalUnread > 0)
                 }
                 .buttonStyle(.plain)
             }

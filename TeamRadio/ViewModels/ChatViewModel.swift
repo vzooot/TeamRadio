@@ -91,10 +91,15 @@ final class ChatViewModel {
             // Merge instead of replace, so paged-in history and local echoes
             // survive every poll.
             let fetchedIds = Set(fetched.map(\.id))
+            let knownIds = Set(messages.map(\.id))
             let kept = messages.filter { !fetchedIds.contains($0.id) }
+            let arrived = !messages.isEmpty && fetched.contains {
+                !knownIds.contains($0.id) && $0.senderId != currentUserId && !blocked.contains($0.senderId)
+            }
             messages = (fetched + kept)
                 .filter { !blocked.contains($0.senderId) }
                 .sorted { $0.date < $1.date }
+            if arrived { MessageSounds.playReceived() }
             // Having the room open counts as catching up — keeps the tab badge quiet.
             if let newest = messages.last?.date, newest > ChatBadge.lastReadAt {
                 ChatBadge.lastReadAt = newest
@@ -140,6 +145,7 @@ final class ChatViewModel {
             }
             // Echo instantly; the next poll reconciles with the server.
             messages.append(sent)
+            MessageSounds.playSent()
             errorText = nil
         } catch {
             errorText = "Message not sent: \(error.localizedDescription)"

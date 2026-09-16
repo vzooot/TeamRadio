@@ -1,7 +1,31 @@
 import SwiftUI
+import UserNotifications
+
+/// Shows private-message pushes as banners even while the app is open, and
+/// routes a tap on one to the Messages pane.
+final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+    func application(_ application: UIApplication,
+                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        UNUserNotificationCenter.current().delegate = self
+        return true
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+        NotificationCenter.default.post(name: .chatPushReceived, object: nil)
+        return [.banner, .sound, .badge]
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        if response.notification.request.content.userInfo["ck"] != nil {
+            NotificationCenter.default.post(name: .openPaddockMessages, object: nil)
+        }
+    }
+}
 
 @main
 struct TeamRadioApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     var body: some Scene {
         WindowGroup {
             RootView()
@@ -67,10 +91,16 @@ struct RootView: View {
                 withAnimation(.easeOut(duration: 0.35)) { showMessageToast = false }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .openPaddockMessages)) { _ in
+            selection = 3
+        }
         .overlay(alignment: .bottom) {
             if showMessageToast {
-                MessageToast(sender: chatBadge.latestSender, text: chatBadge.latestText) {
+                MessageToast(sender: chatBadge.latestSender, text: chatBadge.latestText, isPrivate: chatBadge.latestIsPrivate) {
                     selection = 3
+                    if chatBadge.latestIsPrivate {
+                        NotificationCenter.default.post(name: .openPaddockMessages, object: nil)
+                    }
                 }
                 .padding(.bottom, 62)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -91,18 +121,19 @@ struct RootView: View {
 struct MessageToast: View {
     let sender: String
     let text: String
+    var isPrivate = false
     let onTap: () -> Void
 
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 10) {
-                Image(systemName: "bubble.left.and.bubble.right.fill")
+                Image(systemName: isPrivate ? "paperplane.fill" : "bubble.left.and.bubble.right.fill")
                     .font(.system(size: 16))
-                    .foregroundStyle(Theme.accent)
+                    .foregroundStyle(isPrivate ? Theme.live : Theme.accent)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(sender.isEmpty ? "PADDOCK" : sender.uppercased())
+                    Text(isPrivate ? "PRIVATE · \(sender.uppercased())" : (sender.isEmpty ? "PADDOCK" : sender.uppercased()))
                         .font(.f1(12).italic())
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(isPrivate ? Theme.live : Theme.accent)
                     Text(text)
                         .font(.system(size: 13))
                         .foregroundStyle(.white)
@@ -117,8 +148,8 @@ struct MessageToast: View {
             .background(
                 Capsule()
                     .fill(Theme.card)
-                    .overlay(Capsule().strokeBorder(Theme.accent.opacity(0.45), lineWidth: 1))
-                    .shadow(color: Theme.accent.opacity(0.35), radius: 14, y: 4)
+                    .overlay(Capsule().strokeBorder((isPrivate ? Theme.live : Theme.accent).opacity(0.5), lineWidth: 1))
+                    .shadow(color: (isPrivate ? Theme.live : Theme.accent).opacity(0.4), radius: 14, y: 4)
             )
         }
         .buttonStyle(.plain)
