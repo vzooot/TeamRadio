@@ -5,9 +5,12 @@ struct InboxView: View {
     let myName: String
     /// Open straight into a conversation (from "Message privately" in the room).
     var openWith: (id: String, name: String)? = nil
+    /// Recent room members, offered when starting a new conversation.
+    var suggestions: [(id: String, name: String)] = []
 
     @State private var model = InboxViewModel()
     @State private var path: [DMTarget] = []
+    @State private var composing = false
     @Environment(\.dismiss) private var dismiss
 
     struct DMTarget: Hashable {
@@ -31,6 +34,15 @@ struct InboxView: View {
                             .foregroundStyle(Theme.chromeText)
                     }
                 }
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        composing = true
+                    } label: {
+                        Image(systemName: "square.and.pencil")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(Theme.accent)
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
                         .font(.f1(14, weight: .bold))
@@ -40,6 +52,14 @@ struct InboxView: View {
             .toolbarBackground(Theme.background, for: .navigationBar)
             .navigationDestination(for: DMTarget.self) { target in
                 DMThreadView(model: ThreadViewModel(me: model.me, myName: myName, otherId: target.id, otherName: target.name))
+            }
+            .sheet(isPresented: $composing) {
+                NewMessageSheet(suggestions: suggestions.filter { $0.id != model.me }) { target in
+                    composing = false
+                    path = [target]
+                }
+                .presentationDetents([.medium, .large])
+                .presentationBackground(Theme.background)
             }
         }
         .preferredColorScheme(.dark)
@@ -67,7 +87,7 @@ struct InboxView: View {
                 Text("NO PRIVATE MESSAGES YET")
                     .font(.f1(16).italic())
                     .foregroundStyle(.white)
-                Text("Long-press any message in the paddock and choose “Message privately”. Conversations are end-to-end encrypted.")
+                Text("Tap a name in the paddock, or use the compose button to start one. Conversations are end-to-end encrypted.")
                     .font(.subheadline)
                     .foregroundStyle(Theme.dimText)
                     .multilineTextAlignment(.center)
@@ -254,5 +274,110 @@ struct DMThreadView: View {
                 .foregroundStyle(Theme.faintText)
         }
         .frame(maxWidth: .infinity, alignment: mine ? .trailing : .leading)
+    }
+}
+
+/// Start a conversation: pick a recent paddock member or type an exact paddock name.
+struct NewMessageSheet: View {
+    let suggestions: [(id: String, name: String)]
+    let onPick: (InboxView.DMTarget) -> Void
+
+    @State private var name = ""
+    @State private var notFound = false
+    @State private var searching = false
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                TrioSlashes(height: 16)
+                Text("NEW MESSAGE")
+                    .font(.f1(20).italic())
+                    .foregroundStyle(Theme.chromeText)
+            }
+            .padding(.top, 18)
+
+            HStack(spacing: 8) {
+                TextField("Paddock name", text: $name)
+                    .textFieldStyle(.plain)
+                    .focused($focused)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    .submitLabel(.go)
+                    .onSubmit { Task { await find() } }
+                    .padding(12)
+                    .background(Color.black.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
+                    .foregroundStyle(.white)
+                Button {
+                    Task { await find() }
+                } label: {
+                    if searching {
+                        ProgressView().tint(Theme.onAccent).frame(width: 44)
+                    } else {
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(Theme.onAccent)
+                            .frame(width: 44)
+                    }
+                }
+                .frame(height: 44)
+                .background(name.trimmingCharacters(in: .whitespaces).count >= 3 ? Theme.accent : Color.gray.opacity(0.3),
+                            in: RoundedRectangle(cornerRadius: 10))
+                .buttonStyle(.plain)
+                .disabled(name.trimmingCharacters(in: .whitespaces).count < 3 || searching)
+            }
+            if notFound {
+                Text("No one in the paddock goes by that name — it has to match exactly.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.live)
+            }
+
+            if !suggestions.isEmpty {
+                Text("RECENTLY IN THE PADDOCK")
+                    .font(.f1(11, weight: .bold))
+                    .tracking(2)
+                    .foregroundStyle(Theme.dimText)
+                    .padding(.top, 6)
+                ScrollView {
+                    LazyVStack(spacing: 6) {
+                        ForEach(suggestions, id: \.id) { member in
+                            Button {
+                                onPick(InboxView.DMTarget(id: member.id, name: member.name))
+                            } label: {
+                                HStack {
+                                    Text(member.name)
+                                        .font(.f1(14).italic())
+                                        .foregroundStyle(.white)
+                                    Spacer()
+                                    Image(systemName: "envelope")
+                                        .foregroundStyle(Theme.accent)
+                                }
+                                .padding(12)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(Theme.card)
+                                        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.glassStroke, lineWidth: 1))
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 20)
+        .onAppear { focused = suggestions.isEmpty }
+    }
+
+    private func find() async {
+        searching = true
+        defer { searching = false }
+        if let found = await ChatService.lookup(name: name) {
+            notFound = false
+            onPick(InboxView.DMTarget(id: found.id, name: found.name))
+        } else {
+            notFound = true
+        }
     }
 }

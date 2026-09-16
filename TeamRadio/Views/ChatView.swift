@@ -78,9 +78,9 @@ struct ChatView: View {
         .sheet(item: $dmSheet, onDismiss: { Task { await inbox.load() } }) { sheet in
             switch sheet {
             case .inbox:
-                InboxView(myName: model.nickname)
+                InboxView(myName: model.nickname, suggestions: recentMembers)
             case .thread(let id, let name):
-                InboxView(myName: model.nickname, openWith: (id, name))
+                InboxView(myName: model.nickname, openWith: (id, name), suggestions: recentMembers)
             }
         }
     }
@@ -319,7 +319,9 @@ struct ChatView: View {
                                 .padding(.top, 40)
                         }
                         ForEach(model.messages) { message in
-                            ChatBubble(message: message, isMine: model.isMine(message))
+                            ChatBubble(message: message, isMine: model.isMine(message)) {
+                                dmSheet = .thread(id: message.senderId, name: message.sender)
+                            }
                                 .id(message.id)
                                 // New arrivals spring in from the bottom edge.
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -370,6 +372,16 @@ struct ChatView: View {
             }
 
             inputBar
+        }
+    }
+
+    /// People who posted in the room recently, newest first, for starting a private message.
+    private var recentMembers: [(id: String, name: String)] {
+        var seen: Set<String> = []
+        return model.messages.reversed().compactMap { m in
+            guard !model.isMine(m), !seen.contains(m.senderId) else { return nil }
+            seen.insert(m.senderId)
+            return (m.senderId, m.sender)
         }
     }
 
@@ -547,6 +559,8 @@ private extension UIImage {
 struct ChatBubble: View {
     let message: ChatMessage
     let isMine: Bool
+    /// Tapping someone's name opens a private thread with them.
+    var onSender: (() -> Void)? = nil
     @State private var gifAspect: CGFloat = 1
 
     var body: some View {
@@ -555,6 +569,8 @@ struct ChatBubble: View {
                 Text(message.sender)
                     .font(.f1(12).italic())
                     .foregroundStyle(isMine ? Theme.accent : .white.opacity(0.8))
+                    .contentShape(Rectangle())
+                    .onTapGesture { if !isMine { onSender?() } }
                 Text(message.date.formatted(date: .omitted, time: .shortened))
                     .font(.system(size: 10))
                     .foregroundStyle(Theme.faintText)

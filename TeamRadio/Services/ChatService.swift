@@ -163,6 +163,16 @@ enum ChatService {
         return (name, record.creationDate ?? .distantPast)
     }
 
+    /// Finds a paddock member by their exact name (names are unique).
+    static func lookup(name: String) async -> (id: String, name: String)? {
+        let normalized = name.lowercased().trimmingCharacters(in: .whitespaces)
+        guard !normalized.isEmpty,
+              let record = try? await database.record(for: CKRecord.ID(recordName: "name-\(normalized)")),
+              let owner = record["ownerId"] as? String,
+              let display = record["displayName"] as? String else { return nil }
+        return (owner, display)
+    }
+
     /// Files a report record the developer reviews in the CloudKit dashboard.
     static func report(_ message: ChatMessage, reason: String) async {
         let record = CKRecord(recordType: "Report")
