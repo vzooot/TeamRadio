@@ -19,8 +19,16 @@ struct ChatView: View {
 
     enum Mode { case room, messages }
 
+    struct Member: Identifiable {
+        let id: String
+        let name: String
+    }
+    /// Tapping an avatar or name shows this person's card with a Message button.
+    @State private var memberCard: Member?
+
     /// Jump into a private conversation from anywhere in the room.
     private func openThread(id: String, name: String) {
+        memberCard = nil
         mode = .messages
         dmPath = [InboxView.DMTarget(id: id, name: name)]
     }
@@ -73,6 +81,17 @@ struct ChatView: View {
         .task { await model.start() }
         .task { await inbox.load() }
         .onDisappear { model.stop() }
+        .sheet(item: $memberCard) { member in
+            MemberCard(member: member) {
+                openThread(id: member.id, name: member.name)
+            } onBlock: {
+                ChatModeration.block(member.id)
+                model.messages.removeAll { $0.senderId == member.id }
+                memberCard = nil
+            }
+            .presentationDetents([.height(300)])
+            .presentationBackground(Theme.background)
+        }
     }
 
     // MARK: - Gates
@@ -312,7 +331,7 @@ struct ChatView: View {
                         }
                         ForEach(model.messages) { message in
                             ChatBubble(message: message, isMine: model.isMine(message)) {
-                                openThread(id: message.senderId, name: message.sender)
+                                memberCard = Member(id: message.senderId, name: message.sender)
                             }
                                 .id(message.id)
                                 // New arrivals spring in from the bottom edge.
@@ -556,6 +575,17 @@ struct ChatBubble: View {
     @State private var gifAspect: CGFloat = 1
 
     var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            if !isMine {
+                Avatar(name: message.sender, size: 30)
+                    .onTapGesture { onSender?() }
+            }
+            bubbleColumn
+        }
+        .frame(maxWidth: .infinity, alignment: isMine ? .trailing : .leading)
+    }
+
+    private var bubbleColumn: some View {
         VStack(alignment: isMine ? .trailing : .leading, spacing: 2) {
             HStack(spacing: 6) {
                 Text(message.sender)
@@ -594,7 +624,77 @@ struct ChatBubble: View {
                     )
             }
         }
-        .frame(maxWidth: .infinity, alignment: isMine ? .trailing : .leading)
+    }
+}
+
+/// Initial-letter avatar, tinted from the name so each person keeps a colour.
+struct Avatar: View {
+    let name: String
+    var size: CGFloat = 30
+
+    private var tint: Color {
+        let palette = [Theme.accent, Theme.violet, Theme.live, Color(red: 0.2, green: 0.9, blue: 0.6), Color(red: 1.0, green: 0.75, blue: 0.2)]
+        let hash = name.unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) & 0x7fffffff }
+        return palette[hash % palette.count]
+    }
+
+    var body: some View {
+        ZStack {
+            Circle().fill(tint.opacity(0.18))
+            Circle().strokeBorder(tint.opacity(0.6), lineWidth: 1)
+            Text(String(name.prefix(1)).uppercased())
+                .font(.f1(size * 0.45).italic())
+                .foregroundStyle(tint)
+        }
+        .frame(width: size, height: size)
+        .contentShape(Circle())
+    }
+}
+
+/// The card you get when tapping someone: who they are and one clear action.
+struct MemberCard: View {
+    let member: ChatView.Member
+    let onMessage: () -> Void
+    let onBlock: () -> Void
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Avatar(name: member.name, size: 72)
+                .padding(.top, 22)
+            Text(member.name)
+                .font(.f1(22).italic())
+                .foregroundStyle(Theme.chromeText)
+            Text("PADDOCK MEMBER")
+                .font(.f1(11, weight: .bold))
+                .tracking(2)
+                .foregroundStyle(Theme.dimText)
+
+            Button(action: onMessage) {
+                HStack(spacing: 8) {
+                    Image(systemName: "paperplane.fill")
+                    Text("MESSAGE \(member.name.uppercased())")
+                }
+                .font(.f1(15).italic())
+                .tracking(1)
+                .foregroundStyle(Theme.onAccent)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 13)
+                .background(Theme.accentGradient, in: RoundedRectangle(cornerRadius: 12))
+                .shadow(color: Theme.accent.opacity(0.45), radius: 12, y: 4)
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 24)
+            .padding(.top, 6)
+
+            Button(role: .destructive, action: onBlock) {
+                Text("Block")
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.dimText)
+            }
+            .buttonStyle(.plain)
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 

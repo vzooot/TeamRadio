@@ -105,15 +105,7 @@ struct InboxView: View {
 
     private func row(_ thread: InboxViewModel.Thread) -> some View {
         HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(Theme.card)
-                    .overlay(Circle().strokeBorder(Theme.glassStroke, lineWidth: 1))
-                Text(String(thread.otherName.prefix(1)).uppercased())
-                    .font(.f1(16).italic())
-                    .foregroundStyle(Theme.accent)
-            }
-            .frame(width: 40, height: 40)
+            Avatar(name: thread.otherName, size: 40)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(thread.otherName)
