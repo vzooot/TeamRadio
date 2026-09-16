@@ -237,28 +237,33 @@ struct ChatView: View {
 
                 Spacer()
 
-                // Private messages, with the unread count.
+                // Private messages: same glass capsule as the name chip, lit
+                // cyan with the count when something is waiting.
                 Button {
                     dmSheet = .inbox
                 } label: {
-                    Image(systemName: inbox.totalUnread > 0 ? "envelope.badge.fill" : "envelope.fill")
-                        .font(.system(size: 18))
-                        .foregroundStyle(inbox.totalUnread > 0 ? Theme.accent : Theme.dimText)
-                        .overlay(alignment: .topTrailing) {
-                            if inbox.totalUnread > 0 {
-                                Text("\(inbox.totalUnread)")
-                                    .font(.system(size: 9, weight: .black))
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 4)
-                                    .padding(.vertical, 1)
-                                    .background(Theme.live, in: Capsule())
-                                    .offset(x: 8, y: -8)
-                            }
+                    HStack(spacing: 5) {
+                        Image(systemName: "paperplane.fill")
+                            .font(.system(size: 12, weight: .bold))
+                        if inbox.totalUnread > 0 {
+                            Text("\(inbox.totalUnread)")
+                                .font(.f1(13).italic())
                         }
-                        .padding(8)
+                    }
+                    .foregroundStyle(inbox.totalUnread > 0 ? Theme.accent : Theme.dimText)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(
+                        Capsule()
+                            .fill(inbox.totalUnread > 0 ? Theme.accent.opacity(0.12) : Color.white.opacity(0.05))
+                            .overlay(Capsule().strokeBorder(
+                                inbox.totalUnread > 0 ? AnyShapeStyle(Theme.accent.opacity(0.6)) : AnyShapeStyle(Theme.glassStroke),
+                                lineWidth: 1))
+                    )
+                    .shadow(color: Theme.accent.opacity(inbox.totalUnread > 0 ? 0.45 : 0), radius: 8)
                 }
                 .buttonStyle(.plain)
-                .padding(.trailing, 2)
+                .padding(.trailing, 6)
 
                 // Current paddock name; tap to change it.
                 Button {
