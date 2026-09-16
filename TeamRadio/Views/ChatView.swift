@@ -14,17 +14,15 @@ struct ChatView: View {
     @State private var pendingMedia: PendingMedia?
     @State private var isLoadingMedia = false
     @State private var inbox = InboxViewModel()
-    @State private var dmSheet: DMSheet?
+    @State private var mode: Mode = .room
+    @State private var dmPath: [InboxView.DMTarget] = []
 
-    enum DMSheet: Identifiable {
-        case inbox
-        case thread(id: String, name: String)
-        var id: String {
-            switch self {
-            case .inbox: "inbox"
-            case .thread(let id, _): "thread-\(id)"
-            }
-        }
+    enum Mode { case room, messages }
+
+    /// Jump into a private conversation from anywhere in the room.
+    private func openThread(id: String, name: String) {
+        mode = .messages
+        dmPath = [InboxView.DMTarget(id: id, name: name)]
     }
     @FocusState private var nicknameFocused: Bool
     @FocusState private var draftFocused: Bool
@@ -75,14 +73,6 @@ struct ChatView: View {
         .task { await model.start() }
         .task { await inbox.load() }
         .onDisappear { model.stop() }
-        .sheet(item: $dmSheet, onDismiss: { Task { await inbox.load() } }) { sheet in
-            switch sheet {
-            case .inbox:
-                InboxView(myName: model.nickname, suggestions: recentMembers)
-            case .thread(let id, let name):
-                InboxView(myName: model.nickname, openWith: (id, name), suggestions: recentMembers)
-            }
-        }
     }
 
     // MARK: - Gates
@@ -237,34 +227,6 @@ struct ChatView: View {
 
                 Spacer()
 
-                // Private messages: same glass capsule as the name chip, lit
-                // cyan with the count when something is waiting.
-                Button {
-                    dmSheet = .inbox
-                } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "paperplane.fill")
-                            .font(.system(size: 12, weight: .bold))
-                        if inbox.totalUnread > 0 {
-                            Text("\(inbox.totalUnread)")
-                                .font(.f1(13).italic())
-                        }
-                    }
-                    .foregroundStyle(inbox.totalUnread > 0 ? Theme.accent : Theme.dimText)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 7)
-                    .background(
-                        Capsule()
-                            .fill(inbox.totalUnread > 0 ? Theme.accent.opacity(0.12) : Color.white.opacity(0.05))
-                            .overlay(Capsule().strokeBorder(
-                                inbox.totalUnread > 0 ? AnyShapeStyle(Theme.accent.opacity(0.6)) : AnyShapeStyle(Theme.glassStroke),
-                                lineWidth: 1))
-                    )
-                    .shadow(color: Theme.accent.opacity(inbox.totalUnread > 0 ? 0.45 : 0), radius: 8)
-                }
-                .buttonStyle(.plain)
-                .padding(.trailing, 6)
-
                 // Current paddock name; tap to change it.
                 Button {
                     nicknameDraft = model.nickname
@@ -294,6 +256,31 @@ struct ChatView: View {
             .padding(.top, 8)
             .padding(.bottom, 10)
 
+            // Room / Messages, the way every social app does it
+            HStack(spacing: 8) {
+                Button { mode = .room } label: {
+                    NeonChip(title: "ROOM", tint: Theme.accent, selected: mode == .room)
+                }
+                .buttonStyle(.plain)
+                Button { mode = .messages } label: {
+                    NeonChip(title: inbox.totalUnread > 0 ? "MESSAGES · \(inbox.totalUnread)" : "MESSAGES",
+                             tint: Theme.violet, selected: mode == .messages)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 10)
+
+            if mode == .messages {
+                InboxView(model: inbox, myName: model.nickname, suggestions: recentMembers, path: $dmPath)
+            } else {
+                roomBody
+            }
+        }
+    }
+
+    private var roomBody: some View {
+        VStack(spacing: 0) {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 10) {
@@ -325,7 +312,7 @@ struct ChatView: View {
                         }
                         ForEach(model.messages) { message in
                             ChatBubble(message: message, isMine: model.isMine(message)) {
-                                dmSheet = .thread(id: message.senderId, name: message.sender)
+                                openThread(id: message.senderId, name: message.sender)
                             }
                                 .id(message.id)
                                 // New arrivals spring in from the bottom edge.
@@ -333,7 +320,7 @@ struct ChatView: View {
                                 .contextMenu {
                                     if !model.isMine(message) {
                                         Button {
-                                            dmSheet = .thread(id: message.senderId, name: message.sender)
+                                            openThread(id: message.senderId, name: message.sender)
                                         } label: {
                                             Label("Message \(message.sender) privately", systemImage: "envelope")
                                         }

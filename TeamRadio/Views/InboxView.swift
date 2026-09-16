@@ -1,17 +1,15 @@
 import SwiftUI
 
-/// Private messages: the inbox and, inside it, each conversation.
+/// Private messages: the inbox list (embedded in the Paddock tab) with
+/// conversations pushed on top, and a compose button to start one.
 struct InboxView: View {
+    @State var model: InboxViewModel
     let myName: String
-    /// Open straight into a conversation (from "Message privately" in the room).
-    var openWith: (id: String, name: String)? = nil
     /// Recent room members, offered when starting a new conversation.
     var suggestions: [(id: String, name: String)] = []
+    @Binding var path: [DMTarget]
 
-    @State private var model = InboxViewModel()
-    @State private var path: [DMTarget] = []
     @State private var composing = false
-    @Environment(\.dismiss) private var dismiss
 
     struct DMTarget: Hashable {
         let id: String
@@ -20,38 +18,29 @@ struct InboxView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            ZStack {
+            ZStack(alignment: .bottomTrailing) {
                 Theme.background.ignoresSafeArea()
                 content
+
+                // compose
+                Button {
+                    composing = true
+                } label: {
+                    Image(systemName: "square.and.pencil")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(Theme.onAccent)
+                        .frame(width: 54, height: 54)
+                        .background(Theme.accentGradient, in: Circle())
+                        .overlay(Circle().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
+                        .shadow(color: Theme.accent.opacity(0.55), radius: 14, y: 4)
+                }
+                .buttonStyle(.plain)
+                .padding(20)
             }
-            .navigationTitle("")
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    HStack(spacing: 8) {
-                        TrioSlashes(height: 16)
-                        Text("MESSAGES")
-                            .font(.f1(20).italic())
-                            .foregroundStyle(Theme.chromeText)
-                    }
-                }
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        composing = true
-                    } label: {
-                        Image(systemName: "square.and.pencil")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(Theme.accent)
-                    }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                        .font(.f1(14, weight: .bold))
-                        .foregroundStyle(Theme.accent)
-                }
-            }
-            .toolbarBackground(Theme.background, for: .navigationBar)
+            .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: DMTarget.self) { target in
                 DMThreadView(model: ThreadViewModel(me: model.me, myName: myName, otherId: target.id, otherName: target.name))
+                    .toolbar(.visible, for: .navigationBar)
             }
             .sheet(isPresented: $composing) {
                 NewMessageSheet(suggestions: suggestions.filter { $0.id != model.me }) { target in
@@ -62,13 +51,9 @@ struct InboxView: View {
                 .presentationBackground(Theme.background)
             }
         }
-        .preferredColorScheme(.dark)
         .task {
             InboxViewModel.enableNotifications()
             await model.load()
-            if let openWith, path.isEmpty {
-                path = [DMTarget(id: openWith.id, name: openWith.name)]
-            }
         }
         .onChange(of: path) { _, new in
             if new.isEmpty { Task { await model.load() } }
@@ -81,18 +66,19 @@ struct InboxView: View {
             ProgressView().tint(Theme.accent)
         } else if model.threads.isEmpty {
             VStack(spacing: 10) {
-                Image(systemName: "envelope.open")
+                Image(systemName: "paperplane")
                     .font(.system(size: 34))
                     .foregroundStyle(Theme.dimText)
                 Text("NO PRIVATE MESSAGES YET")
                     .font(.f1(16).italic())
                     .foregroundStyle(.white)
-                Text("Tap a name in the paddock, or use the compose button to start one. Conversations are end-to-end encrypted.")
+                Text("Tap a name in the room, or the compose button, to start one. Conversations are end-to-end encrypted.")
                     .font(.subheadline)
                     .foregroundStyle(Theme.dimText)
                     .multilineTextAlignment(.center)
             }
             .padding(32)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ScrollView {
                 LazyVStack(spacing: 8) {
@@ -103,7 +89,8 @@ struct InboxView: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(16)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 90)
             }
             .refreshable { await model.load() }
         }
