@@ -91,10 +91,10 @@ struct NeonTile: View {
     }
 }
 
-/// The LED matrix: 24×4 sockets. At rest it shows the five start lights
-/// (rounded blocks, lit from the left through race week). Tap it and it
-/// scrambles like a sci-fi readout, resolves to the next info page (session
-/// time, date, days to go, round) in cyan, then falls back to the lights.
+/// The LED matrix. It shows the five start lights (rounded blocks, lit
+/// through race week), then cycles on its own through the info pages
+/// (session time, date, days to go, round) in cyan — each page arriving
+/// with a sci-fi scramble — and back to the lights. A tap skips ahead.
 struct DotMatrixBoard: View {
     let litLights: Int
     var pages: [String] = []
@@ -165,27 +165,29 @@ struct DotMatrixBoard: View {
         return Double(h % 10_000) / 10_000
     }
 
+    /// The board cycles by itself: lights for a while, then each info page
+    /// in turn, each arriving with the scramble. A tap skips ahead.
+    private static let lightsHold: TimeInterval = 12
+    private static let pageHold: TimeInterval = 6
+
     private func advance() {
         guard !pages.isEmpty else { return }
         page = (page + 1) % (pages.count + 1)
-        show()
+        transitionStart = Date()
+        schedule()
     }
 
-    private func show() {
-        transitionStart = Date()
+    private func schedule() {
         settle?.cancel()
         settle = Task {
-            try? await Task.sleep(for: .seconds(Self.scramble))
+            if transitionStart != nil {
+                try? await Task.sleep(for: .seconds(Self.scramble))
+                guard !Task.isCancelled else { return }
+                transitionStart = nil
+            }
+            try? await Task.sleep(for: .seconds(page == 0 ? Self.lightsHold : Self.pageHold))
             guard !Task.isCancelled else { return }
-            transitionStart = nil
-            guard page != 0 else { return }
-            try? await Task.sleep(for: .seconds(Self.hold))
-            guard !Task.isCancelled else { return }
-            page = 0
-            transitionStart = Date()
-            try? await Task.sleep(for: .seconds(Self.scramble))
-            guard !Task.isCancelled else { return }
-            transitionStart = nil
+            advance()
         }
     }
 
@@ -329,6 +331,7 @@ struct DotMatrixBoard: View {
         .aspectRatio(CGFloat(Self.cols) / 6.4, contentMode: .fit)
         .contentShape(Rectangle())
         .onTapGesture { advance() }
+        .onAppear { schedule() }
         .onDisappear { settle?.cancel() }
     }
 }
