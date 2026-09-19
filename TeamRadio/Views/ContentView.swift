@@ -48,10 +48,16 @@ struct ContentView: View {
                 HeaderView(onInfo: { showAbout = true })
                     .padding(.bottom, -6)
 
-                if let race = model.nextRace {
+                if let race = model.displayRace {
+                    if model.isBrowsing {
+                        browsingBar(race)
+                    }
+
                     RaceHeroView(race: race)
+                        .id("hero")
 
                     CountdownView(race: race)
+                        .id(race.id)
 
                     WeekendScheduleView(race: race, weather: model.weather)
 
@@ -70,7 +76,11 @@ struct ContentView: View {
                 }
 
                 if !model.season.isEmpty {
-                    SeasonView(season: model.season, nextRaceId: model.nextRace?.id)
+                    SeasonView(season: model.season, nextRaceId: model.nextRace?.id,
+                               selectedId: model.displayRace?.id) { race in
+                        Task { await model.select(race) }
+                        withAnimation(.easeInOut(duration: 0.45)) { proxy.scrollTo("hero", anchor: .top) }
+                    }
                 }
 
                 FooterView()
@@ -81,6 +91,39 @@ struct ContentView: View {
         }
         .refreshable { await model.load() }
         }
+    }
+
+    /// Shown while looking at a round other than the next one.
+    private func browsingBar(_ race: Race) -> some View {
+        HStack(spacing: 10) {
+            Text(race.isPast ? "PAST ROUND" : "UPCOMING ROUND")
+                .font(.f1(11, weight: .bold))
+                .tracking(2)
+                .foregroundStyle(Theme.dimText)
+            Spacer()
+            Button {
+                Task { await model.select(nil) }
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "arrow.uturn.backward")
+                        .font(.system(size: 10, weight: .bold))
+                    Text("BACK TO NEXT RACE")
+                        .font(.f1(11, weight: .bold))
+                        .tracking(1)
+                }
+                .foregroundStyle(Theme.accent)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(Theme.accent.opacity(0.1))
+                        .overlay(Capsule().strokeBorder(Theme.accent.opacity(0.5), lineWidth: 1))
+                )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 4)
+        .padding(.bottom, -10)
     }
 }
 

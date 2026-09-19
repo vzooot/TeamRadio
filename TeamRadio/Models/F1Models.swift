@@ -88,6 +88,12 @@ struct Race: Decodable, Identifiable, Equatable {
 
     var roundNumber: Int { Int(round) ?? 0 }
 
+    /// The weekend is over (its last session has started).
+    var isPast: Bool {
+        guard let last = sessions.last else { return false }
+        return last.date <= .now
+    }
+
     /// UTC start of the grand prix itself.
     var startDate: Date? { ErgastDate.parse(date: date, time: time) }
 
