@@ -12,13 +12,18 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
         NotificationCenter.default.post(name: .chatPushReceived, object: nil)
-        return [.banner, .sound, .badge]
+        // Room pushes are for when you're away — in the app, the room's own
+        // sound and badge cover it. Private messages still get a banner.
+        let ck = notification.request.content.userInfo["ck"] as? [String: Any]
+        let subscription = (ck?["qry"] as? [String: Any])?["sid"] as? String ?? ""
+        return subscription.hasPrefix("room-") ? [] : [.banner, .sound, .badge]
     }
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
-        if response.notification.request.content.userInfo["ck"] != nil {
-            NotificationCenter.default.post(name: .openPaddockMessages, object: nil)
-        }
+        let ck = response.notification.request.content.userInfo["ck"] as? [String: Any]
+        guard ck != nil else { return }
+        let subscription = (ck?["qry"] as? [String: Any])?["sid"] as? String ?? ""
+        NotificationCenter.default.post(name: subscription.hasPrefix("room-") ? .openPaddockRoom : .openPaddockMessages, object: nil)
     }
 }
 
@@ -92,6 +97,9 @@ struct RootView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .openPaddockMessages)) { _ in
+            selection = 3
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openPaddockRoom)) { _ in
             selection = 3
         }
         .overlay(alignment: .bottom) {

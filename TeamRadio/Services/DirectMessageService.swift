@@ -247,7 +247,8 @@ enum DirectMessageService {
         let info = CKSubscription.NotificationInfo()
         info.alertLocalizationKey = "%1$@ sent you a private message"
         info.alertLocalizationArgs = ["fromName"]
-        info.soundName = "default"
+        info.soundName = MessageSounds.receivedFile
+        info.shouldBadge = true
         subscription.notificationInfo = info
         _ = try? await database.save(subscription)
     }

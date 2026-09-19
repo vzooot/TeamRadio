@@ -107,6 +107,45 @@ enum ChatService {
                            date: created, mediaType: giphy?.type ?? media?.type)
     }
 
+    // MARK: - Room notifications
+
+    static let roomPushKey = "chatRoomPushEnabled"
+
+    /// Push for every room message by someone else this weekend, straight
+    /// from CloudKit. Off = the subscription is removed.
+    static var roomPushEnabled: Bool {
+        get { UserDefaults.standard.object(forKey: roomPushKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: roomPushKey) }
+    }
+
+    static func subscribeToRoom(round: String, me: String) async {
+        let id = "room-\(me)"
+        guard roomPushEnabled else {
+            _ = try? await database.deleteSubscription(withID: id)
+            return
+        }
+        // Same round already subscribed → nothing to do; otherwise replace.
+        if let existing = try? await database.subscription(for: id) as? CKQuerySubscription,
+           existing.predicate.predicateFormat.contains("\"\(round)\"") {
+            return
+        }
+        _ = try? await database.deleteSubscription(withID: id)
+        let subscription = CKQuerySubscription(
+            recordType: "Message",
+            predicate: NSPredicate(format: "round == %@ AND senderId != %@", round, me),
+            subscriptionID: id,
+            options: [.firesOnRecordCreation])
+        let info = CKSubscription.NotificationInfo()
+        info.titleLocalizationKey = "Paddock"
+        info.alertLocalizationKey = "%1$@ posted in the Paddock"
+        info.alertLocalizationArgs = ["sender"]
+        info.soundName = MessageSounds.receivedFile
+        info.shouldBadge = true
+        info.desiredKeys = ["sender"]
+        subscription.notificationInfo = info
+        _ = try? await database.save(subscription)
+    }
+
     // MARK: - Nickname registration
 
     enum NameClaim {

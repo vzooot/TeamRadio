@@ -69,6 +69,10 @@ final class ChatViewModel {
         }
 
         await refresh()
+        if let me = currentUserId {
+            let round = round
+            Task.detached(priority: .utility) { await ChatService.subscribeToRoom(round: round, me: me) }
+        }
         pollTask?.cancel()
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -76,6 +80,16 @@ final class ChatViewModel {
                 await self?.refresh()
             }
         }
+    }
+
+    var roomPushEnabled: Bool = ChatService.roomPushEnabled
+
+    func setRoomPush(_ on: Bool) {
+        ChatService.roomPushEnabled = on
+        roomPushEnabled = on
+        guard let me = currentUserId else { return }
+        let round = round
+        Task.detached(priority: .utility) { await ChatService.subscribeToRoom(round: round, me: me) }
     }
 
     func stop() {

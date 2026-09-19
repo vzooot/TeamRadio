@@ -21,6 +21,9 @@ to your identity, and nothing is ever sold or shared.
   device for push delivery only, is linked to nothing else, and is deleted
   when it stops working. To opt out, disable notifications for Team Radio in
   iOS Settings.
+- **Message notifications.** New-message alerts for the paddock room and for
+  private messages are delivered by Apple's CloudKit; they carry only the
+  sender's paddock name. Room alerts can be muted with the bell in the Paddock.
 - **Private messages.** One-to-one messages are stored in the same CloudKit
   public database but are end-to-end encrypted on your device: each
   participant holds a key that never leaves their devices, and only the two

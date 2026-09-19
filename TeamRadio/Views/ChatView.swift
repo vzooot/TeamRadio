@@ -84,6 +84,9 @@ struct ChatView: View {
         .onReceive(NotificationCenter.default.publisher(for: .chatPushReceived)) { _ in
             Task { await inbox.load() }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .openPaddockRoom)) { _ in
+            mode = .room
+        }
         .sheet(item: $memberCard) { member in
             MemberCard(member: member) {
                 openThread(id: member.id, name: member.name)
@@ -248,6 +251,24 @@ struct ChatView: View {
                 }
 
                 Spacer()
+
+                // Room notifications on/off.
+                Button {
+                    model.setRoomPush(!model.roomPushEnabled)
+                } label: {
+                    Image(systemName: model.roomPushEnabled ? "bell.fill" : "bell.slash")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(model.roomPushEnabled ? Theme.accent : Theme.dimText)
+                        .frame(width: 30, height: 30)
+                        .background(
+                            Circle()
+                                .fill(Color.white.opacity(0.05))
+                                .overlay(Circle().strokeBorder(Theme.glassStroke, lineWidth: 1))
+                        )
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, 6)
+                .accessibilityLabel(model.roomPushEnabled ? "Mute paddock notifications" : "Unmute paddock notifications")
 
                 // Current paddock name; tap to change it.
                 Button {
