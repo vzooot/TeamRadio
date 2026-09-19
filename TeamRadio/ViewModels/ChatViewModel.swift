@@ -43,6 +43,8 @@ final class ChatViewModel {
         if nickname.isEmpty, let profile = await ChatService.registeredProfile() {
             nickname = profile.name
             UserDefaults.standard.set(profile.name, forKey: "chatNickname")
+            // They agreed to the rules when they first claimed the name.
+            agreeToRules()
         }
 
         // Private messages: make us reachable (public key) and let CloudKit

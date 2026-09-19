@@ -129,17 +129,30 @@ enum ChatService {
 
         do {
             _ = try await database.save(record)
+            await savePointer(name: name, userId: userId)
             return .claimed
         } catch let error as CKError where error.code == .serverRecordChanged {
             // Name exists — fine if it's already ours.
             if let existing = try? await database.record(for: recordID),
                existing["ownerId"] as? String == userId {
+                await savePointer(name: name, userId: userId)
                 return .claimed
             }
             return .taken
         } catch {
             return .failed(error.localizedDescription)
         }
+    }
+
+    /// A second Profile record keyed by the *user* ("user-<id>") points at
+    /// their name, so a reinstall restores it with a direct fetch — no query,
+    /// no index to forget in Production.
+    private static func savePointer(name: String, userId: String) async {
+        let id = CKRecord.ID(recordName: "user-\(userId)")
+        let record = (try? await database.record(for: id)) ?? CKRecord(recordType: "Profile", recordID: id)
+        record["displayName"] = name
+        record["ownerId"] = userId
+        _ = try? await database.save(record)
     }
 
     /// Frees a previously claimed name (best-effort, when renaming).
@@ -153,6 +166,12 @@ enum ChatService {
     /// rename cooldown to a server-side date.
     static func registeredProfile() async -> (name: String, claimedAt: Date)? {
         guard let userId = await currentUserId() else { return nil }
+        // Fast path: the per-user pointer record.
+        if let pointer = try? await database.record(for: CKRecord.ID(recordName: "user-\(userId)")),
+           let name = pointer["displayName"] as? String {
+            return (name, pointer.modificationDate ?? pointer.creationDate ?? .distantPast)
+        }
+        // Profiles claimed before the pointer existed: query by owner.
         let query = CKQuery(
             recordType: "Profile",
             predicate: NSPredicate(format: "ownerId == %@", userId)
@@ -160,6 +179,7 @@ enum ChatService {
         guard let (results, _) = try? await database.records(matching: query, resultsLimit: 1),
               let record = results.first.flatMap({ try? $0.1.get() }),
               let name = record["displayName"] as? String else { return nil }
+        await savePointer(name: name, userId: userId)     // upgrade on the way out
         return (name, record.creationDate ?? .distantPast)
     }
 
