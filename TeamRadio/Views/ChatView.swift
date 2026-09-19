@@ -75,7 +75,14 @@ struct ChatView: View {
             }
         }
         .task { await model.start() }
-        .task { await inbox.load() }
+        // Keep the MESSAGES chip honest while the Paddock is open: a private
+        // message may land without a push (same device, muted, or none yet).
+        .task {
+            while !Task.isCancelled {
+                await inbox.load()
+                try? await Task.sleep(for: .seconds(15))
+            }
+        }
         .onDisappear { model.stop() }
         .onReceive(NotificationCenter.default.publisher(for: .openPaddockMessages)) { _ in
             mode = .messages
