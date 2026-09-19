@@ -103,6 +103,7 @@ final class ThreadViewModel {
             let arrived = !messages.isEmpty && fetched.contains { !known.contains($0.id) && $0.fromId != me }
             messages = (fetched + messages.filter { !ids.contains($0.id) }).sorted { $0.date < $1.date }
             DMReadState.markRead(thread)
+            NotificationCenter.default.post(name: .chatPushReceived, object: nil)   // recount badges now
             if arrived { MessageSounds.playReceived() }
             errorText = nil
         } catch is CancellationError {

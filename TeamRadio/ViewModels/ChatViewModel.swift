@@ -47,6 +47,9 @@ final class ChatViewModel {
             agreeToRules()
         }
 
+        // Badge + banners for messages; the icon bubble needs .badge granted.
+        InboxViewModel.enableNotifications()
+
         // Private messages: make us reachable (public key) and let CloudKit
         // push new ones to this device.
         if let me = currentUserId {

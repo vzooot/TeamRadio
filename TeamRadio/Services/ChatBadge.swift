@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UserNotifications
 
 /// Counts paddock messages newer than the last read point, so the tab bar
 /// can show an unread bubble while the user is elsewhere in the app.
@@ -61,6 +62,7 @@ final class ChatBadge {
     func markRead() {
         Self.lastReadAt = .now
         unread = unreadDMs
+        Self.setAppIconBadge(unread)
     }
 
     private func recount(round: String, userId: String?) async {
@@ -94,6 +96,13 @@ final class ChatBadge {
         unread = fresh.count + dms.count
         if unread > before, before >= 0, !firstCount { MessageSounds.playReceived() }
         firstCount = false
+        Self.setAppIconBadge(unread)
+    }
+
+    /// The red bubble on the app icon mirrors the tab badge; cleared the same
+    /// moment the tab is. Needs the badge permission the inbox asks for.
+    static func setAppIconBadge(_ count: Int) {
+        UNUserNotificationCenter.current().setBadgeCount(count) { _ in }
     }
 
     @ObservationIgnored private var firstCount = true
