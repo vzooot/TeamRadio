@@ -121,9 +121,43 @@ def cmd_prepare(a):
             log("subtitle set")
         else:
             log("subtitle skipped — no editable app info")
+    sync_localizations(vid)
     if not a.no_screenshots:
         upload_screenshots(loc)
     log("PREPARED", a.version)
+
+
+def sync_localizations(vid):
+    """Every fastlane/metadata/<locale>/ folder besides en-US becomes a store
+    localization: version-level text on the version, subtitle/name on the
+    editable app info. Files: description, keywords, promotional_text, name,
+    subtitle, release_notes (.txt each)."""
+    meta = os.path.join(ROOT, "fastlane", "metadata")
+    infos = call("GET", f"/v1/apps/{APP}/appInfos?fields[appInfos]=appStoreState")["data"]
+    editable = [i for i in infos if i["attributes"]["appStoreState"] in ("PREPARE_FOR_SUBMISSION", "DEVELOPER_REJECTED", "REJECTED", "METADATA_REJECTED")]
+    existing = {l["attributes"]["locale"]: l["id"] for l in call("GET", f"/v1/appStoreVersions/{vid}/appStoreVersionLocalizations?fields[appStoreVersionLocalizations]=locale")["data"]}
+    for locale in sorted(os.listdir(meta)):
+        folder = os.path.join(meta, locale)
+        if locale == "en-US" or not os.path.isdir(folder) or locale in ("review_information", "screenshots"):
+            continue
+        read = lambda name: open(os.path.join(folder, name)).read().strip() if os.path.exists(os.path.join(folder, name)) else None
+        version_attrs = {k: v for k, v in {"description": read("description.txt"), "keywords": read("keywords.txt"),
+                         "promotionalText": read("promotional_text.txt"), "whatsNew": read("release_notes.txt")}.items() if v}
+        if locale in existing:
+            call("PATCH", f"/v1/appStoreVersionLocalizations/{existing[locale]}", {"data": {"type": "appStoreVersionLocalizations", "id": existing[locale], "attributes": version_attrs}})
+        else:
+            call("POST", "/v1/appStoreVersionLocalizations", {"data": {"type": "appStoreVersionLocalizations",
+                 "attributes": {"locale": locale, **version_attrs},
+                 "relationships": {"appStoreVersion": {"data": {"type": "appStoreVersions", "id": vid}}}}})
+        info_attrs = {k: v for k, v in {"name": read("name.txt"), "subtitle": read("subtitle.txt")}.items() if v}
+        if editable and info_attrs:
+            il = {l["attributes"]["locale"]: l["id"] for l in call("GET", f"/v1/appInfos/{editable[0]['id']}/appInfoLocalizations?fields[appInfoLocalizations]=locale")["data"]}
+            if locale in il:
+                call("PATCH", f"/v1/appInfoLocalizations/{il[locale]}", {"data": {"type": "appInfoLocalizations", "id": il[locale], "attributes": info_attrs}})
+            else:
+                call("POST", "/v1/appInfoLocalizations", {"data": {"type": "appInfoLocalizations", "attributes": {"locale": locale, **info_attrs},
+                     "relationships": {"appInfo": {"data": {"type": "appInfos", "id": editable[0]["id"]}}}}})
+        log("localization", locale, "synced")
 
 
 def cmd_submit(a):

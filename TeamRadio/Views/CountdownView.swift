@@ -110,6 +110,7 @@ struct CountdownView: View {
             } else {
                 LiveActivityManager.start(race: race, session: session)
                 pinned = true
+                ReviewPrompt.goodMoment()
             }
         } label: {
             HStack(spacing: 6) {

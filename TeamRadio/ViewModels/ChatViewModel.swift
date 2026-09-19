@@ -165,6 +165,7 @@ final class ChatViewModel {
             // Echo instantly; the next poll reconciles with the server.
             messages.append(sent)
             MessageSounds.playSent()
+            ReviewPrompt.goodMoment()
             errorText = nil
         } catch {
             errorText = "Message not sent: \(error.localizedDescription)"

@@ -1,0 +1,4 @@
+• Bläddra bland säsongens alla omgångar från listan längst ner – nedräkning, schema och 3D-bana följer med
+• Pushnotiser för paddock-chatten (tysta med klockan) och för privata meddelanden, med räknare på appikonen
+• Startljusen räknar nu ner dagarna till loppet; LED-panelen visar sessionsinfo av sig själv
+• Ditt paddocknamn överlever ominstallation; meddelandeljud; färgade räknare; iPad-fixar

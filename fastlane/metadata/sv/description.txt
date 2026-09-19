@@ -1,0 +1,31 @@
+Team Radio är en snabb och snygg följeslagare för racehelgen.
+
+NEDRÄKNING
+• Live-nedräkning till varje session under kommande racehelg – träning, kval, sprint och lopp
+• Startljus som tänds ett i taget när racehelgen närmar sig
+• Hela helgens tidtabell i din lokala tidszon, med väderprognos per session
+• Sessionsklocka i sändningsstil med millisekunder när en session pågår
+
+BANAN I 3D
+• Riktiga banor i interaktiv 3D – rotera, zooma, utforska
+• Kurvnummer, banlängd, körriktning och tidsförlust i depån
+
+RESULTAT OCH STÄLLNING
+• Pallplatser och full resultatlista för varje avslutad omgång, inklusive sprintlopp
+• Kvalresultat med tider och valfritt spoilerskydd
+• Kompletta förar- och konstruktörsmästerskap
+
+ALLTID PÅ LÅSSKÄRMEN
+• Widgetar för låsskärm och hemskärm med nedräkning som uppdaterar sig själv
+• Fäst en session som Live Activity: en tickande nedräkning i Dynamic Island som slår om till LIVE vid grönt ljus
+• Valfria påminnelser 15 minuter före varje session
+
+PADDOCK-CHATT
+• Ett fanchatt för varje racehelg – inget konto, ingen registrering
+• Privata meddelanden mellan fans, krypterade från ände till ände
+• Unika paddocknamn, med rapportering och blockering inbyggt
+
+NYHETER
+• De senaste racingnyheterna från stora motorsportmedier, i ett flöde
+
+Team Radio är gratis, samlar inte in data och kräver inget konto.

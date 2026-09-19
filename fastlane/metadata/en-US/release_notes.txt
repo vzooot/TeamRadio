@@ -1,4 +1,4 @@
-• Private messages: tap a name in the Paddock to message someone one-to-one — end-to-end encrypted, with photos, videos and GIFs
-• Message sounds, banners and a red unread count so you never miss a reply
-• Start-light board fixed on iPad
-• Bug fixes and polish
+• Browse any round of the season from the strip at the bottom — countdown, schedule and 3D circuit follow
+• Push notifications for the paddock room (mute with the bell) and for private messages, with an app icon badge
+• The start lights now count the days to the race; the LED board loops through session info by itself
+• Your paddock name survives reinstalls; message sounds; badge colours; iPad fixes
