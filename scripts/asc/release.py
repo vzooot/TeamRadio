@@ -141,8 +141,12 @@ def sync_localizations(vid):
         if locale == "en-US" or not os.path.isdir(folder) or locale in ("review_information", "screenshots"):
             continue
         read = lambda name: open(os.path.join(folder, name)).read().strip() if os.path.exists(os.path.join(folder, name)) else None
+        en = lambda name: open(os.path.join(meta, "en-US", name)).read().strip() if os.path.exists(os.path.join(meta, "en-US", name)) else None
         version_attrs = {k: v for k, v in {"description": read("description.txt"), "keywords": read("keywords.txt"),
-                         "promotionalText": read("promotional_text.txt"), "whatsNew": read("release_notes.txt")}.items() if v}
+                         "promotionalText": read("promotional_text.txt"), "whatsNew": read("release_notes.txt"),
+                         # required on every localization; fall back to the English ones
+                         "supportUrl": read("support_url.txt") or en("support_url.txt"),
+                         "marketingUrl": read("marketing_url.txt") or en("marketing_url.txt")}.items() if v}
         if locale in existing:
             call("PATCH", f"/v1/appStoreVersionLocalizations/{existing[locale]}", {"data": {"type": "appStoreVersionLocalizations", "id": existing[locale], "attributes": version_attrs}})
         else:
