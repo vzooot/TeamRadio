@@ -105,7 +105,8 @@ struct DotMatrixBoard: View {
     @State private var transitionStart: Date?
     @State private var settle: Task<Void, Never>?
 
-    private static let cols = 24, rows = 4
+    private static let cols = 26, rows = 6      // a quiet ring of sockets around the 24×4 content
+    private static let inset = 1
     private static let scramble: TimeInterval = 0.9
     private static let hold: TimeInterval = 5
 
@@ -129,24 +130,24 @@ struct DotMatrixBoard: View {
         if page == 0 {
             // five round 4×4 blocks (corners dark), one dark column between
             for c in 0..<5 {
-                let c0 = c * 5
+                let c0 = Self.inset + c * 5
                 for dc in 0..<4 {
                     for dr in 0..<4 {
                         let corner = (dc == 0 || dc == 3) && (dr == 0 || dr == 3)
                         guard !corner else { continue }
-                        cells[dr * 1000 + c0 + dc] = c < litLights ? 1 : 0
+                        cells[(Self.inset + dr) * 1000 + c0 + dc] = c < litLights ? 1 : 0
                     }
                 }
             }
         } else {
             let text = Array(pages[page - 1].uppercased().prefix(6))
             let width = text.count * 4 - 1
-            var col = max(0, (Self.cols - width) / 2)
+            var col = max(Self.inset, (Self.cols - width) / 2)
             for ch in text {
                 let bits = Array(Self.glyphs[ch] ?? Self.glyphs[" "]!)
                 for row in 0..<4 {
                     for k in 0..<3 where bits[row * 3 + k] == "#" && col + k < Self.cols {
-                        cells[row * 1000 + col + k] = 1
+                        cells[(Self.inset + row) * 1000 + col + k] = 1
                     }
                 }
                 col += 4
@@ -239,17 +240,17 @@ struct DotMatrixBoard: View {
                 for c in 0..<cols { for r in 0..<rows { sockets.append(center(c, r)) } }
                 for p in sockets {
                     ctx.stroke(Path(ellipseIn: rect(p, hole * 1.03)),
-                               with: .linearGradient(Gradient(colors: [Color.white.opacity(0.03), Color.white.opacity(0.18)]),
+                               with: .linearGradient(Gradient(colors: [Color.white.opacity(0.015), Color.white.opacity(0.09)]),
                                                      startPoint: CGPoint(x: p.x, y: p.y - hole), endPoint: CGPoint(x: p.x, y: p.y + hole)),
                                lineWidth: 1.3)
-                    disc(p, hole, .linearGradient(Gradient(colors: [Color.black.opacity(0.97), Color.black.opacity(0.72)]),
+                    disc(p, hole, .linearGradient(Gradient(colors: [Color.black.opacity(0.7), Color.black.opacity(0.45)]),
                                                   startPoint: CGPoint(x: p.x, y: p.y - hole), endPoint: CGPoint(x: p.x, y: p.y + hole)), in: &ctx)
                 }
                 ctx.drawLayer { layer in
                     layer.addFilter(.blur(radius: 0.9))
                     for p in sockets {
-                        layer.stroke(Path(ellipseIn: rect(CGPoint(x: p.x, y: p.y - 1.3), hole * 0.9)), with: .color(.black.opacity(0.8)), lineWidth: 2.2)
-                        layer.stroke(Path(ellipseIn: rect(CGPoint(x: p.x, y: p.y + 1.1), hole * 0.9)), with: .color(.white.opacity(0.12)), lineWidth: 1.6)
+                        layer.stroke(Path(ellipseIn: rect(CGPoint(x: p.x, y: p.y - 1.3), hole * 0.9)), with: .color(.black.opacity(0.5)), lineWidth: 2.2)
+                        layer.stroke(Path(ellipseIn: rect(CGPoint(x: p.x, y: p.y + 1.1), hole * 0.9)), with: .color(.white.opacity(0.06)), lineWidth: 1.6)
                     }
                 }
                 // unlit: the 3×3 grey die
@@ -258,7 +259,7 @@ struct DotMatrixBoard: View {
                         let key = r * 1000 + c
                         guard lit[key] == nil else { continue }
                         let p = center(c, r)
-                        let tint: Color = armed.contains(key) ? Color(red: 0.46, green: 0.17, blue: 0.12) : Color(red: 0.3, green: 0.34, blue: 0.36)
+                        let tint: Color = armed.contains(key) ? Color(red: 0.34, green: 0.12, blue: 0.08) : Color(red: 0.17, green: 0.19, blue: 0.21)
                         for dx in -1...1 {
                             for dy in -1...1 {
                                 let q = CGPoint(x: p.x + CGFloat(dx) * dieStep, y: p.y + CGFloat(dy) * dieStep)
@@ -324,7 +325,7 @@ struct DotMatrixBoard: View {
         // a little taller than the grid so the halos aren't clipped
         // height follows width (4 rows + a little room for halos); capped so
         // iPad keeps iPhone-sized LEDs instead of a wall of them
-        .aspectRatio(CGFloat(Self.cols + 1) / 4.7, contentMode: .fit)
+        .aspectRatio(CGFloat(Self.cols + 1) / 6.7, contentMode: .fit)
         .frame(maxWidth: 440)
         .padding(.top, -8)
         .contentShape(Rectangle())
