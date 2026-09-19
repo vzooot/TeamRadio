@@ -41,10 +41,10 @@ struct CountdownView: View {
                 }
 
                 if remaining > 0 {
-                    let lit = StartLightsView.litCount(secondsRemaining: remaining)
-                    DotMatrixBoard(litLights: lit, pages: infoPages(session: session, remaining: remaining))
-                    if lit > 0 {
-                        Text(lit >= 5 ? "FINAL 24 HOURS" : "IT'S RACE WEEK")
+                    let gantry = raceWeekend(now: now)
+                    DotMatrixBoard(litLights: gantry.lit, pages: infoPages(session: session, remaining: remaining))
+                    if let label = gantry.label {
+                        Text(label)
                             .font(.f1(11, weight: .bold))
                             .tracking(3)
                             .foregroundStyle(Theme.live)
@@ -69,8 +69,8 @@ struct CountdownView: View {
                     }
                     .padding(.bottom, 10)
                 } else if let session, now < session.date.addingTimeInterval(session.kind.expectedDuration) {
-                    // Lights out: the gantry goes dark the moment the session starts.
-                    DotMatrixBoard(litLights: 0)
+                    // Race start = lights out; a live practice/quali keeps the weekend's lights.
+                    DotMatrixBoard(litLights: session.kind == .race ? 0 : raceWeekend(now: now).lit)
                     liveBanner(session)
                 } else {
                     Text("🏁 \(session?.kind.rawValue.uppercased() ?? "SESSION") COMPLETE")
@@ -154,6 +154,22 @@ struct CountdownView: View {
             days > 0 ? "\(days) DAYS" : "\(hours) HRS",
             "RND \(race.round)",
         ]
+    }
+
+    /// The start gantry is about Sunday's race, whatever session is selected:
+    /// dark until the weekend's first session day, then one more column for
+    /// every session that has run, all five on race day, lights out at the start.
+    private func raceWeekend(now: Date) -> (lit: Int, label: String?) {
+        guard let raceSession = sessions.last(where: { $0.kind == .race }) ?? sessions.last,
+              let first = sessions.first else { return (0, nil) }
+        let cal = Calendar.current
+        guard now >= cal.startOfDay(for: first.date) else { return (0, nil) }
+        if now >= raceSession.date { return (0, nil) }              // lights out
+        if cal.isDate(now, inSameDayAs: raceSession.date) { return (5, "RACE DAY") }
+        let done = sessions.filter { $0.kind != .race && $0.date.addingTimeInterval($0.kind.expectedDuration) <= now }.count
+        let lit = min(4, max(1, done + 1))
+        let tomorrow = cal.isDate(now.addingTimeInterval(86400), inSameDayAs: raceSession.date)
+        return (lit, tomorrow ? "LIGHTS OUT TOMORROW" : "RACE WEEK")
     }
 
     /// Sector colours, like the 3D circuit: practice cyan, qualifying violet, race red.
