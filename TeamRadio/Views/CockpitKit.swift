@@ -372,17 +372,17 @@ extension DotMatrixBoard {
     /// side, so the content columns line up with the chips and tiles and the
     /// outer ring sits in the margin.
     func alignedToContent() -> some View {
-        // the first and last content sockets' outer edges sit exactly on the
-        // content edges; the ring columns fall into the card inset
+        // the whole board, ring included, spans the card's content width —
+        // its outer sockets' edges land on the chips' and tiles' edges
         let edge = 0.5 - Self.holeRatio                                   // socket edge inset within its cell, in pitches
-        let contentPitches = CGFloat(Self.cols - 2 * Self.inset) - 2 * edge
+        let visiblePitches = CGFloat(Self.cols) - 2 * edge
         return GeometryReader { geo in
-            let pitch = geo.size.width / contentPitches
+            let pitch = geo.size.width / visiblePitches
             self
                 .frame(width: CGFloat(Self.cols) * pitch)
-                .offset(x: -(CGFloat(Self.inset) + edge) * pitch)
+                .offset(x: -edge * pitch)
         }
-        .aspectRatio(contentPitches / 6.4, contentMode: .fit)
+        .aspectRatio(visiblePitches / 6.4, contentMode: .fit)
         .padding(.top, -10)
         .padding(.bottom, -4)
     }
