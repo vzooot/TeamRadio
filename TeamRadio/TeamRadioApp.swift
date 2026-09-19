@@ -59,6 +59,7 @@ struct RootView: View {
                 .tag(2)
             ChatView()
                 .tabItem { Label("Paddock", systemImage: "bubble.left.and.bubble.right.fill") }
+                .badge(chatBadge.unread)
                 .tag(3)
             NewsView()
                 .tabItem { Label("News", systemImage: "newspaper.fill") }
@@ -101,15 +102,9 @@ struct RootView: View {
         .onReceive(NotificationCenter.default.publisher(for: .openPaddockRoom)) { _ in
             selection = 3
         }
-        // Unread bubbles above the Paddock tab: blue for the room, red for private.
-        .overlay(alignment: .bottom) {
-            if selection != 3, chatBadge.unread > 0 {
-                UnreadBubbles(room: chatBadge.unread - chatBadge.unreadDMs, direct: chatBadge.unreadDMs)
-                    .padding(.bottom, 52)
-                    .allowsHitTesting(false)
-                    .transition(.scale.combined(with: .opacity))
-            }
-        }
+        // The badge is blue for room chatter, red as soon as a private message waits.
+        .onChange(of: chatBadge.unread) { _, _ in TabBarBadge.tint(private: chatBadge.unreadDMs > 0) }
+        .onChange(of: chatBadge.unreadDMs) { _, _ in TabBarBadge.tint(private: chatBadge.unreadDMs > 0) }
         .overlay(alignment: .bottom) {
             if showMessageToast {
                 MessageToast(sender: chatBadge.latestSender, text: chatBadge.latestText, isPrivate: chatBadge.latestIsPrivate) {
@@ -173,32 +168,24 @@ struct MessageToast: View {
     }
 }
 
-/// Two small counters that sit just above the Paddock tab icon.
-struct UnreadBubbles: View {
-    let room: Int
-    let direct: Int
-
-    var body: some View {
-        GeometryReader { geo in
-            // the Paddock tab is the 4th of 5
-            let x = geo.size.width * (3.5 / 5)
-            HStack(spacing: 4) {
-                if room > 0 { pill("\(room)", Theme.accent) }
-                if direct > 0 { pill("\(direct)", Theme.live) }
+/// Colours the Paddock tab's badge: iOS draws it red; we recolour the
+/// UIKit item underneath (blue for the room, red when a private message waits).
+enum TabBarBadge {
+    static func tint(private isPrivate: Bool) {
+        DispatchQueue.main.async {
+            let color = UIColor(isPrivate ? Theme.live : Theme.accent)
+            let windows = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows)
+            for window in windows {
+                for bar in window.allSubviews(of: UITabBar.self) {
+                    bar.items?.forEach { $0.badgeColor = color }
+                }
             }
-            .position(x: x + 14, y: 6)
         }
-        .frame(height: 12)
-        .animation(.spring(response: 0.35, dampingFraction: 0.7), value: room + direct)
     }
+}
 
-    private func pill(_ text: String, _ color: Color) -> some View {
-        Text(text)
-            .font(.f1(10, weight: .black))
-            .foregroundStyle(color == Theme.accent ? Theme.onAccent : .white)
-            .padding(.horizontal, 5)
-            .padding(.vertical, 1.5)
-            .background(color, in: Capsule())
-            .shadow(color: color.opacity(0.6), radius: 5)
+private extension UIView {
+    func allSubviews<T: UIView>(of type: T.Type) -> [T] {
+        subviews.flatMap { ($0 as? T).map { [$0] } ?? [] + $0.allSubviews(of: type) }
     }
 }
