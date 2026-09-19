@@ -107,6 +107,7 @@ struct DotMatrixBoard: View {
 
     private static let cols = 26, rows = 6      // a quiet ring of sockets around the 24×4 content
     private static let inset = 1
+    private static let holeRatio: CGFloat = 0.28  // socket radius as a fraction of the pitch
     private static let scramble: TimeInterval = 0.9
     private static let hold: TimeInterval = 5
 
@@ -196,7 +197,7 @@ struct DotMatrixBoard: View {
                 let pitch = size.width / CGFloat(cols)
                 let left: CGFloat = 0
                 let top = (size.height - CGFloat(rows) * pitch) / 2
-                let hole = pitch * 0.28          // gap about 80% of the LED — roomy
+                let hole = pitch * Self.holeRatio   // gap about 80% of the LED — roomy
                 let die = hole * 0.21            // side of one grey square in an unlit socket
                 let dieStep = hole * 0.37
 
@@ -326,9 +327,6 @@ struct DotMatrixBoard: View {
         // height follows width (4 rows + a little room for halos); capped so
         // iPad keeps iPhone-sized LEDs instead of a wall of them
         .aspectRatio(CGFloat(Self.cols) / 6.4, contentMode: .fit)
-        .frame(maxWidth: 440)
-        .padding(.top, -10)
-        .padding(.bottom, -4)
         .contentShape(Rectangle())
         .onTapGesture { advance() }
         .onDisappear { settle?.cancel() }
@@ -366,5 +364,26 @@ struct NeonChip: View {
                 }
             )
             .shadow(color: tint.opacity(selected ? 0.5 : 0), radius: 8)
+    }
+}
+
+extension DotMatrixBoard {
+    /// Bleeds the board past the card inset by exactly one socket pitch per
+    /// side, so the content columns line up with the chips and tiles and the
+    /// outer ring sits in the margin.
+    func alignedToContent() -> some View {
+        // the first and last content sockets' outer edges sit exactly on the
+        // content edges; the ring columns fall into the card inset
+        let edge = 0.5 - Self.holeRatio                                   // socket edge inset within its cell, in pitches
+        let contentPitches = CGFloat(Self.cols - 2 * Self.inset) - 2 * edge
+        return GeometryReader { geo in
+            let pitch = geo.size.width / contentPitches
+            self
+                .frame(width: CGFloat(Self.cols) * pitch)
+                .offset(x: -(CGFloat(Self.inset) + edge) * pitch)
+        }
+        .aspectRatio(contentPitches / 6.4, contentMode: .fit)
+        .padding(.top, -10)
+        .padding(.bottom, -4)
     }
 }
