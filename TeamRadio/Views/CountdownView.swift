@@ -43,6 +43,7 @@ struct CountdownView: View {
                 if remaining > 0 {
                     let gantry = raceWeekend(now: now)
                     DotMatrixBoard(litLights: gantry.lit, pages: infoPages(session: session, remaining: remaining))
+                        .padding(.horizontal, -12)
                     if let label = gantry.label {
                         Text(label)
                             .font(.f1(11, weight: .bold))
@@ -71,6 +72,7 @@ struct CountdownView: View {
                 } else if let session, now < session.date.addingTimeInterval(session.kind.expectedDuration) {
                     // Race start = lights out; a live practice/quali keeps the weekend's lights.
                     DotMatrixBoard(litLights: session.kind == .race ? 0 : raceWeekend(now: now).lit)
+                        .padding(.horizontal, -12)
                     liveBanner(session)
                 } else {
                     Text("🏁 \(session?.kind.rawValue.uppercased() ?? "SESSION") COMPLETE")

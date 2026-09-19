@@ -193,8 +193,8 @@ struct DotMatrixBoard: View {
             Canvas { ctx, size in
                 let cols = Self.cols, rows = Self.rows
                 // a little side margin so the outer lamps' halos aren't clipped
-                let pitch = size.width / (CGFloat(cols) + 0.8)
-                let left = pitch * 0.4
+                let pitch = size.width / CGFloat(cols)
+                let left: CGFloat = 0
                 let top = (size.height - CGFloat(rows) * pitch) / 2
                 let hole = pitch * 0.28          // gap about 80% of the LED — roomy
                 let die = hole * 0.21            // side of one grey square in an unlit socket
@@ -325,10 +325,10 @@ struct DotMatrixBoard: View {
         // a little taller than the grid so the halos aren't clipped
         // height follows width (4 rows + a little room for halos); capped so
         // iPad keeps iPhone-sized LEDs instead of a wall of them
-        .aspectRatio(CGFloat(Self.cols + 1) / 6.2, contentMode: .fit)
+        .aspectRatio(CGFloat(Self.cols) / 6.4, contentMode: .fit)
         .frame(maxWidth: 440)
-        .padding(.top, -16)
-        .padding(.bottom, -10)
+        .padding(.top, -10)
+        .padding(.bottom, -4)
         .contentShape(Rectangle())
         .onTapGesture { advance() }
         .onDisappear { settle?.cancel() }
