@@ -59,7 +59,6 @@ struct RootView: View {
                 .tag(2)
             ChatView()
                 .tabItem { Label("Paddock", systemImage: "bubble.left.and.bubble.right.fill") }
-                .badge(chatBadge.unread)
                 .tag(3)
             NewsView()
                 .tabItem { Label("News", systemImage: "newspaper.fill") }
@@ -101,6 +100,15 @@ struct RootView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .openPaddockRoom)) { _ in
             selection = 3
+        }
+        // Unread bubbles above the Paddock tab: blue for the room, red for private.
+        .overlay(alignment: .bottom) {
+            if selection != 3, chatBadge.unread > 0 {
+                UnreadBubbles(room: chatBadge.unread - chatBadge.unreadDMs, direct: chatBadge.unreadDMs)
+                    .padding(.bottom, 52)
+                    .allowsHitTesting(false)
+                    .transition(.scale.combined(with: .opacity))
+            }
         }
         .overlay(alignment: .bottom) {
             if showMessageToast {
@@ -162,5 +170,35 @@ struct MessageToast: View {
         }
         .buttonStyle(.plain)
         .frame(maxWidth: 340)
+    }
+}
+
+/// Two small counters that sit just above the Paddock tab icon.
+struct UnreadBubbles: View {
+    let room: Int
+    let direct: Int
+
+    var body: some View {
+        GeometryReader { geo in
+            // the Paddock tab is the 4th of 5
+            let x = geo.size.width * (3.5 / 5)
+            HStack(spacing: 4) {
+                if room > 0 { pill("\(room)", Theme.accent) }
+                if direct > 0 { pill("\(direct)", Theme.live) }
+            }
+            .position(x: x + 14, y: 6)
+        }
+        .frame(height: 12)
+        .animation(.spring(response: 0.35, dampingFraction: 0.7), value: room + direct)
+    }
+
+    private func pill(_ text: String, _ color: Color) -> some View {
+        Text(text)
+            .font(.f1(10, weight: .black))
+            .foregroundStyle(color == Theme.accent ? Theme.onAccent : .white)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 1.5)
+            .background(color, in: Capsule())
+            .shadow(color: color.opacity(0.6), radius: 5)
     }
 }
