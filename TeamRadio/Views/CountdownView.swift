@@ -158,20 +158,18 @@ struct CountdownView: View {
         ]
     }
 
-    /// The start gantry is about Sunday's race, whatever session is selected:
-    /// dark until the weekend's first session day, then one more column for
-    /// every session that has run, all five on race day, lights out at the start.
+    /// The start gantry counts down to Sunday's race, whatever session is
+    /// selected: one light per day — 1 at five days out … all five on race
+    /// day — and lights out when the race starts.
     private func raceWeekend(now: Date) -> (lit: Int, label: String?) {
-        guard let raceSession = sessions.last(where: { $0.kind == .race }) ?? sessions.last,
-              let first = sessions.first else { return (0, nil) }
-        let cal = Calendar.current
-        guard now >= cal.startOfDay(for: first.date) else { return (0, nil) }
+        guard let raceSession = sessions.last(where: { $0.kind == .race }) ?? sessions.last else { return (0, nil) }
         if now >= raceSession.date { return (0, nil) }              // lights out
-        if cal.isDate(now, inSameDayAs: raceSession.date) { return (5, "RACE DAY") }
-        let done = sessions.filter { $0.kind != .race && $0.date.addingTimeInterval($0.kind.expectedDuration) <= now }.count
-        let lit = min(4, max(1, done + 1))
-        let tomorrow = cal.isDate(now.addingTimeInterval(86400), inSameDayAs: raceSession.date)
-        return (lit, tomorrow ? "LIGHTS OUT TOMORROW" : "RACE WEEK")
+        let cal = Calendar.current
+        let days = cal.dateComponents([.day], from: cal.startOfDay(for: now), to: cal.startOfDay(for: raceSession.date)).day ?? 99
+        guard days <= 4 else { return (0, nil) }
+        let lit = 5 - days
+        let label = days == 0 ? "RACE DAY" : days == 1 ? "LIGHTS OUT TOMORROW" : "RACE WEEK"
+        return (lit, label)
     }
 
     /// Sector colours, like the 3D circuit: practice cyan, qualifying violet, race red.
