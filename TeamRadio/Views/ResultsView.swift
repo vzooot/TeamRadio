@@ -422,6 +422,7 @@ struct RaceClassificationView: View {
         VStack(spacing: 0) {
             ForEach(results) { result in
                 RaceResultRow(result: result)
+                    .opensProfile(.driver(result.driver.driverId))
                 if result.id != results.last?.id {
                     Divider().overlay(Color.white.opacity(0.06))
                 }
@@ -511,6 +512,7 @@ struct QualifyingClassificationView: View {
         VStack(spacing: 0) {
             ForEach(results) { result in
                 QualifyingResultRow(result: result)
+                    .opensProfile(.driver(result.driver.driverId))
                 if result.id != results.last?.id {
                     Divider().overlay(Color.white.opacity(0.06))
                 }
@@ -613,6 +615,7 @@ struct ConstructorStandingsView: View {
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 9)
+                    .opensProfile(.team(entry.id))
 
                     if entry.id != standings.last?.id {
                         Divider().overlay(Color.white.opacity(0.06))

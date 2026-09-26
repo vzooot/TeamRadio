@@ -13,10 +13,13 @@ struct ErgastResponse: Decodable {
 struct MRData: Decodable {
     let raceTable: RaceTable?
     let standingsTable: StandingsTable?
+    /// Total matching rows on the server (before `limit`), e.g. career win count.
+    let total: String?
 
     enum CodingKeys: String, CodingKey {
         case raceTable = "RaceTable"
         case standingsTable = "StandingsTable"
+        case total
     }
 }
 
@@ -207,6 +210,8 @@ struct Driver: Decodable {
     let code: String?
     let givenName: String
     let familyName: String
+    var dateOfBirth: String?
+    var nationality: String?
 
     var shortCode: String { code ?? String(familyName.prefix(3)).uppercased() }
 }
@@ -214,6 +219,7 @@ struct Driver: Decodable {
 struct Constructor: Decodable {
     let constructorId: String
     let name: String
+    var nationality: String?
 }
 
 struct ConstructorStanding: Decodable, Identifiable {

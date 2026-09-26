@@ -45,6 +45,7 @@ struct RootView: View {
     @State private var chatBadge = ChatBadge()
     @State private var showMessageToast = false
     @State private var toastDismissTask: Task<Void, Never>?
+    @State private var profile: ProfileTarget?
 
     var body: some View {
         TabView(selection: $selection) {
@@ -66,6 +67,11 @@ struct RootView: View {
                 .tag(4)
         }
         .tint(Theme.accent)
+        .environment(\.openProfile, OpenProfileAction { profile = $0 })
+        .sheet(item: $profile) { target in
+            ProfileSheet(target: target)
+                .environment(\.openProfile, OpenProfileAction { profile = $0 })
+        }
         .onAppear {
             chatBadge.start()
             PushSync.start()

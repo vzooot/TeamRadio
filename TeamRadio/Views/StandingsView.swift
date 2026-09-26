@@ -11,6 +11,7 @@ struct StandingsView: View {
             VStack(spacing: 0) {
                 ForEach(standings) { entry in
                     StandingRow(entry: entry, isLeader: entry.position == "1")
+                        .opensProfile(.driver(entry.id))
                     if entry.id != standings.last?.id {
                         Divider().overlay(Color.white.opacity(0.06))
                     }

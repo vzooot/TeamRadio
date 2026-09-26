@@ -105,6 +105,7 @@ struct StandingsTabView: View {
             let leaderPoints = Double(model.drivers.first?.points ?? "") ?? 0
             ForEach(model.drivers) { entry in
                 FullDriverRow(entry: entry, leaderPoints: leaderPoints)
+                    .opensProfile(.driver(entry.id))
                 if entry.id != model.drivers.last?.id {
                     Divider().overlay(Color.white.opacity(0.06))
                 }
@@ -126,6 +127,7 @@ struct StandingsTabView: View {
             let leaderPoints = Double(model.constructors.first?.points ?? "") ?? 0
             ForEach(model.constructors) { entry in
                 FullConstructorRow(entry: entry, leaderPoints: leaderPoints)
+                    .opensProfile(.team(entry.id))
                 if entry.id != model.constructors.last?.id {
                     Divider().overlay(Color.white.opacity(0.06))
                 }
