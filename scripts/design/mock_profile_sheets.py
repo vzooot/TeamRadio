@@ -30,8 +30,8 @@ def team(out):
     car = trim(Image.open('Marketing/raw/art/Silver graphite open-wheel with turquoise accents.png').convert('RGBA'))
     car = car.resize((600, int(car.height*600/car.width)), Image.LANCZOS)
     # straight down from the top, on the right like the driver: the front half enters the sheet
-    car = car.resize((700, int(car.height*700/car.width)), Image.LANCZOS)
-    x0, y0 = W - car.width + 150, -car.height + 460
+    car = car.resize((650, int(car.height*650/car.width)), Image.LANCZOS)
+    x0, y0 = W - car.width + 130, -car.height + 465
     car = fade_left(car, 0.3)
     sh = Image.new('RGBA', car.size, (0,0,0,0)); sh.putalpha(car.getchannel('A').point(lambda a: int(a*0.5)))
     hdr.alpha_composite(sh.filter(ImageFilter.GaussianBlur(22)), (x0+10, y0+24))
