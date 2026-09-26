@@ -21,3 +21,6 @@ fastlane/README.md
 
 # Client API keys (GIPHY) — bundled at build time, never committed
 TeamRadio/Resources/Secrets.plist
+
+# Full-size generated artwork (optimized copies live in the asset catalog)
+Marketing/raw/art/*.png

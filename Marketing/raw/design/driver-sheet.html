@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
+<meta content="mobile_tab" name="shell-type"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,800;0,900;1,700;1,800;1,900&amp;family=Chivo:wght@400;600;700&amp;family=JetBrains+Mono:wght@500;600;700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#dbfcff",
+            "primary-container": "#00f0ff",
+            "secondary": "#a855f7",
+            "secondary-fixed": "#e9ddff",
+            "surface": "#10131a",
+            "background": "#0b0e14",
+            "surface-container-lowest": "#0b0e14",
+            "surface-container-low": "#13161f",
+            "surface-container": "#181c25",
+            "surface-container-high": "#222734",
+            "surface-container-highest": "#2c3242",
+            "on-surface": "#f1f3fa",
+            "on-surface-variant": "#94a3b8",
+            "outline": "#64748b",
+            "outline-variant": "#334155",
+            "error": "#ef4444",
+            "error-container": "#7f1d1d"
+          },
+          fontFamily: {
+            "racing": ["Barlow Condensed", "sans-serif"],
+            "mono": ["JetBrains Mono", "monospace"],
+            "body": ["Chivo", "sans-serif"]
+          }
+        }
+      }
+    };
+  </script>
+<style>
+    @layer base {
+      html, body {
+        width: 100vw;
+        height: 100dvh;
+        margin: 0;
+        padding: 0;
+        background-color: #0b0e14;
+        overflow: hidden;
+      }
+      .pb-safe {
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+      }
+      .pt-safe {
+        padding-top: env(safe-area-inset-top, 0px);
+      }
+    }
+    ::-webkit-scrollbar {
+      display: none;
+    }
+  </style>
+</head>
+<body class="bg-background text-on-surface font-body flex flex-col h-screen select-none overflow-hidden relative">
+<!-- BACKGROUND: Screen with Countdown Image dimmed as the backdrop under dark modal overlay -->
+<div class="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+<img alt="Countdown Screen Backdrop" class="w-full h-full object-cover object-top opacity-35 filter blur-[3px] scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDtGPO2ms7F2D5ALEu7cTBu1fTngp4qUJ8ozIovW0loLoyEGRjy2Ml23qVp8WcevZX2Yt4HCEWmHm0ICKKb5vkQJYIzT2JjWHBwm2885TixtBqFnB60lc8iUlakGAidYxajvNcK-k6VQH-D3a1h2m7pB7bDqa8_e3pL7tEx3mx4xy3bPLsRzsz9QUvnl7ZDx56z6tIZ4kaQ5yB-OX78h8a9ULy3-XymlUJf1KKDB-3G6-bNRwXgypbfujvzOJSRRrtAvQ"/>
+<div class="absolute inset-0 bg-gradient-to-b from-[#0b0e14]/75 via-[#0b0e14]/85 to-[#0b0e14]/98 backdrop-brightness-50"></div>
+</div>
+<!-- iOS Status Bar Simulation -->
+<header class="relative z-30 pt-safe w-full">
+<div class="h-10 px-6 flex items-center justify-between text-on-surface font-mono text-xs opacity-70">
+<span class="font-bold tracking-tight">16:01</span>
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[15px]">signal_cellular_alt</span>
+<span class="material-symbols-outlined text-[15px]">wifi</span>
+<span class="material-symbols-outlined text-[18px]">battery_full</span>
+</div>
+</div>
+</header>
+<!-- Main Container: Flexible modal sheet fitting cleanly above bottom nav -->
+<main class="relative z-20 flex-1 flex flex-col justify-end w-full overflow-hidden px-2 pb-16">
+<!-- DRIVER DETAIL MODAL BOTTOM SHEET -->
+<section aria-label="Andrea Kimi Antonelli Driver Profile" class="w-full bg-[#11151f]/95 border-t border-x border-[#00f0ff]/30 rounded-t-[28px] shadow-[0_-15px_45px_rgba(0,0,0,0.85)] flex flex-col backdrop-blur-2xl overflow-hidden max-h-[84vh]" id="driver-sheet">
+<!-- Top Subtle Cyan Neon Edge Glow -->
+<div class="w-full h-[2px] bg-gradient-to-r from-transparent via-[#00f0ff] to-transparent shrink-0"></div>
+<!-- Sheet Header: Drag Handle & Close Button -->
+<div class="w-full px-4 pt-2.5 pb-1 flex items-center justify-between shrink-0">
+<!-- Spacer for center balance -->
+<div class="w-7 h-7"></div>
+<!-- Clean Sheet Drag Handle Bar -->
+<div class="w-11 h-1 bg-outline/40 rounded-full mx-auto"></div>
+<!-- Close 'X' Button -->
+<button aria-label="Close sheet" class="w-7 h-7 rounded-full bg-[#1e2433] hover:bg-[#2b3348] border border-white/10 flex items-center justify-center text-on-surface-variant hover:text-white transition-all active:scale-95 shadow-sm" id="close-sheet-btn" type="button">
+<span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+</div>
+<!-- Scrollable / Fitted Sheet Body -->
+<div class="overflow-y-auto px-3.5 pb-3 flex flex-col gap-2.5">
+<!-- 1. DRIVER IDENTITY CARD -->
+<div class="relative overflow-hidden rounded-xl bg-gradient-to-r from-[#171c28] to-[#121620] p-3 border border-white/10 shadow-lg">
+<div class="absolute -right-4 -top-4 w-28 h-28 rounded-full bg-[#00f0ff]/10 blur-xl pointer-events-none"></div>
+<div class="flex items-center justify-between relative z-10 gap-2">
+<!-- Left Info -->
+<div class="flex flex-col flex-1 min-w-0">
+<div class="flex items-center gap-2 mb-0.5">
+<span class="w-1.5 h-6 bg-[#00f0ff] rounded-sm shadow-[0_0_10px_#00f0ff]"></span>
+<span class="font-racing italic font-black text-2xl tracking-wide text-[#00f0ff] leading-none drop-shadow-[0_0_8px_rgba(0,240,255,0.4)]">
+                  #12 ANT
+                </span>
+<span class="px-1.5 py-0.5 rounded bg-surface-container-highest font-mono text-[10px] text-on-surface uppercase font-bold tracking-wider">
+                  🇮🇹 ITA
+                </span>
+</div>
+<h1 class="font-racing italic font-black text-[22px] tracking-wide text-white uppercase leading-tight truncate">
+                ANDREA KIMI ANTONELLI
+              </h1>
+<div class="flex items-center gap-1.5 mt-1">
+<span class="w-2 h-2 rounded-full bg-[#00f0ff] shadow-[0_0_6px_#00f0ff]"></span>
+<span class="font-racing italic font-bold text-xs tracking-wider uppercase text-[#00f0ff]">
+                  MERCEDES-AMG PETRONAS F1 TEAM
+                </span>
+</div>
+</div>
+<!-- Right: Technical square placeholder box for helmet illustration -->
+<div class="w-[72px] h-[72px] shrink-0 rounded-xl bg-[#0b0e14] border border-[#00f0ff]/40 flex flex-col items-center justify-center relative p-1 overflow-hidden shadow-inner">
+<div class="absolute inset-0 bg-[radial-gradient(#00f0ff_1px,transparent_1px)] [background-size:6px_6px] opacity-25"></div>
+<svg class="w-9 h-9 text-[#00f0ff] drop-shadow-[0_0_8px_rgba(0,240,255,0.7)] relative z-10" fill="none" viewbox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+<path d="M12 36C12 21 21 10 37 10C51 10 56 22 56 34C56 46 48 52 38 52C28 52 24 52 18 48C14 45 12 40 12 36Z" fill="#141923" stroke="#00f0ff" stroke-linejoin="round" stroke-width="2"></path>
+<path d="M14 33H44C47 33 49 35 48 38L45 44C44 46 41 47 38 47H22L14 39V33Z" fill="#8b5cf6" fill-opacity="0.5" stroke="#a855f7" stroke-width="1.6"></path>
+<path d="M26 18L38 18" stroke="#00f0ff" stroke-linecap="round" stroke-width="1.8"></path>
+<path d="M24 23L42 23" stroke="#00f0ff" stroke-linecap="round" stroke-width="1.8"></path>
+<circle cx="20" cy="43" fill="#00f0ff" r="1.5"></circle>
+</svg>
+<span class="font-mono text-[7.5px] text-[#00f0ff] tracking-tighter relative z-10 font-bold mt-0.5">HELMET // SPEC</span>
+</div>
+</div>
+</div>
+<!-- 2. STAT TILES HEADER (With 3 Slanted Slashes) & 6 TILES -->
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center justify-between px-0.5">
+<div class="flex items-center gap-1.5">
+<!-- Three Slanted Slashes: Cyan, Violet, Orange-Red -->
+<span class="inline-flex items-center text-sm font-racing italic font-black tracking-tighter leading-none select-none">
+<span class="text-[#00f0ff] drop-shadow-[0_0_6px_#00f0ff]">//</span><span class="text-[#a855f7] drop-shadow-[0_0_6px_#a855f7]">/</span><span class="text-[#ef4444] drop-shadow-[0_0_6px_#ef4444]">/</span>
+</span>
+<span class="font-racing italic font-black text-sm uppercase tracking-wider text-white">DRIVER TELEMETRY STATS</span>
+</div>
+<span class="font-mono text-[10px] text-outline tracking-wider font-semibold">2026 STANDINGS</span>
+</div>
+<!-- 6 Stat Tiles Grid -->
+<div class="grid grid-cols-3 gap-2">
+<!-- POSITION: 1ST -->
+<div class="rounded-xl bg-[#171c26]/90 border border-[#00f0ff]/40 p-2 flex flex-col justify-between shadow-[0_2px_10px_rgba(0,240,255,0.06)] relative overflow-hidden">
+<div class="absolute top-0 left-0 right-0 h-[2px] bg-[#00f0ff] shadow-[0_0_8px_#00f0ff]"></div>
+<span class="font-racing italic font-bold text-[11px] uppercase tracking-wider text-on-surface-variant">POSITION</span>
+<div class="my-0.5">
+<span class="font-racing italic font-black text-[26px] leading-none text-[#00f0ff] drop-shadow-[0_0_6px_rgba(0,240,255,0.4)]">1ST</span>
+</div>
+<span class="font-mono text-[8.5px] text-[#00f0ff] tracking-tight font-bold">CHAMPION</span>
+</div>
+<!-- POINTS: 302 PTS -->
+<div class="rounded-xl bg-[#171c26]/90 border border-white/10 p-2 flex flex-col justify-between shadow-sm relative overflow-hidden">
+<div class="absolute top-0 left-0 right-0 h-[2px] bg-[#00f0ff]"></div>
+<span class="font-racing italic font-bold text-[11px] uppercase tracking-wider text-on-surface-variant">POINTS</span>
+<div class="my-0.5 flex items-baseline gap-1">
+<span class="font-racing italic font-black text-[26px] leading-none text-white">302</span>
+<span class="font-racing italic font-bold text-xs text-outline">PTS</span>
+</div>
+<span class="font-mono text-[8.5px] text-[#a855f7] tracking-tight font-bold">AVG 30.2/RD</span>
+</div>
+<!-- WINS: 8 -->
+<div class="rounded-xl bg-[#171c26]/90 border border-white/10 p-2 flex flex-col justify-between shadow-sm relative overflow-hidden">
+<div class="absolute top-0 left-0 right-0 h-[2px] bg-[#00f0ff]"></div>
+<span class="font-racing italic font-bold text-[11px] uppercase tracking-wider text-on-surface-variant">WINS</span>
+<div class="my-0.5">
+<span class="font-racing italic font-black text-[26px] leading-none text-white">8</span>
+</div>
+<span class="font-mono text-[8.5px] text-[#00f0ff] tracking-tight font-bold">80% CONV.</span>
+</div>
+<!-- PODIUMS: 14 -->
+<div class="rounded-xl bg-[#171c26]/90 border border-white/10 p-2 flex flex-col justify-between shadow-sm relative overflow-hidden">
+<div class="absolute top-0 left-0 right-0 h-[2px] bg-[#a855f7]"></div>
+<span class="font-racing italic font-bold text-[11px] uppercase tracking-wider text-on-surface-variant">PODIUMS</span>
+<div class="my-0.5">
+<span class="font-racing italic font-black text-[26px] leading-none text-white">14</span>
+</div>
+<span class="font-mono text-[8.5px] text-on-surface-variant tracking-tight font-bold">87.5% RATE</span>
+</div>
+<!-- POLES: 6 -->
+<div class="rounded-xl bg-[#171c26]/90 border border-white/10 p-2 flex flex-col justify-between shadow-sm relative overflow-hidden">
+<div class="absolute top-0 left-0 right-0 h-[2px] bg-[#a855f7]"></div>
+<span class="font-racing italic font-bold text-[11px] uppercase tracking-wider text-on-surface-variant">POLES</span>
+<div class="my-0.5">
+<span class="font-racing italic font-black text-[26px] leading-none text-[#a855f7]">6</span>
+</div>
+<span class="font-mono text-[8.5px] text-on-surface-variant tracking-tight font-bold">5 FAST LAPS</span>
+</div>
+<!-- DNFS: 1 -->
+<div class="rounded-xl bg-[#171c26]/90 border border-[#ef4444]/40 p-2 flex flex-col justify-between shadow-sm relative overflow-hidden">
+<div class="absolute top-0 left-0 right-0 h-[2px] bg-[#ef4444]"></div>
+<span class="font-racing italic font-bold text-[11px] uppercase tracking-wider text-[#ef4444]">DNFS</span>
+<div class="my-0.5">
+<span class="font-racing italic font-black text-[26px] leading-none text-[#ef4444]">1</span>
+</div>
+<span class="font-mono text-[8.5px] text-[#ef4444]/90 tracking-tight font-bold">R07 GEARBOX</span>
+</div>
+</div>
+</div>
+<!-- 3. PER-ROUND RESULTS STRIP (With 3 Slanted Slashes) -->
+<div class="flex flex-col gap-1.5 mt-0.5">
+<div class="flex items-center justify-between px-0.5">
+<div class="flex items-center gap-1.5">
+<!-- Three Slanted Slashes: Cyan, Violet, Orange-Red -->
+<span class="inline-flex items-center text-sm font-racing italic font-black tracking-tighter leading-none select-none">
+<span class="text-[#00f0ff] drop-shadow-[0_0_6px_#00f0ff]">//</span><span class="text-[#a855f7] drop-shadow-[0_0_6px_#a855f7]">/</span><span class="text-[#ef4444] drop-shadow-[0_0_6px_#ef4444]">/</span>
+</span>
+<span class="font-racing italic font-black text-sm uppercase tracking-wider text-white">2026 RACE RESULTS</span>
+</div>
+<span class="font-mono text-[10px] text-outline tracking-wider font-semibold">10 ROUNDS LOGGED</span>
+</div>
+<!-- Horizontal scrolling badge strip -->
+<div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+<!-- R01 P1 -->
+<div class="shrink-0 flex flex-col items-center justify-center w-11 h-12 rounded-lg bg-[#00f0ff]/15 border border-[#00f0ff]/60 shadow-[0_0_8px_rgba(0,240,255,0.25)] p-0.5">
+<span class="font-mono text-[8.5px] text-[#00f0ff] font-bold">R01</span>
+<span class="font-racing italic font-black text-lg text-[#00f0ff] leading-none">P1</span>
+</div>
+<!-- R02 P1 -->
+<div class="shrink-0 flex flex-col items-center justify-center w-11 h-12 rounded-lg bg-[#181d29] border border-white/10 p-0.5">
+<span class="font-mono text-[8.5px] text-on-surface-variant">R02</span>
+<span class="font-racing italic font-black text-lg text-[#00f0ff] leading-none">P1</span>
+</div>
+<!-- R03 P2 -->
+<div class="shrink-0 flex flex-col items-center justify-center w-11 h-12 rounded-lg bg-[#181d29] border border-white/10 p-0.5">
+<span class="font-mono text-[8.5px] text-on-surface-variant">R03</span>
+<span class="font-racing italic font-black text-lg text-[#a855f7] leading-none">P2</span>
+</div>
+<!-- R04 P1 -->
+<div class="shrink-0 flex flex-col items-center justify-center w-11 h-12 rounded-lg bg-[#181d29] border border-white/10 p-0.5">
+<span class="font-mono text-[8.5px] text-on-surface-variant">R04</span>
+<span class="font-racing italic font-black text-lg text-[#00f0ff] leading-none">P1</span>
+</div>
+<!-- R05 P4 -->
+<div class="shrink-0 flex flex-col items-center justify-center w-11 h-12 rounded-lg bg-[#181d29] border border-white/10 p-0.5">
+<span class="font-mono text-[8.5px] text-on-surface-variant">R05</span>
+<span class="font-racing italic font-black text-lg text-white leading-none">P4</span>
+</div>
+<!-- R06 P1 -->
+<div class="shrink-0 flex flex-col items-center justify-center w-11 h-12 rounded-lg bg-[#181d29] border border-white/10 p-0.5">
+<span class="font-mono text-[8.5px] text-on-surface-variant">R06</span>
+<span class="font-racing italic font-black text-lg text-[#00f0ff] leading-none">P1</span>
+</div>
+<!-- R07 DNF (red pill) -->
+<div class="shrink-0 flex flex-col items-center justify-center w-11 h-12 rounded-lg bg-[#ef4444]/20 border border-[#ef4444]/70 shadow-[0_0_10px_rgba(239,68,68,0.3)] p-0.5">
+<span class="font-mono text-[8.5px] text-[#ef4444] font-bold">R07</span>
+<span class="font-racing italic font-black text-base text-[#ef4444] leading-none">DNF</span>
+</div>
+<!-- R08 P1 -->
+<div class="shrink-0 flex flex-col items-center justify-center w-11 h-12 rounded-lg bg-[#181d29] border border-white/10 p-0.5">
+<span class="font-mono text-[8.5px] text-on-surface-variant">R08</span>
+<span class="font-racing italic font-black text-lg text-[#00f0ff] leading-none">P1</span>
+</div>
+<!-- R09 P2 -->
+<div class="shrink-0 flex flex-col items-center justify-center w-11 h-12 rounded-lg bg-[#181d29] border border-white/10 p-0.5">
+<span class="font-mono text-[8.5px] text-on-surface-variant">R09</span>
+<span class="font-racing italic font-black text-lg text-[#a855f7] leading-none">P2</span>
+</div>
+<!-- R10 P1 -->
+<div class="shrink-0 flex flex-col items-center justify-center w-11 h-12 rounded-lg bg-[#181d29] border border-white/10 p-0.5">
+<span class="font-mono text-[8.5px] text-on-surface-variant">R10</span>
+<span class="font-racing italic font-black text-lg text-[#00f0ff] leading-none">P1</span>
+</div>
+</div>
+</div>
+<!-- 4. CAREER SPECIFICATIONS (With 3 Slanted Slashes) -->
+<div class="flex flex-col gap-1.5 mt-0.5">
+<div class="flex items-center justify-between px-0.5">
+<div class="flex items-center gap-1.5">
+<!-- Three Slanted Slashes: Cyan, Violet, Orange-Red -->
+<span class="inline-flex items-center text-sm font-racing italic font-black tracking-tighter leading-none select-none">
+<span class="text-[#00f0ff] drop-shadow-[0_0_6px_#00f0ff]">//</span><span class="text-[#a855f7] drop-shadow-[0_0_6px_#a855f7]">/</span><span class="text-[#ef4444] drop-shadow-[0_0_6px_#ef4444]">/</span>
+</span>
+<span class="font-racing italic font-black text-sm uppercase tracking-wider text-white">CAREER SPECIFICATIONS</span>
+</div>
+<span class="font-mono text-[10px] text-outline tracking-wider font-semibold">FIA DOSSIER</span>
+</div>
+<div class="bg-[#171c26]/90 rounded-xl p-2.5 flex flex-col gap-2 border border-white/10 shadow-sm">
+<!-- First Entry -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-1.5 h-1.5 rounded-full bg-[#00f0ff]"></span>
+<span class="font-racing italic font-bold text-xs text-on-surface-variant uppercase tracking-wider">FIRST ENTRY</span>
+</div>
+<span class="font-racing italic font-extrabold text-sm text-white">2025 Australian GP</span>
+</div>
+<div class="h-px bg-white/5"></div>
+<!-- First Win -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-1.5 h-1.5 rounded-full bg-[#a855f7]"></span>
+<span class="font-racing italic font-bold text-xs text-on-surface-variant uppercase tracking-wider">FIRST WIN</span>
+</div>
+<span class="font-racing italic font-extrabold text-sm text-white">2025 Italian GP (Monza)</span>
+</div>
+<div class="h-px bg-white/5"></div>
+<!-- World Titles -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-1.5 h-1.5 rounded-full bg-[#00f0ff]"></span>
+<span class="font-racing italic font-bold text-xs text-on-surface-variant uppercase tracking-wider">WORLD TITLES</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="font-racing italic font-black text-base text-[#00f0ff]">0</span>
+<span class="font-mono text-[10px] text-on-surface-variant font-bold">(Current Leader)</span>
+</div>
+</div>
+<div class="h-px bg-white/5"></div>
+<!-- Date of Birth -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-1.5 h-1.5 rounded-full bg-outline"></span>
+<span class="font-racing italic font-bold text-xs text-on-surface-variant uppercase tracking-wider">DATE OF BIRTH</span>
+</div>
+<span class="font-racing italic font-extrabold text-sm text-white">25 AUG 2006 (19 YRS)</span>
+</div>
+</div>
+</div>
+<!-- 5. PRIMARY BUTTON: COMPARE DRIVER (Bold Italic Rounded CTA) -->
+<div class="pt-1.5">
+<button class="w-full h-12 rounded-xl bg-gradient-to-r from-[#00f0ff] via-[#46b3ff] to-[#a855f7] flex items-center justify-center gap-2 text-[#0b0e14] font-racing italic font-black text-lg tracking-wider uppercase shadow-[0_0_25px_rgba(0,240,255,0.4)] hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer" id="compare-btn" type="button">
+<span class="material-symbols-outlined text-[22px] font-bold">compare_arrows</span>
+<span>COMPARE DRIVER</span>
+</button>
+</div>
+</div>
+</section>
+</main>
+<!-- BOTTOM NAVIGATION BAR (Countdown Active Tab) -->
+<nav class="fixed bottom-0 w-full z-40 pb-safe bg-[#0b0e14]/95 backdrop-blur-xl border-t border-white/10 shadow-[0_-4px_20px_rgba(0,0,0,0.7)]" data-active-classes="text-[#00f0ff] [&amp;&gt;span]:text-[#00f0ff]">
+<div class="flex justify-around items-center h-16 px-1">
+<!-- Countdown Tab (Active) -->
+<a aria-current="page" class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] transition-colors text-[#00f0ff] [&amp;&gt;span]:text-[#00f0ff]" data-path="countdown" href="#">
+<span class="material-symbols-outlined text-[22px]">timer</span>
+<span class="font-racing italic font-bold text-[11px] uppercase tracking-wider mt-0.5">Countdown</span>
+</a>
+<!-- Results Tab -->
+<a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-on-surface-variant transition-colors hover:text-white" data-path="results" href="#">
+<span class="material-symbols-outlined text-[22px]">sports_score</span>
+<span class="font-racing italic font-bold text-[11px] uppercase tracking-wider mt-0.5">Results</span>
+</a>
+<!-- Standings Tab -->
+<a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-on-surface-variant transition-colors hover:text-white" data-path="standings" href="#">
+<span class="material-symbols-outlined text-[22px]">leaderboard</span>
+<span class="font-racing italic font-bold text-[11px] uppercase tracking-wider mt-0.5">Standings</span>
+</a>
+<!-- Paddock Tab -->
+<a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-on-surface-variant transition-colors hover:text-white" data-path="paddock" href="#">
+<span class="material-symbols-outlined text-[22px]">garage</span>
+<span class="font-racing italic font-bold text-[11px] uppercase tracking-wider mt-0.5">Paddock</span>
+</a>
+<!-- News Tab -->
+<a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-on-surface-variant transition-colors hover:text-white" data-path="news" href="#">
+<span class="material-symbols-outlined text-[22px]">newspaper</span>
+<span class="font-racing italic font-bold text-[11px] uppercase tracking-wider mt-0.5">News</span>
+</a>
+</div>
+</nav>
+<script>
+    (function () {
+      const closeBtn = document.getElementById('close-sheet-btn');
+      const compareBtn = document.getElementById('compare-btn');
+
+      if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+          const sheet = document.getElementById('driver-sheet');
+          if (sheet) {
+            sheet.style.transform = 'translateY(100%)';
+            sheet.style.transition = 'transform 0.3s ease-in-out';
+            setTimeout(() => {
+              window.history.back();
+            }, 300);
+          } else {
+            window.history.back();
+          }
+        });
+      }
+
+      if (compareBtn) {
+        compareBtn.addEventListener('click', () => {
+          const originalHTML = compareBtn.innerHTML;
+          compareBtn.innerHTML = '<span class="material-symbols-outlined text-[22px] animate-spin">sync</span><span>CONFIGURING DELTA...</span>';
+          setTimeout(() => {
+            compareBtn.innerHTML = '<span class="material-symbols-outlined text-[22px]">check_circle</span><span>DELTA STACK READY</span>';
+            setTimeout(() => {
+              compareBtn.innerHTML = originalHTML;
+            }, 1800);
+          }, 800);
+        });
+      }
+    })();
+  </script>
+</body></html>

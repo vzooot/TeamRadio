@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_tab" name="shell-type"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,800;1,700;1,800&amp;family=Chivo:wght@400;600&amp;family=JetBrains+Mono:wght@500;600&amp;family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,100..900;1,100..900&amp;family=Chivo:wght@100..900&amp;family=JetBrains+Mono:wght@100..900&amp;display=swap" rel="stylesheet"/><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "outline": "#849495", "on-surface": "#e1e2eb", "secondary-fixed": "#e9ddff", "tertiary": "#fff3f2", "on-primary-container": "#006970", "surface": "#10131a", "secondary-container": "#571bc1", "background": "#10131a", "primary-fixed-dim": "#00dbe9", "primary-container": "#00f0ff", "on-secondary-fixed-variant": "#5516be", "on-tertiary-fixed": "#410004", "error-container": "#93000a", "surface-bright": "#363940", "on-primary-fixed-variant": "#004f54", "tertiary-container": "#ffceca", "primary-fixed": "#7df4ff", "outline-variant": "#3b494b", "on-background": "#e1e2eb", "inverse-primary": "#006970", "primary": "#dbfcff", "inverse-surface": "#e1e2eb", "on-secondary-container": "#c4abff", "tertiary-fixed": "#ffdad7", "on-secondary-fixed": "#23005c", "error": "#ffb4ab", "on-secondary": "#3c0091", "on-error": "#690005", "on-tertiary-container": "#ba1b24", "surface-variant": "#32353c", "inverse-on-surface": "#2e3037", "surface-container-low": "#191c22", "on-primary-fixed": "#002022", "on-surface-variant": "#b9cacb", "surface-container": "#1d2026", "surface-container-lowest": "#0b0e14", "surface-container-high": "#272a31", "surface-tint": "#00dbe9", "surface-dim": "#10131a", "secondary": "#d0bcff", "on-tertiary": "#68000a", "tertiary-fixed-dim": "#ffb3ad", "secondary-fixed-dim": "#d0bcff", "on-primary": "#00363a", "on-tertiary-fixed-variant": "#930013", "on-error-container": "#ffdad6", "surface-container-highest": "#32353c" }, "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, "spacing": { "space-sm": "0.5rem", "space-lg": "1.5rem", "space-xl": "2rem", "margin": "1rem", "gutter-desktop": "1.5rem", "space-xs": "0.25rem", "space-md": "1rem", "margin-desktop": "2.5rem", "margin-tablet": "1.5rem", "gutter": "1rem" }, "fontFamily": { "body-md": ["Chivo"], "body-sm": ["Chivo"], "label-md": ["JetBrains Mono"], "headline-xl-mobile": ["Barlow Condensed"], "headline-md": ["Barlow Condensed"], "headline-sm": ["Barlow Condensed"], "body-lg": ["Chivo"], "label-lg": ["JetBrains Mono"], "label-sm": ["JetBrains Mono"], "headline-xl": ["Barlow Condensed"], "headline-lg": ["Barlow Condensed"] }, "fontSize": { "body-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "400" }], "body-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "400" }], "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.04em", "fontWeight": "500" }], "headline-xl-mobile": ["36px", { "lineHeight": "40px", "letterSpacing": "0.03em", "fontWeight": "800" }], "headline-md": ["24px", { "lineHeight": "28px", "letterSpacing": "0.02em", "fontWeight": "700" }], "headline-sm": ["20px", { "lineHeight": "24px", "letterSpacing": "0.02em", "fontWeight": "700" }], "body-lg": ["16px", { "lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "400" }], "label-lg": ["14px", { "lineHeight": "18px", "letterSpacing": "0.05em", "fontWeight": "600" }], "label-sm": ["10px", { "lineHeight": "14px", "letterSpacing": "0.06em", "fontWeight": "500" }], "headline-xl": ["48px", { "lineHeight": "52px", "letterSpacing": "0.04em", "fontWeight": "800" }], "headline-lg": ["32px", { "lineHeight": "36px", "letterSpacing": "0.03em", "fontWeight": "800" }] } } } };</script><style>@layer base{html,body{width:100vw;margin:0;padding:0;background-color:#0b0e14;}body{overscroll-behavior:none;background-image:linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);background-size:16px 16px;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head><body class="bg-surface-container-lowest text-on-surface font-body-md flex flex-col min-h-screen relative overflow-x-hidden">
+<!-- Dimmed Countdown Screen Background Backdrop -->
+<div class="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+<img alt="Countdown Background" class="w-full h-full object-cover object-top opacity-35 filter blur-[1.5px]" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCWTaXnezJiTBRzl0E65NQ3KtTSKqccqDifDAl8MATsXlO9aVehUoY6-pzwTnsNL2MP4eR-8lQV7pcLXBNH6Lyf6_NCv9luh_pNbIUrL_iuieJFfP3aUF9JU_EBUBEV5eYJGztttccx2NbXwiCxoDcelx5CljugpvCYjN4qv8s6fbl5QOKl-ysZfsvQFgP4X-jfsR_T6dAb04wl5KHQHxIl2Ny_9yXry1LnYaIfHCOGGhOP9U2tmVJ0wZtYv6TZAqj7Bg"/>
+<div class="absolute inset-0 bg-background/60"></div>
+</div>
+<main class="flex flex-col relative w-full z-10 pt-10 pb-20"><div class="flex flex-col w-full relative">
+<!-- Telemetry Constructor Detail Bottom Sheet -->
+<section aria-label="Team Overview Modal" class="relative w-full bg-[#10141d]/95 backdrop-blur-2xl rounded-t-3xl border-t border-[#00f0ff]/30 shadow-[0_-16px_40px_rgba(0,0,0,0.85)] pb-safe transition-all duration-300 overflow-hidden">
+<!-- Drag Handle & Close Control Bar -->
+<div class="relative w-full px-4 pt-3 pb-2 flex items-center justify-between">
+<div class="w-8"></div>
+<!-- Centered Drag Bar Handle -->
+<div class="w-10 h-1 bg-white/20 rounded-full"></div>
+<!-- Close Button -->
+<button aria-label="Close sheet" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 flex items-center justify-center text-white/80 transition-all" type="button">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
+<!-- Minimalist Top-Down Car Silhouette Card -->
+<div class="px-margin pt-1 pb-2">
+<div class="relative w-full h-36 rounded-2xl bg-gradient-to-b from-[#161b26] to-[#0d1017] border border-white/10 flex items-center justify-center overflow-hidden shadow-inner">
+<!-- Subtle Carbon & Grid Matrix -->
+<div class="absolute inset-0 opacity-20 bg-[radial-gradient(#00f0ff_1px,transparent_1px)] [background-size:14px_14px]"></div>
+<div class="absolute inset-x-0 h-px top-1/2 bg-gradient-to-r from-transparent via-[#00f0ff]/20 to-transparent"></div>
+<!-- Minimalist Precision Silhouette SVG in Mercedes Cyan -->
+<svg class="relative z-10 w-24 h-32 filter drop-shadow-[0_0_16px_rgba(0,240,255,0.6)]" fill="none" viewbox="0 0 100 140" xmlns="http://www.w3.org/2000/svg">
+<!-- Front Wing -->
+<path d="M 22 18 L 78 18 C 82 22, 80 25, 74 25 L 26 25 C 20 25, 18 22, 22 18 Z" fill="#00f0ff"></path>
+<!-- Nosecone & Chassis Monocoque -->
+<path d="M 45 20 L 55 20 C 56 36, 58 48, 62 58 C 66 68, 64 88, 60 105 L 40 105 C 36 88, 34 68, 38 58 C 42 48, 44 36, 45 20 Z" fill="#00f0ff" opacity="0.9"></path>
+<!-- Cockpit opening -->
+<ellipse cx="50" cy="62" fill="#0b0e14" rx="5" ry="11"></ellipse>
+<!-- Halo arch outline -->
+<path d="M 46 54 Q 50 49 54 54 L 53 66 Q 50 64 47 66 Z" fill="#dbfcff"></path>
+<!-- Front Wheels -->
+<rect fill="#00f0ff" height="22" rx="3" width="9" x="12" y="24"></rect>
+<rect fill="#00f0ff" height="22" rx="3" width="9" x="79" y="24"></rect>
+<!-- Front Suspension Struts -->
+<line stroke="#00f0ff" stroke-width="1.8" x1="21" x2="46" y1="35" y2="38"></line>
+<line stroke="#00f0ff" stroke-width="1.8" x1="79" x2="54" y1="35" y2="38"></line>
+<!-- Sidepod aerodynamic pods -->
+<path d="M 36 58 C 30 64, 28 80, 36 94 L 40 94 C 36 80, 37 68, 40 58 Z" fill="#00f0ff" opacity="0.75"></path>
+<path d="M 64 58 C 70 64, 72 80, 64 94 L 60 94 C 64 80, 63 68, 60 58 Z" fill="#00f0ff" opacity="0.75"></path>
+<!-- Rear Wheels -->
+<rect fill="#00f0ff" height="26" rx="3" width="12" x="8" y="94"></rect>
+<rect fill="#00f0ff" height="26" rx="3" width="12" x="80" y="94"></rect>
+<!-- Rear Suspension Arms -->
+<line stroke="#00f0ff" stroke-width="1.8" x1="20" x2="42" y1="104" y2="105"></line>
+<line stroke="#00f0ff" stroke-width="1.8" x1="80" x2="58" y1="104" y2="105"></line>
+<!-- Rear Wing -->
+<rect fill="#00f0ff" height="9" rx="2" width="62" x="19" y="122"></rect>
+</svg>
+</div>
+</div>
+<!-- Team Identity Header -->
+<div class="px-margin pt-2 flex flex-col gap-1">
+<div class="flex items-center gap-2">
+<div class="w-1.5 h-6 bg-[#00f0ff] rounded shadow-[0_0_10px_#00f0ff]"></div>
+<h2 class="font-headline-lg text-headline-lg tracking-wide italic font-black uppercase text-white">Mercedes-AMG PETRONAS</h2>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="bg-[#00f0ff]/20 text-[#00f0ff] font-headline-md text-headline-md tracking-wider italic font-black uppercase px-2.5 py-0.5 rounded-lg border border-[#00f0ff]/30">1ST</span>
+<span class="font-headline-md text-headline-md tracking-wider italic font-black uppercase text-white">538 PTS</span>
+</div>
+<span class="font-label-md text-label-md italic uppercase text-[#00f0ff] flex items-center gap-1 font-bold">
+<span class="material-symbols-outlined text-[18px]">trending_up</span> LEADER
+</span>
+</div>
+</div>
+<!-- High-Performance Stat Grid Tiles (Wins, Podiums, Poles) -->
+<div class="px-margin pt-4 grid grid-cols-3 gap-3">
+<div class="bg-surface-container-high/60 border border-white/5 rounded-2xl p-3 flex flex-col items-center justify-center relative overflow-hidden shadow-sm">
+<div class="w-full h-1 absolute top-0 bg-[#00f0ff]"></div>
+<span class="font-label-sm text-label-sm italic uppercase tracking-wider text-outline-variant font-bold">WINS</span>
+<span class="font-headline-xl-mobile text-headline-xl-mobile text-white italic font-black tracking-tight leading-none mt-1">11</span>
+</div>
+<div class="bg-surface-container-high/60 border border-white/5 rounded-2xl p-3 flex flex-col items-center justify-center relative overflow-hidden shadow-sm">
+<div class="w-full h-1 absolute top-0 bg-[#8b5cf6]"></div>
+<span class="font-label-sm text-label-sm italic uppercase tracking-wider text-outline-variant font-bold">PODIUMS</span>
+<span class="font-headline-xl-mobile text-headline-xl-mobile text-white italic font-black tracking-tight leading-none mt-1">22</span>
+</div>
+<div class="bg-surface-container-high/60 border border-white/5 rounded-2xl p-3 flex flex-col items-center justify-center relative overflow-hidden shadow-sm">
+<div class="w-full h-1 absolute top-0 bg-[#00f0ff]"></div>
+<span class="font-label-sm text-label-sm italic uppercase tracking-wider text-outline-variant font-bold">POLES</span>
+<span class="font-headline-xl-mobile text-headline-xl-mobile text-white italic font-black tracking-tight leading-none mt-1">9</span>
+</div>
+</div>
+<!-- Tappable Championship Drivers Section -->
+<div class="px-margin pt-5 flex flex-col gap-2.5">
+<div class="flex items-center justify-between pb-0.5">
+<div class="flex items-center gap-2">
+<!-- Three Slanted Slashes: cyan, violet, red -->
+<span class="font-headline-sm text-headline-sm italic font-black tracking-tighter select-none">
+<span class="text-[#00f0ff]">/</span><span class="text-[#8b5cf6]">/</span><span class="text-[#ef4444]">/</span>
+</span>
+<span class="font-headline-sm text-headline-sm uppercase italic font-black tracking-wider text-white">CHAMPIONSHIP DRIVERS</span>
+</div>
+<span class="font-label-sm text-label-sm italic font-bold uppercase tracking-wider text-outline">PILOT TELEMETRY</span>
+</div>
+<!-- Driver Card 1: Antonelli -->
+<button class="w-full bg-[#181c25]/80 hover:bg-[#1f2430] active:scale-[0.99] border border-white/5 rounded-2xl p-3 flex items-center justify-between text-left transition-all relative overflow-hidden shadow-md group" type="button">
+<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-[#00f0ff] shadow-[0_0_10px_#00f0ff]"></div>
+<div class="flex items-center gap-3 pl-1.5">
+<div class="flex flex-col items-center justify-center bg-black/40 border border-white/10 px-2.5 py-1.5 rounded-xl min-w-[46px]">
+<span class="font-label-sm text-label-sm text-[#00f0ff] font-bold leading-tight">#12</span>
+<span class="font-headline-sm text-headline-sm text-white italic font-black leading-none">ANT</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-1.5">
+<span class="font-headline-sm text-[18px] leading-tight font-black italic uppercase text-white">Andrea Kimi Antonelli</span>
+<span class="w-1.5 h-1.5 rounded-full bg-[#00f0ff]"></span>
+</div>
+<span class="font-label-sm text-label-sm italic font-semibold text-outline-variant uppercase">P1 STANDING • 8 RACE VICTORIES</span>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<div class="text-right">
+<span class="font-headline-md text-headline-md italic font-black text-[#00f0ff] tracking-wider leading-none block">302</span>
+<span class="font-label-sm text-label-sm text-outline font-bold leading-none block mt-0.5">PTS</span>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-[#00f0ff] text-[20px] transition-colors">chevron_right</span>
+</div>
+</button>
+<!-- Driver Card 2: Russell -->
+<button class="w-full bg-[#181c25]/80 hover:bg-[#1f2430] active:scale-[0.99] border border-white/5 rounded-2xl p-3 flex items-center justify-between text-left transition-all relative overflow-hidden shadow-md group" type="button">
+<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-[#00f0ff]"></div>
+<div class="flex items-center gap-3 pl-1.5">
+<div class="flex flex-col items-center justify-center bg-black/40 border border-white/10 px-2.5 py-1.5 rounded-xl min-w-[46px]">
+<span class="font-label-sm text-label-sm text-outline-variant font-bold leading-tight">#63</span>
+<span class="font-headline-sm text-headline-sm text-white italic font-black leading-none">RUS</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-1.5">
+<span class="font-headline-sm text-[18px] leading-tight font-black italic uppercase text-white">George Russell</span>
+</div>
+<span class="font-label-sm text-label-sm italic font-semibold text-outline-variant uppercase">P3 STANDING • 3 RACE VICTORIES</span>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<div class="text-right">
+<span class="font-headline-md text-headline-md italic font-black text-white tracking-wider leading-none block">236</span>
+<span class="font-label-sm text-label-sm text-outline font-bold leading-none block mt-0.5">PTS</span>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-[#00f0ff] text-[20px] transition-colors">chevron_right</span>
+</div>
+</button>
+</div>
+<!-- Technical Specifications Module -->
+<div class="px-margin pt-5 flex flex-col gap-2">
+<div class="flex items-center justify-between pb-0.5">
+<div class="flex items-center gap-2">
+<!-- Three Slanted Slashes: cyan, violet, red -->
+<span class="font-headline-sm text-headline-sm italic font-black tracking-tighter select-none">
+<span class="text-[#00f0ff]">/</span><span class="text-[#8b5cf6]">/</span><span class="text-[#ef4444]">/</span>
+</span>
+<span class="font-headline-sm text-headline-sm uppercase italic font-black tracking-wider text-white">TECHNICAL SPECIFICATIONS</span>
+</div>
+<span class="font-label-sm text-label-sm italic font-bold uppercase tracking-wider text-outline">HOMOLOGATION</span>
+</div>
+<div class="bg-surface-container-high/40 border border-white/5 rounded-2xl p-3.5 flex flex-col gap-3 shadow-sm">
+<div class="flex items-center justify-between text-body-sm font-body-sm">
+<span class="font-label-sm text-label-sm text-outline uppercase font-semibold">Chassis</span>
+<span class="font-headline-sm text-[17px] italic font-black text-white uppercase tracking-wide">W17 Performance</span>
+</div>
+<div class="h-px bg-white/5"></div>
+<div class="flex items-center justify-between text-body-sm font-body-sm">
+<span class="font-label-sm text-label-sm text-outline uppercase font-semibold">Base</span>
+<span class="font-headline-sm text-[16px] italic font-bold text-white tracking-wide">Brackley, United Kingdom</span>
+</div>
+<div class="h-px bg-white/5"></div>
+<div class="flex items-center justify-between text-body-sm font-body-sm">
+<span class="font-label-sm text-label-sm text-outline uppercase font-semibold">Nationality</span>
+<span class="font-headline-sm text-[16px] italic font-bold text-white flex items-center gap-1.5 tracking-wide">
+<span>🇩🇪</span> Germany
+</span>
+</div>
+</div>
+</div>
+<!-- Primary Action Button -->
+<div class="px-margin pt-6 pb-4">
+<button class="w-full h-12 rounded-2xl bg-gradient-to-r from-[#00f0ff] via-[#38bdf8] to-[#a855f7] flex items-center justify-center gap-2 text-[#0b0e14] font-headline-md text-headline-md italic font-black uppercase tracking-wider shadow-[0_0_24px_rgba(0,240,255,0.4)] active:scale-[0.98] transition-all" type="button">
+<span class="material-symbols-outlined text-[22px] font-black">compare_arrows</span>
+<span>COMPARE CONSTRUCTOR</span>
+</button>
+</div>
+</section>
+</div></main>
+<!-- Bottom Navigation Bar with Countdown Selected -->
+<nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface-container-lowest/90 backdrop-blur-xl border-t border-white/5 shadow-[0_-4px_20px_rgba(0,0,0,0.5)]" data-active-classes="text-primary-container [&amp;&gt;span]:text-primary-container"><div class="flex justify-around items-center h-16 px-space-xs"><a aria-current="page" class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] transition-colors text-primary-container [&amp;&gt;span]:text-primary-container" data-path="countdown" href="#"><span class="material-symbols-outlined text-[22px]">timer</span><span class="font-label-sm text-label-sm uppercase tracking-wider mt-0.5 font-bold">Countdown</span></a><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-on-surface-variant transition-colors hover:text-on-surface" data-path="results" href="#"><span class="material-symbols-outlined text-[22px]">sports_score</span><span class="font-label-sm text-label-sm uppercase tracking-wider mt-0.5">Results</span></a><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-on-surface-variant transition-colors hover:text-on-surface" data-path="standings" href="#"><span class="material-symbols-outlined text-[22px]">leaderboard</span><span class="font-label-sm text-label-sm uppercase tracking-wider mt-0.5">Standings</span></a><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-on-surface-variant transition-colors hover:text-on-surface" data-path="paddock" href="#"><span class="material-symbols-outlined text-[22px]">garage</span><span class="font-label-sm text-label-sm uppercase tracking-wider mt-0.5">Paddock</span></a><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-on-surface-variant transition-colors hover:text-on-surface" data-path="news" href="#"><span class="material-symbols-outlined text-[22px]">newspaper</span><span class="font-label-sm text-label-sm uppercase tracking-wider mt-0.5">News</span></a></div></nav></body></html>

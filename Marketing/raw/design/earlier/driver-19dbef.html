@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_tab" name="shell-type"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,800;1,700;1,800&family=Chivo:wght@400;600&family=JetBrains+Mono:wght@500;600&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@100..900&family=Chivo:wght@100..900&family=JetBrains+Mono:wght@100..900&display=swap" rel="stylesheet"/><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "outline": "#849495", "on-surface": "#e1e2eb", "secondary-fixed": "#e9ddff", "tertiary": "#fff3f2", "on-primary-container": "#006970", "surface": "#10131a", "secondary-container": "#571bc1", "background": "#10131a", "primary-fixed-dim": "#00dbe9", "primary-container": "#00f0ff", "on-secondary-fixed-variant": "#5516be", "on-tertiary-fixed": "#410004", "error-container": "#93000a", "surface-bright": "#363940", "on-primary-fixed-variant": "#004f54", "tertiary-container": "#ffceca", "primary-fixed": "#7df4ff", "outline-variant": "#3b494b", "on-background": "#e1e2eb", "inverse-primary": "#006970", "primary": "#dbfcff", "inverse-surface": "#e1e2eb", "on-secondary-container": "#c4abff", "tertiary-fixed": "#ffdad7", "on-secondary-fixed": "#23005c", "error": "#ffb4ab", "on-secondary": "#3c0091", "on-error": "#690005", "on-tertiary-container": "#ba1b24", "surface-variant": "#32353c", "inverse-on-surface": "#2e3037", "surface-container-low": "#191c22", "on-primary-fixed": "#002022", "on-surface-variant": "#b9cacb", "surface-container": "#1d2026", "surface-container-lowest": "#0b0e14", "surface-container-high": "#272a31", "surface-tint": "#00dbe9", "surface-dim": "#10131a", "secondary": "#d0bcff", "on-tertiary": "#68000a", "tertiary-fixed-dim": "#ffb3ad", "secondary-fixed-dim": "#d0bcff", "on-primary": "#00363a", "on-tertiary-fixed-variant": "#930013", "on-error-container": "#ffdad6", "surface-container-highest": "#32353c" }, "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, "spacing": { "space-sm": "0.5rem", "space-lg": "1.5rem", "space-xl": "2rem", "margin": "1rem", "gutter-desktop": "1.5rem", "space-xs": "0.25rem", "space-md": "1rem", "margin-desktop": "2.5rem", "margin-tablet": "1.5rem", "gutter": "1rem" }, "fontFamily": { "body-md": ["Chivo"], "body-sm": ["Chivo"], "label-md": ["JetBrains Mono"], "headline-xl-mobile": ["Barlow Condensed"], "headline-md": ["Barlow Condensed"], "headline-sm": ["Barlow Condensed"], "body-lg": ["Chivo"], "label-lg": ["JetBrains Mono"], "label-sm": ["JetBrains Mono"], "headline-xl": ["Barlow Condensed"], "headline-lg": ["Barlow Condensed"] }, "fontSize": { "body-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "400" }], "body-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "400" }], "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.04em", "fontWeight": "500" }], "headline-xl-mobile": ["36px", { "lineHeight": "40px", "letterSpacing": "0.03em", "fontWeight": "800" }], "headline-md": ["24px", { "lineHeight": "28px", "letterSpacing": "0.02em", "fontWeight": "700" }], "headline-sm": ["20px", { "lineHeight": "24px", "letterSpacing": "0.02em", "fontWeight": "700" }], "body-lg": ["16px", { "lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "400" }], "label-lg": ["14px", { "lineHeight": "18px", "letterSpacing": "0.05em", "fontWeight": "600" }], "label-sm": ["10px", { "lineHeight": "14px", "letterSpacing": "0.06em", "fontWeight": "500" }], "headline-xl": ["48px", { "lineHeight": "52px", "letterSpacing": "0.04em", "fontWeight": "800" }], "headline-lg": ["32px", { "lineHeight": "36px", "letterSpacing": "0.03em", "fontWeight": "800" }] } } } };</script><style>@layer base{html,body{width:100vw;margin:0;padding:0;background-color:#0b0e14;}body{overscroll-behavior:none;background-image:linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);background-size:16px 16px;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface-container-lowest text-on-surface font-body-md flex flex-col min-h-screen"><header class="fixed top-0 w-full z-50 pt-safe bg-surface-container-lowest/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.4)]"><div class="h-16 px-margin flex items-center justify-between"><div class="flex items-center gap-space-sm"><div class="w-2 h-5 bg-primary-container rounded-DEFAULT"></div><span class="font-headline-md text-headline-md tracking-wider uppercase italic text-on-surface">Standings</span></div><div class="flex items-center gap-space-sm"><button aria-label="Telemetry Stream" class="w-11 h-11 flex items-center justify-center text-on-surface-variant hover:text-primary-container transition-colors"><span class="material-symbols-outlined text-[20px]">sensors</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex flex-col relative w-full pt-16 pb-24 bg-surface-container-lowest"><div class="flex flex-col w-full relative">
+<!-- Obscured Standings Background Context (Pit-wall Telemetry Simulation) -->
+<div aria-hidden="true" class="px-margin pt-space-xs pb-space-lg flex flex-col gap-space-sm opacity-25 filter blur-[2px] pointer-events-none select-none">
+<div class="flex items-center justify-between py-space-xs text-on-surface-variant font-label-sm">
+<span>POS • DRIVER</span>
+<span>PTS • GAP</span>
+</div>
+<div class="h-11 rounded-lg bg-surface-container flex items-center justify-between px-space-md">
+<div class="flex items-center gap-space-sm">
+<span class="font-headline-sm text-headline-sm italic text-primary-container">01</span>
+<span class="w-1 h-5 bg-primary-container rounded-full"></span>
+<span class="font-label-lg text-label-lg uppercase tracking-wider text-on-surface">ANT</span>
+</div>
+<span class="font-label-lg text-label-lg text-primary-container">302 PTS</span>
+</div>
+<div class="h-11 rounded-lg bg-surface-container-high flex items-center justify-between px-space-md">
+<div class="flex items-center gap-space-sm">
+<span class="font-headline-sm text-headline-sm italic text-on-surface">02</span>
+<span class="w-1 h-5 bg-secondary rounded-full"></span>
+<span class="font-label-lg text-label-lg uppercase tracking-wider text-on-surface">VER</span>
+</div>
+<span class="font-label-lg text-label-lg text-on-surface">278 PTS</span>
+</div>
+<div class="h-11 rounded-lg bg-surface-container flex items-center justify-between px-space-md">
+<div class="flex items-center gap-space-sm">
+<span class="font-headline-sm text-headline-sm italic text-on-surface">03</span>
+<span class="w-1 h-5 bg-error rounded-full"></span>
+<span class="font-label-lg text-label-lg uppercase tracking-wider text-on-surface">LEC</span>
+</div>
+<span class="font-label-lg text-label-lg text-on-surface">244 PTS</span>
+</div>
+</div>
+<!-- Bottom Sheet Backdrop Wash -->
+<div class="fixed inset-0 z-40 bg-surface-container-lowest/80 backdrop-blur-md transition-opacity duration-300" id="driver-backdrop"></div>
+<!-- Interactive Telemetry Bottom Sheet Overlay -->
+<section aria-label="Driver Profile Telemetry Modal" class="fixed inset-x-0 bottom-0 z-50 flex flex-col max-h-[813px] overflow-y-auto rounded-t-full bg-surface-container-lowest/95 backdrop-blur-2xl shadow-[0_-12px_40px_rgba(0,240,255,0.18)] pb-safe" id="driver-sheet">
+<!-- Top Accent Edge & Drag Pill Area -->
+<div class="sticky top-0 z-20 w-full pt-space-xs pb-space-sm flex flex-col items-center bg-surface-container-lowest/90 backdrop-blur-xl">
+<div class="w-12 h-1 rounded-full bg-outline-variant/60 my-1"></div>
+<!-- Modal Navigation Bar -->
+<div class="w-full flex items-center justify-between px-margin mt-1">
+<div class="flex items-center gap-space-xs">
+<span class="w-2 h-2 rounded-full bg-primary-container animate-pulse shadow-[0_0_8px_#00f0ff]"></span>
+<span class="font-label-sm text-label-sm uppercase tracking-widest text-primary-container">Telemetry Active // W17 E-PERFORMANCE</span>
+</div>
+<button aria-label="Dismiss Modal" class="w-8 h-8 rounded-full bg-surface-container-high hover:bg-surface-variant flex items-center justify-center text-on-surface transition-all active:scale-90" id="close-sheet-btn" type="button">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
+</div>
+<!-- Sheet Content Body -->
+<div class="flex flex-col px-margin pb-space-lg gap-space-md">
+<!-- DRIVER HERO HEADER -->
+<div class="relative overflow-hidden rounded-xl bg-gradient-to-r from-surface-container to-surface-container-low p-space-md shadow-md">
+<!-- Ambient Cyber Gradient Glow in corner -->
+<div class="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-primary-container/10 filter blur-2xl pointer-events-none"></div>
+<div class="flex items-start justify-between relative z-10">
+<div class="flex flex-col flex-1 min-w-0 pr-space-xs">
+<!-- Race Number & Driver Code Pill -->
+<div class="flex items-center gap-space-sm mb-1">
+<span class="w-1.5 h-6 bg-primary-container rounded-DEFAULT shadow-[0_0_10px_#00f0ff]"></span>
+<span class="font-headline-lg text-headline-lg italic font-extrabold tracking-tight text-primary-container leading-none">#12 ANT</span>
+<span class="px-space-xs py-0.5 rounded bg-surface-container-highest font-label-sm text-label-sm text-on-surface uppercase tracking-wider">ITA</span>
+</div>
+<!-- Full Driver Name -->
+<h1 class="font-headline-md text-headline-md italic uppercase text-on-surface tracking-wide truncate mt-0.5">
+              ANDREA KIMI ANTONELLI
+            </h1>
+<!-- Team Descriptor Pill -->
+<div class="flex items-center gap-1.5 mt-2">
+<span class="w-2 h-2 rounded-full bg-primary-container"></span>
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-primary-container font-semibold">
+                MERCEDES-AMG PETRONAS F1 TEAM
+              </span>
+</div>
+</div>
+<!-- Stylized Cyber Helmet Wireframe Illustration Placeholder -->
+<div class="w-20 h-20 shrink-0 rounded-xl bg-surface-container-highest/60 flex items-center justify-center relative p-1">
+<svg class="w-16 h-16 text-primary-container/80 drop-shadow-[0_0_8px_rgba(0,240,255,0.4)]" fill="none" viewbox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+<!-- Geometric Helmet Silhouette -->
+<path d="M12 36C12 21 21 10 37 10C51 10 56 22 56 34C56 46 48 52 38 52C28 52 24 52 18 48C14 45 12 40 12 36Z" fill="#141923" stroke="#00f0ff" stroke-linejoin="round" stroke-width="1.8"></path>
+<!-- Visor Area -->
+<path d="M14 33H44C47 33 49 35 48 38L45 44C44 46 41 47 38 47H22L14 39V33Z" fill="#571bc1" fill-opacity="0.45" stroke="#d0bcff" stroke-width="1.5"></path>
+<!-- Aerodynamic Vent Slits -->
+<path d="M26 18L38 18" stroke="#00f0ff" stroke-linecap="round" stroke-width="1.5"></path>
+<path d="M24 23L42 23" stroke="#00f0ff" stroke-linecap="round" stroke-width="1.5"></path>
+<!-- Chin Guard Details -->
+<circle cx="20" cy="43" fill="#00f0ff" r="1.5"></circle>
+<path d="M25 46H34" stroke="#849495" stroke-linecap="round" stroke-width="1.2"></path>
+</svg>
+<div class="absolute bottom-1 right-1 font-label-sm text-[8px] text-outline tracking-tighter">W17-K2</div>
+</div>
+</div>
+</div>
+<!-- PRIMARY TELEMETRY STAT GRID (3x2 High Contrast Tiles) -->
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center justify-between px-0.5">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">CHAMPIONSHIP METRICS</span>
+<span class="font-label-sm text-label-sm text-primary-container">CURRENT LEADER</span>
+</div>
+<div class="grid grid-cols-3 gap-space-xs">
+<!-- Position Tile -->
+<div class="relative overflow-hidden rounded-lg bg-surface-container p-space-sm flex flex-col justify-between shadow-sm">
+<div class="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-primary-container to-secondary-container"></div>
+<span class="font-label-sm text-label-sm uppercase italic text-on-surface-variant">POSITION</span>
+<div class="flex items-baseline mt-1">
+<span class="font-headline-md text-headline-md italic font-extrabold text-primary-container leading-none">1</span>
+<span class="font-headline-sm text-headline-sm italic text-primary-container uppercase ml-0.5">ST</span>
+</div>
+<span class="font-label-sm text-[9px] text-on-surface-variant tracking-tight mt-1">+24 PTS LEAD</span>
+</div>
+<!-- Points Tile -->
+<div class="relative overflow-hidden rounded-lg bg-surface-container p-space-sm flex flex-col justify-between shadow-sm">
+<div class="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-primary-container to-secondary-container"></div>
+<span class="font-label-sm text-label-sm uppercase italic text-on-surface-variant">TOTAL PTS</span>
+<div class="flex items-baseline mt-1">
+<span class="font-headline-md text-headline-md italic font-extrabold text-on-surface leading-none">302</span>
+</div>
+<span class="font-label-sm text-[9px] text-secondary tracking-tight mt-1">AVG 30.2/RD</span>
+</div>
+<!-- Wins Tile -->
+<div class="relative overflow-hidden rounded-lg bg-surface-container p-space-sm flex flex-col justify-between shadow-sm">
+<div class="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-primary-container to-secondary-container"></div>
+<span class="font-label-sm text-label-sm uppercase italic text-on-surface-variant">WINS</span>
+<div class="flex items-baseline mt-1">
+<span class="font-headline-md text-headline-md italic font-extrabold text-on-surface leading-none">8</span>
+</div>
+<span class="font-label-sm text-[9px] text-primary-container tracking-tight mt-1">80% CONV.</span>
+</div>
+<!-- Podiums Tile -->
+<div class="relative overflow-hidden rounded-lg bg-surface-container p-space-sm flex flex-col justify-between shadow-sm">
+<div class="absolute top-0 left-0 right-0 h-0.5 bg-surface-container-highest"></div>
+<span class="font-label-sm text-label-sm uppercase italic text-on-surface-variant">PODIUMS</span>
+<div class="flex items-baseline mt-1">
+<span class="font-headline-md text-headline-md italic font-extrabold text-on-surface leading-none">14</span>
+</div>
+<span class="font-label-sm text-[9px] text-on-surface-variant tracking-tight mt-1">87.5% RATE</span>
+</div>
+<!-- Poles Tile -->
+<div class="relative overflow-hidden rounded-lg bg-surface-container p-space-sm flex flex-col justify-between shadow-sm">
+<div class="absolute top-0 left-0 right-0 h-0.5 bg-surface-container-highest"></div>
+<span class="font-label-sm text-label-sm uppercase italic text-on-surface-variant">POLES</span>
+<div class="flex items-baseline mt-1">
+<span class="font-headline-md text-headline-md italic font-extrabold text-secondary leading-none">6</span>
+</div>
+<span class="font-label-sm text-[9px] text-on-surface-variant tracking-tight mt-1">FAST LAPS: 5</span>
+</div>
+<!-- DNFs Tile -->
+<div class="relative overflow-hidden rounded-lg bg-surface-container p-space-sm flex flex-col justify-between shadow-sm">
+<div class="absolute top-0 left-0 right-0 h-0.5 bg-error-container"></div>
+<span class="font-label-sm text-label-sm uppercase italic text-error">DNFs</span>
+<div class="flex items-baseline mt-1">
+<span class="font-headline-md text-headline-md italic font-extrabold text-error leading-none">1</span>
+</div>
+<span class="font-label-sm text-[9px] text-error/80 tracking-tight mt-1">R07 GEARBOX</span>
+</div>
+</div>
+</div>
+<!-- PER-ROUND RESULTS STRIP -->
+<div class="flex flex-col gap-space-xs mt-1">
+<div class="flex items-center justify-between px-0.5">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-[16px] text-primary-container">flag</span>
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface font-semibold">2026 SEASON RESULTS</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">10 ROUNDS LOGGED</span>
+</div>
+<!-- Horizontal Micro-Strip of Race Rounds -->
+<div class="overflow-x-auto -mx-margin px-margin py-1 flex items-center gap-2 no-scrollbar">
+<!-- R01 -->
+<div class="flex-shrink-0 flex flex-col items-center justify-center w-14 h-14 rounded-lg bg-surface-container shadow-sm p-1">
+<span class="font-label-sm text-[10px] text-on-surface-variant">R01</span>
+<span class="font-headline-sm text-headline-sm italic font-extrabold text-primary-container">P1</span>
+</div>
+<!-- R02 -->
+<div class="flex-shrink-0 flex flex-col items-center justify-center w-14 h-14 rounded-lg bg-surface-container shadow-sm p-1">
+<span class="font-label-sm text-[10px] text-on-surface-variant">R02</span>
+<span class="font-headline-sm text-headline-sm italic font-extrabold text-primary-container">P1</span>
+</div>
+<!-- R03 -->
+<div class="flex-shrink-0 flex flex-col items-center justify-center w-14 h-14 rounded-lg bg-surface-container shadow-sm p-1">
+<span class="font-label-sm text-[10px] text-on-surface-variant">R03</span>
+<span class="font-headline-sm text-headline-sm italic font-extrabold text-secondary">P2</span>
+</div>
+<!-- R04 -->
+<div class="flex-shrink-0 flex flex-col items-center justify-center w-14 h-14 rounded-lg bg-surface-container shadow-sm p-1">
+<span class="font-label-sm text-[10px] text-on-surface-variant">R04</span>
+<span class="font-headline-sm text-headline-sm italic font-extrabold text-primary-container">P1</span>
+</div>
+<!-- R05 -->
+<div class="flex-shrink-0 flex flex-col items-center justify-center w-14 h-14 rounded-lg bg-surface-container shadow-sm p-1">
+<span class="font-label-sm text-[10px] text-on-surface-variant">R05</span>
+<span class="font-headline-sm text-headline-sm italic font-extrabold text-on-surface">P4</span>
+</div>
+<!-- R06 -->
+<div class="flex-shrink-0 flex flex-col items-center justify-center w-14 h-14 rounded-lg bg-surface-container shadow-sm p-1">
+<span class="font-label-sm text-[10px] text-on-surface-variant">R06</span>
+<span class="font-headline-sm text-headline-sm italic font-extrabold text-primary-container">P1</span>
+</div>
+<!-- R07 (DNF) -->
+<div class="flex-shrink-0 flex flex-col items-center justify-center w-14 h-14 rounded-lg bg-error-container/30 shadow-[0_0_12px_rgba(239,68,68,0.25)] p-1">
+<span class="font-label-sm text-[10px] text-error">R07</span>
+<span class="font-headline-sm text-headline-sm italic font-extrabold text-error">DNF</span>
+</div>
+<!-- R08 -->
+<div class="flex-shrink-0 flex flex-col items-center justify-center w-14 h-14 rounded-lg bg-surface-container shadow-sm p-1">
+<span class="font-label-sm text-[10px] text-on-surface-variant">R08</span>
+<span class="font-headline-sm text-headline-sm italic font-extrabold text-primary-container">P1</span>
+</div>
+<!-- R09 -->
+<div class="flex-shrink-0 flex flex-col items-center justify-center w-14 h-14 rounded-lg bg-surface-container shadow-sm p-1">
+<span class="font-label-sm text-[10px] text-on-surface-variant">R09</span>
+<span class="font-headline-sm text-headline-sm italic font-extrabold text-secondary">P2</span>
+</div>
+<!-- R10 -->
+<div class="flex-shrink-0 flex flex-col items-center justify-center w-14 h-14 rounded-lg bg-surface-container shadow-sm p-1">
+<span class="font-label-sm text-[10px] text-on-surface-variant">R10</span>
+<span class="font-headline-sm text-headline-sm italic font-extrabold text-primary-container">P1</span>
+</div>
+</div>
+</div>
+<!-- CAREER & BIO TELEMETRY ROWS -->
+<div class="flex flex-col gap-1 rounded-xl bg-surface-container p-space-sm shadow-sm">
+<div class="px-space-xs pt-1 pb-2 flex items-center justify-between">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">CAREER RECORD & DOSSIER</span>
+<span class="font-label-sm text-[10px] text-primary-container font-mono">FIA-SUPER-LIC-2025-12</span>
+</div>
+<!-- Row 1: First Entry -->
+<div class="flex items-center justify-between py-2 px-space-xs bg-surface-container-low rounded-DEFAULT">
+<div class="flex items-center gap-2">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">First Entry</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface font-semibold">2025 Australian GP</span>
+</div>
+<!-- Row 2: First Win -->
+<div class="flex items-center justify-between py-2 px-space-xs bg-surface-container-low rounded-DEFAULT">
+<div class="flex items-center gap-2">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">First Win</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface font-semibold">2025 Italian GP (Monza)</span>
+</div>
+<!-- Row 3: World Titles -->
+<div class="flex items-center justify-between py-2 px-space-xs bg-surface-container-low rounded-DEFAULT">
+<div class="flex items-center gap-2">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">World Titles</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="font-label-md text-label-md text-primary-container font-bold">0</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">(Current Leader)</span>
+</div>
+</div>
+<!-- Row 4: Date of Birth -->
+<div class="flex items-center justify-between py-2 px-space-xs bg-surface-container-low rounded-DEFAULT">
+<div class="flex items-center gap-2">
+<span class="w-1.5 h-1.5 rounded-full bg-outline"></span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Date of Birth</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface font-semibold">25 AUG 2006 (19 YRS)</span>
+</div>
+</div>
+<!-- HIGH-ENERGY CALL TO ACTION -->
+<div class="pt-2 flex flex-col gap-2">
+<button class="w-full h-12 rounded-lg bg-gradient-to-r from-primary-container via-primary to-secondary text-surface-container-lowest font-headline-md text-headline-md italic uppercase tracking-wider font-extrabold flex items-center justify-center gap-2 shadow-[0_0_24px_rgba(0,240,255,0.45)] hover:brightness-110 active:scale-[0.98] transition-all" id="compare-btn" type="button">
+<span class="material-symbols-outlined text-[20px] text-surface-container-lowest">compare_arrows</span>
+<span>COMPARE DRIVER</span>
+</button>
+<!-- Secondary Quick Actions -->
+<div class="grid grid-cols-2 gap-space-xs">
+<button class="h-10 rounded-lg bg-surface-container hover:bg-surface-variant text-on-surface font-label-md text-label-md uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px] text-primary-container">query_stats</span>
+<span>TELEMETRY LAP</span>
+</button>
+<button class="h-10 rounded-lg bg-surface-container hover:bg-surface-variant text-on-surface font-label-md text-label-md uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px] text-secondary">radio</span>
+<span>TEAM RADIO (8)</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+</div>
+<script>
+  (function () {
+    const sheet = document.getElementById('driver-sheet');
+    const backdrop = document.getElementById('driver-backdrop');
+    const closeBtn = document.getElementById('close-sheet-btn');
+    const compareBtn = document.getElementById('compare-btn');
+
+    function dismissSheet() {
+      if (!sheet || !backdrop) return;
+      sheet.style.transform = 'translateY(100%)';
+      sheet.style.transition = 'transform 0.28s cubic-bezier(0.32, 0.72, 0, 1)';
+      backdrop.style.opacity = '0';
+      backdrop.style.pointerEvents = 'none';
+      setTimeout(() => {
+        sheet.classList.add('hidden');
+        backdrop.classList.add('hidden');
+      }, 300);
+    }
+
+    if (closeBtn) {
+      closeBtn.addEventListener('click', dismissSheet);
+    }
+
+    if (backdrop) {
+      backdrop.addEventListener('click', dismissSheet);
+    }
+
+    if (compareBtn) {
+      compareBtn.addEventListener('click', () => {
+        const originalText = compareBtn.innerHTML;
+        compareBtn.innerHTML = '<span class="material-symbols-outlined text-[20px] animate-spin">sync</span><span>CONFIGURING DELTA...</span>';
+        setTimeout(() => {
+          compareBtn.innerHTML = '<span class="material-symbols-outlined text-[20px]">check_circle</span><span>DELTA STACK READY</span>';
+          setTimeout(() => {
+            compareBtn.innerHTML = originalText;
+          }, 1800);
+        }, 900);
+      });
+    }
+
+    // Touch Drag-Down dismiss gesture simulation
+    let startY = 0;
+    let currentY = 0;
+
+    sheet.addEventListener('touchstart', (e) => {
+      startY = e.touches[0].clientY;
+    }, { passive: true });
+
+    sheet.addEventListener('touchmove', (e) => {
+      currentY = e.touches[0].clientY;
+      const deltaY = currentY - startY;
+      if (deltaY > 0 && sheet.scrollTop <= 0) {
+        sheet.style.transform = `translateY(${deltaY}px)`;
+      }
+    }, { passive: true });
+
+    sheet.addEventListener('touchend', () => {
+      const deltaY = currentY - startY;
+      if (deltaY > 120 && sheet.scrollTop <= 0) {
+        dismissSheet();
+      } else {
+        sheet.style.transform = 'translateY(0)';
+        sheet.style.transition = 'transform 0.2s ease-out';
+      }
+      startY = 0;
+      currentY = 0;
+    });
+  })();
+</script></main><nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface-container-lowest/90 backdrop-blur-xl shadow-[0_-4px_20px_rgba(0,0,0,0.5)]" data-active-classes="text-primary-container [&>span]:text-primary-container"><div class="flex justify-around items-center h-16 px-space-xs"><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-on-surface-variant transition-colors hover:text-on-surface" data-path="countdown" href="#"><span class="material-symbols-outlined text-[22px]">timer</span><span class="font-label-sm text-label-sm uppercase tracking-wider mt-0.5">Countdown</span></a><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-on-surface-variant transition-colors hover:text-on-surface" data-path="results" href="#"><span class="material-symbols-outlined text-[22px]">sports_score</span><span class="font-label-sm text-label-sm uppercase tracking-wider mt-0.5">Results</span></a><a aria-current="page" class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] transition-colors text-primary-container [&>span]:text-primary-container" data-path="standings" href="#"><span class="material-symbols-outlined text-[22px]">leaderboard</span><span class="font-label-sm text-label-sm uppercase tracking-wider mt-0.5">Standings</span></a><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-on-surface-variant transition-colors hover:text-on-surface" data-path="paddock" href="#"><span class="material-symbols-outlined text-[22px]">garage</span><span class="font-label-sm text-label-sm uppercase tracking-wider mt-0.5">Paddock</span></a><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-on-surface-variant transition-colors hover:text-on-surface" data-path="news" href="#"><span class="material-symbols-outlined text-[22px]">newspaper</span><span class="font-label-sm text-label-sm uppercase tracking-wider mt-0.5">News</span></a></div></nav></body></html>

@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_tab" name="shell-type"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,800;1,700;1,800&family=Chivo:wght@400;600&family=JetBrains+Mono:wght@500;600&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@100..900&family=Chivo:wght@100..900&family=JetBrains+Mono:wght@100..900&display=swap" rel="stylesheet"/><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "outline": "#849495", "on-surface": "#e1e2eb", "secondary-fixed": "#e9ddff", "tertiary": "#fff3f2", "on-primary-container": "#006970", "surface": "#10131a", "secondary-container": "#571bc1", "background": "#10131a", "primary-fixed-dim": "#00dbe9", "primary-container": "#00f0ff", "on-secondary-fixed-variant": "#5516be", "on-tertiary-fixed": "#410004", "error-container": "#93000a", "surface-bright": "#363940", "on-primary-fixed-variant": "#004f54", "tertiary-container": "#ffceca", "primary-fixed": "#7df4ff", "outline-variant": "#3b494b", "on-background": "#e1e2eb", "inverse-primary": "#006970", "primary": "#dbfcff", "inverse-surface": "#e1e2eb", "on-secondary-container": "#c4abff", "tertiary-fixed": "#ffdad7", "on-secondary-fixed": "#23005c", "error": "#ffb4ab", "on-secondary": "#3c0091", "on-error": "#690005", "on-tertiary-container": "#ba1b24", "surface-variant": "#32353c", "inverse-on-surface": "#2e3037", "surface-container-low": "#191c22", "on-primary-fixed": "#002022", "on-surface-variant": "#b9cacb", "surface-container": "#1d2026", "surface-container-lowest": "#0b0e14", "surface-container-high": "#272a31", "surface-tint": "#00dbe9", "surface-dim": "#10131a", "secondary": "#d0bcff", "on-tertiary": "#68000a", "tertiary-fixed-dim": "#ffb3ad", "secondary-fixed-dim": "#d0bcff", "on-primary": "#00363a", "on-tertiary-fixed-variant": "#930013", "on-error-container": "#ffdad6", "surface-container-highest": "#32353c" }, "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, "spacing": { "space-sm": "0.5rem", "space-lg": "1.5rem", "space-xl": "2rem", "margin": "1rem", "gutter-desktop": "1.5rem", "space-xs": "0.25rem", "space-md": "1rem", "margin-desktop": "2.5rem", "margin-tablet": "1.5rem", "gutter": "1rem" }, "fontFamily": { "body-md": ["Chivo"], "body-sm": ["Chivo"], "label-md": ["JetBrains Mono"], "headline-xl-mobile": ["Barlow Condensed"], "headline-md": ["Barlow Condensed"], "headline-sm": ["Barlow Condensed"], "body-lg": ["Chivo"], "label-lg": ["JetBrains Mono"], "label-sm": ["JetBrains Mono"], "headline-xl": ["Barlow Condensed"], "headline-lg": ["Barlow Condensed"] }, "fontSize": { "body-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "400" }], "body-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "400" }], "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.04em", "fontWeight": "500" }], "headline-xl-mobile": ["36px", { "lineHeight": "40px", "letterSpacing": "0.03em", "fontWeight": "800" }], "headline-md": ["24px", { "lineHeight": "28px", "letterSpacing": "0.02em", "fontWeight": "700" }], "headline-sm": ["20px", { "lineHeight": "24px", "letterSpacing": "0.02em", "fontWeight": "700" }], "body-lg": ["16px", { "lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "400" }], "label-lg": ["14px", { "lineHeight": "18px", "letterSpacing": "0.05em", "fontWeight": "600" }], "label-sm": ["10px", { "lineHeight": "14px", "letterSpacing": "0.06em", "fontWeight": "500" }], "headline-xl": ["48px", { "lineHeight": "52px", "letterSpacing": "0.04em", "fontWeight": "800" }], "headline-lg": ["32px", { "lineHeight": "36px", "letterSpacing": "0.03em", "fontWeight": "800" }] } } } };</script><style>@layer base{html,body{width:100vw;margin:0;padding:0;background-color:#0b0e14;}body{overscroll-behavior:none;background-image:linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);background-size:16px 16px;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface-container-lowest text-on-surface font-body-md flex flex-col min-h-screen"><header class="fixed top-0 w-full z-50 pt-safe bg-surface-container-lowest/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.4)]"><div class="h-16 px-margin flex items-center justify-between"><div class="flex items-center gap-space-sm"><div class="w-2 h-5 bg-primary-container rounded-DEFAULT"></div><span class="font-headline-md text-headline-md tracking-wider uppercase italic text-on-surface">Standings</span></div><div class="flex items-center gap-space-sm"><button aria-label="Telemetry Stream" class="w-11 h-11 flex items-center justify-center text-on-surface-variant hover:text-primary-container transition-colors"><span class="material-symbols-outlined text-[20px]">sensors</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex flex-col relative w-full pt-16 pb-24 bg-surface-container-lowest"><div class="flex flex-col w-full relative">
+<!-- Dimmed & Blurred Background Standings Layer (Context under modal) -->
+<div class="px-margin pt-space-xs pb-space-lg flex flex-col gap-space-sm opacity-25 filter blur-[2px] pointer-events-none select-none">
+<div class="flex items-center justify-between py-space-xs">
+<span class="font-headline-sm text-headline-sm uppercase text-on-surface-variant italic">Constructors Championship</span>
+<span class="font-label-sm text-label-sm text-primary-container">ROUND 21/24</span>
+</div>
+<!-- Faux List Items for Depth -->
+<div class="h-14 bg-surface-container rounded-lg p-space-sm flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<span class="font-headline-sm text-headline-sm text-on-surface italic">01</span>
+<div class="w-1.5 h-7 bg-primary-container rounded-full"></div>
+<div>
+<p class="font-headline-sm text-headline-sm text-on-surface leading-none italic uppercase">Mercedes-AMG</p>
+<p class="font-label-sm text-label-sm text-outline">538 PTS</p>
+</div>
+</div>
+<span class="font-label-md text-label-md text-primary-container font-bold">+42 PTS</span>
+</div>
+<div class="h-14 bg-surface-container-low rounded-lg p-space-sm flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<span class="font-headline-sm text-headline-sm text-outline italic">02</span>
+<div class="w-1.5 h-7 bg-secondary rounded-full"></div>
+<div>
+<p class="font-headline-sm text-headline-sm text-on-surface leading-none italic uppercase">Scuderia Ferrari</p>
+<p class="font-label-sm text-label-sm text-outline">496 PTS</p>
+</div>
+</div>
+<span class="font-label-md text-label-md text-outline">GAP -42</span>
+</div>
+<div class="h-14 bg-surface-container-low rounded-lg p-space-sm flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<span class="font-headline-sm text-headline-sm text-outline italic">03</span>
+<div class="w-1.5 h-7 bg-on-tertiary-container rounded-full"></div>
+<div>
+<p class="font-headline-sm text-headline-sm text-on-surface leading-none italic uppercase">McLaren F1 Team</p>
+<p class="font-label-sm text-label-sm text-outline">471 PTS</p>
+</div>
+</div>
+<span class="font-label-md text-label-md text-outline">GAP -67</span>
+</div>
+</div>
+<!-- Telemetry Constructor Detail Bottom Sheet -->
+<section aria-label="Team Overview Modal" class="relative w-full bg-surface-container-lowest/95 rounded-t-full shadow-[0_-12px_40px_rgba(0,240,255,0.18)] pb-safe transition-all duration-300 overflow-hidden">
+<!-- Ambient Top Neon Edge Light Strip -->
+<div class="w-full h-0.5 bg-gradient-to-r from-transparent via-primary-container to-secondary"></div>
+<!-- Drag Bar Handle -->
+<div class="w-full flex justify-center pt-3 pb-1">
+<div class="w-10 h-1 bg-outline-variant/60 rounded-full"></div>
+</div>
+<!-- Sheet Top Utility Bar -->
+<div class="px-margin flex items-center justify-between pb-space-xs">
+<div class="flex items-center gap-space-xs">
+<span class="w-2 h-2 rounded-full bg-primary-container animate-pulse"></span>
+<span class="font-label-sm text-label-sm uppercase tracking-widest text-primary-container">Live Pitwall Telemetry</span>
+</div>
+<button aria-label="Close sheet" class="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant hover:text-on-surface active:scale-95 transition-transform" type="button">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
+<!-- Vector Wireframe Top-Down Chassis Canvas Area -->
+<div class="relative w-full px-margin py-space-xs flex flex-col items-center">
+<div class="relative w-full h-44 rounded-xl bg-gradient-to-b from-surface-container-high/40 to-surface-container-low/20 flex items-center justify-center overflow-hidden shadow-inner">
+<!-- Technical Grid & Wind Tunnel Airflow Waves -->
+<div class="absolute inset-0 bg-[radial-gradient(#00f0ff_1px,transparent_1px)] [background-size:16px_16px] opacity-15"></div>
+<!-- Animated Aerodynamic Vectors -->
+<svg class="absolute inset-0 w-full h-full opacity-40 pointer-events-none" fill="none" preserveaspectratio="none" viewbox="0 0 360 176">
+<path d="M 20 20 C 100 20, 140 70, 180 88 C 220 106, 260 156, 340 156" opacity="0.4" stroke="#00f0ff" stroke-dasharray="4 6" stroke-width="1"></path>
+<path d="M 20 156 C 100 156, 140 106, 180 88 C 220 70, 260 20, 340 20" opacity="0.4" stroke="#00f0ff" stroke-dasharray="4 6" stroke-width="1"></path>
+<path d="M 0 88 L 360 88" opacity="0.3" stroke="#d0bcff" stroke-dasharray="8 8" stroke-width="0.5"></path>
+</svg>
+<!-- Technical HUD Crosshairs & Aero Readouts -->
+<div class="absolute top-2 left-3 flex flex-col">
+<span class="font-label-sm text-label-sm text-outline-variant font-semibold">CAD // AERO MESH</span>
+<span class="font-label-sm text-label-sm text-primary-container">DOWNFORCE HIGH [DF-04]</span>
+</div>
+<div class="absolute bottom-2 right-3 text-right">
+<span class="font-label-sm text-label-sm text-outline-variant">DRAG COEFF</span>
+<span class="font-label-sm text-label-sm text-secondary font-bold">0.714 CdA</span>
+</div>
+<!-- Sleek Top-Down F1 Wireframe / Precision Vector Illustration -->
+<svg class="relative z-10 w-28 h-40 filter drop-shadow-[0_0_12px_rgba(0,240,255,0.4)]" fill="none" viewbox="0 0 120 180" xmlns="http://www.w3.org/2000/svg">
+<!-- Halo & Cockpit Surround -->
+<ellipse cx="60" cy="80" fill="#10131a" rx="10" ry="18" stroke="#00f0ff" stroke-width="1.5"></ellipse>
+<circle cx="60" cy="74" fill="#363940" r="5" stroke="#dbfcff" stroke-width="1"></circle>
+<!-- Front Wing Elements -->
+<path d="M 20 15 L 100 15 L 105 25 L 15 25 Z" fill="#191c22" stroke="#00f0ff" stroke-width="1.5"></path>
+<line stroke="#dbfcff" stroke-width="1" x1="25" x2="95" y1="20" y2="20"></line>
+<!-- Nosecone -->
+<path d="M 52 25 L 68 25 L 64 62 L 56 62 Z" fill="#272a31" stroke="#00f0ff" stroke-width="1.2"></path>
+<!-- Front Suspension Wishbones & Wheels -->
+<line stroke="#849495" stroke-width="1.5" x1="55" x2="22" y1="42" y2="38"></line>
+<line stroke="#849495" stroke-width="1.5" x1="55" x2="22" y1="48" y2="44"></line>
+<line stroke="#849495" stroke-width="1.5" x1="65" x2="98" y1="42" y2="38"></line>
+<line stroke="#849495" stroke-width="1.5" x1="65" x2="98" y1="48" y2="44"></line>
+<!-- Front Left & Right Tires -->
+<rect fill="#0b0e14" height="24" rx="2" stroke="#849495" stroke-width="1" width="12" x="10" y="30"></rect>
+<rect fill="#0b0e14" height="24" rx="2" stroke="#849495" stroke-width="1" width="12" x="98" y="30"></rect>
+<!-- Sidepods & Engine Cover -->
+<path d="M 56 62 L 40 70 L 36 112 L 52 135 L 68 135 L 84 112 L 80 70 L 64 62 Z" fill="#191c22" stroke="#00f0ff" stroke-width="1.5"></path>
+<!-- Radiator Inlets -->
+<path d="M 40 72 L 48 72 L 44 88 L 38 88 Z" fill="#00f0ff" fill-opacity="0.3"></path>
+<path d="M 80 72 L 72 72 L 76 88 L 82 88 Z" fill="#00f0ff" fill-opacity="0.3"></path>
+<!-- Dorsal Fin / T-Cam -->
+<line stroke="#dbfcff" stroke-width="2" x1="60" x2="60" y1="88" y2="135"></line>
+<circle cx="60" cy="85" fill="#571bc1" r="2.5"></circle>
+<!-- Rear Suspension Wishbones -->
+<line stroke="#849495" stroke-width="1.5" x1="54" x2="24" y1="130" y2="134"></line>
+<line stroke="#849495" stroke-width="1.5" x1="54" x2="24" y1="138" y2="140"></line>
+<line stroke="#849495" stroke-width="1.5" x1="66" x2="96" y1="130" y2="134"></line>
+<line stroke="#849495" stroke-width="1.5" x1="66" x2="96" y1="138" y2="140"></line>
+<!-- Rear Left & Right Wide Tires -->
+<rect fill="#0b0e14" height="28" rx="2" stroke="#849495" stroke-width="1" width="16" x="8" y="125"></rect>
+<rect fill="#0b0e14" height="28" rx="2" stroke="#849495" stroke-width="1" width="16" x="96" y="125"></rect>
+<!-- Rear Wing & DRS Flap -->
+<rect fill="#191c22" height="12" rx="1" stroke="#00f0ff" stroke-width="1.5" width="68" x="26" y="152"></rect>
+<line stroke="#d0bcff" stroke-width="1.5" x1="28" x2="92" y1="156" y2="156"></line>
+<line stroke="#00f0ff" stroke-width="1.5" x1="60" x2="60" y1="145" y2="152"></line>
+</svg>
+<!-- Spec Tag Overlay -->
+<div class="absolute bottom-2 left-3 bg-surface-container-lowest/80 px-2 py-0.5 rounded shadow-sm">
+<span class="font-label-sm text-label-sm text-on-surface-variant font-bold">CHASSIS SPEC: 2025.v4</span>
+</div>
+</div>
+</div>
+<!-- Team Identity Header -->
+<div class="px-margin pt-space-sm flex flex-col gap-1">
+<div class="flex items-center gap-space-xs">
+<div class="w-1.5 h-6 bg-primary-container rounded-sm shadow-[0_0_8px_rgba(0,240,255,0.8)]"></div>
+<h2 class="font-headline-lg text-headline-lg tracking-wider italic uppercase text-on-surface">Mercedes-AMG PETRONAS</h2>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="bg-primary-container/20 text-primary-container font-headline-md text-headline-md tracking-wider italic uppercase px-2 py-0.5 rounded">1ST</span>
+<span class="font-headline-md text-headline-md tracking-wider italic uppercase text-on-surface">538 PTS</span>
+</div>
+<span class="font-label-md text-label-md text-primary-container flex items-center gap-1 font-semibold">
+<span class="material-symbols-outlined text-[16px]">trending_up</span> LEADER
+        </span>
+</div>
+</div>
+<!-- High-Performance Stat Grid Tiles -->
+<div class="px-margin pt-space-md grid grid-cols-4 gap-space-xs">
+<div class="bg-surface-container-high/60 rounded-xl p-space-xs flex flex-col items-center justify-center relative overflow-hidden shadow-sm">
+<div class="w-full h-0.5 absolute top-0 bg-primary-container/70"></div>
+<span class="font-label-sm text-label-sm text-outline-variant font-bold uppercase">WINS</span>
+<span class="font-headline-md text-headline-md text-on-surface italic font-bold tracking-tight">11</span>
+</div>
+<div class="bg-surface-container-high/60 rounded-xl p-space-xs flex flex-col items-center justify-center relative overflow-hidden shadow-sm">
+<div class="w-full h-0.5 absolute top-0 bg-secondary"></div>
+<span class="font-label-sm text-label-sm text-outline-variant font-bold uppercase">PODIUMS</span>
+<span class="font-headline-md text-headline-md text-on-surface italic font-bold tracking-tight">22</span>
+</div>
+<div class="bg-surface-container-high/60 rounded-xl p-space-xs flex flex-col items-center justify-center relative overflow-hidden shadow-sm">
+<div class="w-full h-0.5 absolute top-0 bg-primary-container/70"></div>
+<span class="font-label-sm text-label-sm text-outline-variant font-bold uppercase">POLES</span>
+<span class="font-headline-md text-headline-md text-on-surface italic font-bold tracking-tight">9</span>
+</div>
+<div class="bg-surface-container-high/60 rounded-xl p-space-xs flex flex-col items-center justify-center relative overflow-hidden shadow-sm">
+<div class="w-full h-0.5 absolute top-0 bg-secondary"></div>
+<span class="font-label-sm text-label-sm text-outline-variant font-bold uppercase">FASTEST</span>
+<span class="font-headline-md text-headline-md text-on-surface italic font-bold tracking-tight">8 FL</span>
+</div>
+</div>
+<!-- Tappable Championship Drivers Section -->
+<div class="px-margin pt-space-lg flex flex-col gap-space-xs">
+<div class="flex items-center justify-between pb-1">
+<span class="font-headline-sm text-headline-sm uppercase italic tracking-wide text-on-surface-variant">Championship Drivers</span>
+<span class="font-label-sm text-label-sm text-outline font-semibold">PILOT TELEMETRY</span>
+</div>
+<!-- Driver Card 1: Antonelli -->
+<button class="w-full bg-surface-container-high/80 active:bg-surface-container rounded-xl p-space-sm flex items-center justify-between text-left transition-colors relative overflow-hidden shadow-sm group" type="button">
+<!-- Mercedes Cyan Racing Spine -->
+<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-primary-container shadow-[0_0_8px_rgba(0,240,255,0.7)]"></div>
+<div class="flex items-center gap-space-sm pl-1.5">
+<div class="flex flex-col items-center justify-center bg-surface-container-lowest px-2 py-1 rounded">
+<span class="font-label-sm text-label-sm text-primary-container font-bold leading-tight">#12</span>
+<span class="font-headline-sm text-headline-sm text-on-surface italic leading-none font-bold">ANT</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-1.5">
+<span class="font-body-md text-body-md font-semibold text-on-surface">Andrea Kimi Antonelli</span>
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>
+</div>
+<span class="font-label-sm text-label-sm text-outline-variant">P1 STANDING • 8 RACE VICTORIES</span>
+</div>
+</div>
+<div class="flex items-center gap-space-xs">
+<div class="text-right">
+<span class="font-headline-md text-headline-md italic text-primary-container tracking-wider">302</span>
+<span class="font-label-sm text-label-sm text-outline block -mt-1 font-bold">PTS</span>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary-container text-[20px] transition-colors">chevron_right</span>
+</div>
+</button>
+<!-- Driver Card 2: Russell -->
+<button class="w-full bg-surface-container-high/80 active:bg-surface-container rounded-xl p-space-sm flex items-center justify-between text-left transition-colors relative overflow-hidden shadow-sm group" type="button">
+<!-- Mercedes Cyan Racing Spine -->
+<div class="absolute left-0 top-0 bottom-0 w-1.5 bg-primary-container"></div>
+<div class="flex items-center gap-space-sm pl-1.5">
+<div class="flex flex-col items-center justify-center bg-surface-container-lowest px-2 py-1 rounded">
+<span class="font-label-sm text-label-sm text-outline-variant font-bold leading-tight">#63</span>
+<span class="font-headline-sm text-headline-sm text-on-surface italic leading-none font-bold">RUS</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-1.5">
+<span class="font-body-md text-body-md font-semibold text-on-surface">George Russell</span>
+</div>
+<span class="font-label-sm text-label-sm text-outline-variant">P3 STANDING • 3 RACE VICTORIES</span>
+</div>
+</div>
+<div class="flex items-center gap-space-xs">
+<div class="text-right">
+<span class="font-headline-md text-headline-md italic text-on-surface tracking-wider">236</span>
+<span class="font-label-sm text-label-sm text-outline block -mt-1 font-bold">PTS</span>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary-container text-[20px] transition-colors">chevron_right</span>
+</div>
+</button>
+</div>
+<!-- Technical & Heritage Specifications Module -->
+<div class="px-margin pt-space-lg flex flex-col gap-space-xs">
+<div class="flex items-center justify-between pb-1">
+<span class="font-headline-sm text-headline-sm uppercase italic tracking-wide text-on-surface-variant">Technical Specifications</span>
+<span class="font-label-sm text-label-sm text-outline font-semibold">HOMOLOGATION</span>
+</div>
+<div class="bg-surface-container-high/40 rounded-xl p-space-sm flex flex-col gap-2.5 shadow-sm">
+<div class="flex items-center justify-between text-body-sm font-body-sm">
+<span class="font-label-sm text-label-sm text-outline uppercase">Chassis Identification</span>
+<span class="font-label-md text-label-md text-on-surface font-semibold">W17 PERFORMANCE</span>
+</div>
+<div class="h-px bg-outline-variant/20"></div>
+<div class="flex items-center justify-between text-body-sm font-body-sm">
+<span class="font-label-sm text-label-sm text-outline uppercase">Power Unit</span>
+<span class="font-label-md text-label-md text-primary-container font-semibold">Mercedes-AMG M17 V6 Turbo</span>
+</div>
+<div class="h-px bg-outline-variant/20"></div>
+<div class="flex items-center justify-between text-body-sm font-body-sm">
+<span class="font-label-sm text-label-sm text-outline uppercase">Operations Base</span>
+<span class="font-body-md text-body-md text-on-surface">Brackley, United Kingdom</span>
+</div>
+<div class="h-px bg-outline-variant/20"></div>
+<div class="flex items-center justify-between text-body-sm font-body-sm">
+<span class="font-label-sm text-label-sm text-outline uppercase">Entry License</span>
+<span class="font-body-md text-body-md text-on-surface">🇩🇪 Germany</span>
+</div>
+<div class="h-px bg-outline-variant/20"></div>
+<div class="flex items-center justify-between text-body-sm font-body-sm">
+<span class="font-label-sm text-label-sm text-outline uppercase">Team Principal</span>
+<span class="font-body-md text-body-md text-on-surface font-semibold">Toto Wolff</span>
+</div>
+</div>
+</div>
+<!-- Action Section Button -->
+<div class="px-margin pt-space-lg pb-space-md">
+<button class="w-full h-12 rounded-xl bg-gradient-to-r from-primary-container to-secondary flex items-center justify-center gap-space-sm text-surface-container-lowest font-headline-md text-headline-md italic uppercase tracking-wider shadow-[0_0_24px_rgba(0,240,255,0.4)] active:scale-[0.98] transition-transform" type="button">
+<span class="material-symbols-outlined text-[20px] font-bold">compare_arrows</span>
+<span>Compare Constructor</span>
+</button>
+</div>
+</section>
+</div></main><nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface-container-lowest/90 backdrop-blur-xl shadow-[0_-4px_20px_rgba(0,0,0,0.5)]" data-active-classes="text-primary-container [&>span]:text-primary-container"><div class="flex justify-around items-center h-16 px-space-xs"><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-on-surface-variant transition-colors hover:text-on-surface" data-path="countdown" href="#"><span class="material-symbols-outlined text-[22px]">timer</span><span class="font-label-sm text-label-sm uppercase tracking-wider mt-0.5">Countdown</span></a><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-on-surface-variant transition-colors hover:text-on-surface" data-path="results" href="#"><span class="material-symbols-outlined text-[22px]">sports_score</span><span class="font-label-sm text-label-sm uppercase tracking-wider mt-0.5">Results</span></a><a aria-current="page" class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] transition-colors text-primary-container [&>span]:text-primary-container" data-path="standings" href="#"><span class="material-symbols-outlined text-[22px]">leaderboard</span><span class="font-label-sm text-label-sm uppercase tracking-wider mt-0.5">Standings</span></a><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-on-surface-variant transition-colors hover:text-on-surface" data-path="paddock" href="#"><span class="material-symbols-outlined text-[22px]">garage</span><span class="font-label-sm text-label-sm uppercase tracking-wider mt-0.5">Paddock</span></a><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-on-surface-variant transition-colors hover:text-on-surface" data-path="news" href="#"><span class="material-symbols-outlined text-[22px]">newspaper</span><span class="font-label-sm text-label-sm uppercase tracking-wider mt-0.5">News</span></a></div></nav></body></html>
