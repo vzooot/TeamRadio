@@ -31,7 +31,7 @@ def team(out):
     car = car.resize((600, int(car.height*600/car.width)), Image.LANCZOS)
     # straight down from the top, on the right like the driver: the front half enters the sheet
     car = car.resize((680, int(car.height*680/car.width)), Image.LANCZOS)
-    x0, y0 = W - car.width + 142, -car.height + 470
+    x0, y0 = W - car.width + 142, -car.height + 510
     car = fade_left(car, 0.3)
     sh = Image.new('RGBA', car.size, (0,0,0,0)); sh.putalpha(car.getchannel('A').point(lambda a: int(a*0.5)))
     hdr.alpha_composite(sh.filter(ImageFilter.GaussianBlur(22)), (x0+10, y0+24))
