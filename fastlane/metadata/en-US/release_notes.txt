@@ -1,4 +1,5 @@
-• Browse any round of the season from the strip at the bottom — countdown, schedule and 3D circuit follow
-• Push notifications for the paddock room (mute with the bell) and for private messages, with an app icon badge
-• The start lights now count the days to the race; the LED board loops through session info by itself
-• Your paddock name survives reinstalls; message sounds; badge colours; iPad fixes
+• Tap any driver or team for a profile card: season stats, career firsts and a race-by-race strip
+• Call in your crew: share Team Radio with friends straight from the Countdown tab
+• 3D circuit for Sepang
+• The start lights glow on standby until race week
+• Sharper header and section titles

@@ -1,4 +1,5 @@
-• Bläddra bland säsongens alla omgångar från listan längst ner – nedräkning, schema och 3D-bana följer med
-• Pushnotiser för paddock-chatten (tysta med klockan) och för privata meddelanden, med räknare på appikonen
-• Startljusen räknar nu ner dagarna till loppet; LED-panelen visar sessionsinfo av sig själv
-• Ditt paddocknamn överlever ominstallation; meddelandeljud; färgade räknare; iPad-fixar
+• Tryck på valfri förare eller valfritt stall för ett profilkort: säsongsstatistik, karriärens första gånger och resultat lopp för lopp
+• Bjud in dina vänner: dela Team Radio direkt från fliken Nedräkning
+• 3D-bana för Sepang
+• Startljusen lyser i standby fram till racehelgen
+• Skarpare rubrik och sektionstitlar
