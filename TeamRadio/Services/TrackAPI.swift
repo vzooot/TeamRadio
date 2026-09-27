@@ -5,7 +5,8 @@ import Foundation
 enum TrackAPI {
     /// Ergast circuitId → MultiViewer circuitKey.
     /// Discovered by probing the /circuits index; new circuits (Madring, Sepang)
-    /// have no map data yet and are intentionally absent.
+    /// have no map data yet and are intentionally absent — they ship bundled
+    /// OSM geometry instead (Resources/madring.json, sepang.json).
     static let circuitKeys: [String: Int] = [
         "albert_park": 10,
         "shanghai": 49,
@@ -43,7 +44,7 @@ enum TrackAPI {
 
     /// Fetches the track map for an Ergast circuitId, falling back to a
     /// bundled OpenStreetMap-derived centerline for circuits MultiViewer
-    /// doesn't cover (e.g. Madring).
+    /// doesn't cover (Madring, Sepang).
     static func trackMap(circuitId: String, season: String) async throws -> TrackMap? {
         if let key = circuitKeys[circuitId] {
             let url = URL(string: "https://api.multiviewer.app/api/v1/circuits/\(key)/\(season)")!
