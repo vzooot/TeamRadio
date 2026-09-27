@@ -47,6 +47,7 @@ struct ContentView: View {
 
                 HeaderView(onInfo: { showAbout = true })
                     .padding(.bottom, -6)
+                    .id("top")
 
                 if let race = model.displayRace {
                     if model.isBrowsing {
@@ -60,8 +61,14 @@ struct ContentView: View {
                         .id(race.id)
 
                     WeekendScheduleView(race: race, weather: model.weather)
+                        .id("schedule")
 
                     SessionAlertsCard(season: model.season)
+                        .id("alerts")
+
+                    if !Self.demoMode {
+                        InviteBanner()
+                    }
 
                     if let map = model.trackMap {
                         TrackSectionView(map: map, circuit: race.circuit)
@@ -90,7 +97,24 @@ struct ContentView: View {
             .padding(.bottom, 32)
         }
         .refreshable { await model.load() }
+        #if DEBUG
+        .task { await DemoDirector.shared.runIfNeeded() }
+        .onChange(of: DemoDirector.shared.scroll) { _, step in
+            guard let step else { return }
+            let id: String = step.target == "countdown" ? (model.displayRace?.id ?? "") : step.target
+            withAnimation(.easeInOut(duration: step.duration)) { proxy.scrollTo(id, anchor: step.anchor) }
         }
+        #endif
+        }
+    }
+
+    /// Debug-only demo recordings hide anything not yet released.
+    private static var demoMode: Bool {
+        #if DEBUG
+        DemoDirector.shared.isActive
+        #else
+        false
+        #endif
     }
 
     /// Shown while looking at a round other than the next one.
@@ -282,8 +306,16 @@ struct SessionAlertsCard: View {
                         .strokeBorder(Theme.glassStroke, lineWidth: 1)
                 )
         )
+        #if DEBUG
+        .onChange(of: DemoDirector.shared.alertsOn) { _, on in
+            if let on { withAnimation { enabled = on } }
+        }
+        #endif
         .onChange(of: enabled) { old, wantsOn in
             guard old != wantsOn else { return }
+            #if DEBUG
+            if DemoDirector.shared.isActive { return }   // demo: on screen only
+            #endif
             Task {
                 let result = await NotificationManager.setEnabled(wantsOn, season: season)
                 // Flips back if the user denied the permission prompt.

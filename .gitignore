@@ -24,3 +24,7 @@ TeamRadio/Resources/Secrets.plist
 
 # Full-size generated artwork (optimized copies live in the asset catalog)
 Marketing/raw/art/*.png
+
+# Video pipeline: raw Simulator recordings are large and regenerable
+Marketing/videos/raw/
+__pycache__/

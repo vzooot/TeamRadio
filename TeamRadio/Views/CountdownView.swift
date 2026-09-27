@@ -42,7 +42,8 @@ struct CountdownView: View {
 
                 if remaining > 0 {
                     let gantry = raceWeekend(now: now)
-                    DotMatrixBoard(litLights: gantry.lit, pages: infoPages(session: session, remaining: remaining))
+                    DotMatrixBoard(litLights: gantry.lit, pages: infoPages(session: session, remaining: remaining),
+                                   standby: gantry.lit == 0)
                         .alignedToContent()
                     if let label = gantry.label {
                         Text(label)
@@ -87,6 +88,14 @@ struct CountdownView: View {
                 }
             }
             .onAppear { pinned = LiveActivityManager.hasPinIntent }
+            #if DEBUG
+            .onChange(of: DemoDirector.shared.sessionIndex) { _, i in
+                if let i, sessions.indices.contains(i) { selectedId = sessions[i].id }
+            }
+            .onChange(of: DemoDirector.shared.pinned) { _, on in
+                if let on { pinned = on }                    // demo: on screen only
+            }
+            #endif
             .padding(18)
             .background(
                 CarbonFiber()
