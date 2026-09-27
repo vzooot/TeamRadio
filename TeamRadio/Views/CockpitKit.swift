@@ -98,6 +98,9 @@ struct NeonTile: View {
 struct DotMatrixBoard: View {
     let litLights: Int
     var pages: [String] = []
+    /// Before race week no light is due yet: the five lamps idle in a dim,
+    /// slowly breathing red instead of sitting dark.
+    var standby = false
     var lightColor: Color = Theme.live
     var infoColor: Color = Color(red: 0.45, green: 0.9, blue: 1.0)
 
@@ -192,7 +195,8 @@ struct DotMatrixBoard: View {
     }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30, paused: transitionStart == nil)) { context in
+        let breathing = standby && litLights == 0 && page == 0
+        TimelineView(.animation(minimumInterval: 1 / 30, paused: transitionStart == nil && !breathing)) { context in
             Canvas { ctx, size in
                 let cols = Self.cols, rows = Self.rows
                 // a little side margin so the outer lamps' halos aren't clipped
@@ -232,6 +236,11 @@ struct DotMatrixBoard: View {
                             }
                         }
                     }
+                } else if breathing {
+                    // standby: every lamp glows faintly, breathing over ~3 s
+                    let phase = context.date.timeIntervalSinceReferenceDate * 2 * .pi / 3.2
+                    let k = 0.1 + 0.12 * (0.5 + 0.5 * sin(phase))
+                    for key in goal.keys { lit[key] = k }
                 } else {
                     for (key, v) in goal { if v > 0 { lit[key] = 1 } else { armed.insert(key) } }
                 }
@@ -318,7 +327,7 @@ struct DotMatrixBoard: View {
                                .init(color: Color(red: 0.46, green: 0.92, blue: 1.0), location: 0.6),
                                .init(color: Color(red: 0.34, green: 0.87, blue: 0.99), location: 0.8),
                                .init(color: Color(red: 0.25, green: 0.82, blue: 0.95), location: 1)]
-                        layer.opacity = 0.35 + 0.65 * k
+                        layer.opacity = breathing ? 2 * k : 0.35 + 0.65 * k
                         disc(p, core, .radialGradient(Gradient(stops: stops), center: p, startRadius: 0, endRadius: core), in: &layer)
                         layer.stroke(Path(ellipseIn: rect(p, core)), with: .color(edgeColor), lineWidth: 0.8)
                     }
@@ -333,6 +342,14 @@ struct DotMatrixBoard: View {
         .onTapGesture { advance() }
         .onAppear { schedule() }
         .onDisappear { settle?.cancel() }
+        #if DEBUG
+        .onChange(of: DemoDirector.shared.boardPageSeq) {
+            guard !pages.isEmpty else { return }
+            page = DemoDirector.shared.boardPageValue % (pages.count + 1)
+            transitionStart = Date()
+            schedule()
+        }
+        #endif
     }
 }
 
