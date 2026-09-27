@@ -50,8 +50,9 @@ struct StandingsTabView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 9) {
+                    HStack(alignment: .top, spacing: 9) {
                         TrioSlashes(height: 24)
+                            .padding(.top, 6)   // centred on the first line when the title wraps
                         Text("STANDINGS")
                     }
                         .font(.f1(30).italic())

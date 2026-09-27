@@ -42,8 +42,9 @@ struct NewsView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 12) {
                         VStack(alignment: .leading, spacing: 2) {
-                            HStack(spacing: 9) {
+                            HStack(alignment: .top, spacing: 9) {
                                 TrioSlashes(height: 24)
+                                    .padding(.top, 6)   // centred on the first line when the title wraps
                                 Text("PADDOCK NEWS")
                             }
                                 .font(.f1(30).italic())

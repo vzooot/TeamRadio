@@ -245,8 +245,9 @@ struct ChatView: View {
         VStack(spacing: 0) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 9) {
+                    HStack(alignment: .top, spacing: 9) {
                         TrioSlashes(height: 24)
+                            .padding(.top, 6)   // centred on the first line when the title wraps
                         Text("PADDOCK CHAT")
                     }
                         .font(.f1(30).italic())

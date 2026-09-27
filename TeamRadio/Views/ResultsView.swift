@@ -207,8 +207,9 @@ struct ResultsView: View {
     private func header(race: Race) -> some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 9) {
+                HStack(alignment: .top, spacing: 9) {
                     TrioSlashes(height: 24)
+                        .padding(.top, 6)   // centred on the first line when the title wraps
                     Text("RESULTS")
                 }
                     .font(.f1(30).italic())
