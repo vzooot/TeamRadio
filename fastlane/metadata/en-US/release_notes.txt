@@ -1,5 +1,2 @@
-• Tap any driver or team for a profile card: season stats, career firsts and a race-by-race strip
-• Call in your crew: share Team Radio with friends straight from the Countdown tab
-• 3D circuit for Sepang
-• The start lights glow on standby until race week
-• Sharper header and section titles
+• The Paddock is now one continuous conversation: the chat no longer starts empty every race weekend
+• Clear error messages if the chat or your private messages can't load, instead of an empty screen

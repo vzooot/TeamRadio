@@ -1,5 +1,2 @@
-• Tryck på valfri förare eller valfritt stall för ett profilkort: säsongsstatistik, karriärens första gånger och resultat lopp för lopp
-• Bjud in dina vänner: dela Team Radio direkt från fliken Nedräkning
-• 3D-bana för Sepang
-• Startljusen lyser i standby fram till racehelgen
-• Skarpare rubrik och sektionstitlar
+• Paddock-chatten är nu ett enda pågående samtal: den börjar inte längre tom varje racehelg
+• Tydliga felmeddelanden om chatten eller dina privata meddelanden inte kan laddas, i stället för en tom skärm

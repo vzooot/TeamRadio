@@ -52,8 +52,10 @@ enum ChatService {
             let (results, cursor) = try await database.records(
                 matching: query, desiredKeys: Self.listKeys, resultsLimit: limit)
             return (parse(results), cursor)
-        } catch let error as CKError where error.code == .unknownItem || error.code == .invalidArguments {
+        } catch let error as CKError where error.code == .unknownItem {
             // Record type doesn't exist yet (first ever run) — empty room.
+            // Anything else, a missing index included, surfaces as an error
+            // instead of an empty room.
             return ([], nil)
         }
     }

@@ -206,8 +206,8 @@ enum DirectMessageService {
                 matching: query, desiredKeys: ["thread", "fromId", "toId", "fromName", "toName", "created", "payload", "mediaType"],
                 resultsLimit: limit)
             return results.compactMap { try? $0.1.get() }
-        } catch let error as CKError where error.code == .unknownItem || error.code == .invalidArguments {
-            return []   // record type not created yet — nobody has written a DM
+        } catch let error as CKError where error.code == .unknownItem {
+            return []   // record type not created yet — nobody has written a DM; other errors surface
         }
     }
 
