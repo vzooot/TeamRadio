@@ -12,4 +12,5 @@ id = "cbcf7ede1a484ac8b35cd12d5b830367"
 
 [vars]
 # CloudKit environments the prediction-game scorer reads picks from.
-CK_ENVS = "development,production"
+# Production is added once its Prediction schema and server key exist.
+CK_ENVS = "development"
