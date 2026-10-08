@@ -144,10 +144,54 @@ third is a CloudKit subscription on the player's own `Score` record.
 | Azure Function scorer | Within the free monthly grant (one run per race) |
 | Optional AI comment per player | about $0.0006 per player per race with gpt-4.1-mini |
 
+## AI extras
+
+Both run in the scorer backend, never in the app, so the Azure OpenAI key
+stays a server secret (a Worker secret if the scorer is the Cloudflare
+Worker). Scoring itself never uses AI.
+
+### Post-race comment
+
+After scoring, each player gets one or two sentences about their weekend,
+shown on the result card and the result reveal:
+
+> "You called Verstappen on pole, then had him nowhere near the podium. The
+> fastest-lap pick saved your weekend."
+
+- Input is structured only: the player's picks, the results and the
+  breakdown. Nicknames are not sent; the comment says "you".
+- Tone: playful team-radio banter, never insulting. A fixed system prompt and
+  a length limit keep it on brand.
+- Model: gpt-4.1-mini, several players per request. About $0.0006 per player
+  per race.
+- Stored as `comment` on the player's `Score` record. If generation fails,
+  the card simply shows no comment.
+
+### AI analyst
+
+An AI player on the leaderboard that everyone can try to beat.
+
+- On Thursday of race week the scorer asks a stronger model for a full set of
+  picks, giving it only data available before the lock: standings, recent
+  results, last year's result at the circuit.
+- Its picks are saved like anyone's (`pred-<round>-ai-analyst`), before the
+  lock, and scored by the same rules.
+- It shows one line of reasoning per pick ("Pole: VER, three poles in the
+  last four races"), visible after the lock so nobody copies it.
+- On the leaderboard it has its own badge, and players see "You beat the
+  analyst" on their result.
+- Cost: one request per race, a few cents at most.
+
+Open: the analyst's name and avatar, and whether it counts in the global
+ranking or sits beside it.
+
 ## Privacy and App Store
 
 - Predictions and scores are public under the player's Paddock name. The
   privacy policy gets one paragraph on that.
+- Picks and results (no names) are sent to Azure OpenAI for the post-race
+  comment; the privacy policy and App Store privacy label mention it.
+- AI-written text is labelled as such in the app.
 - The App Store age rating questionnaire is reviewed for contests; no change
   is expected because nothing is wagered.
 - Launch is promoted with an In-App Event, badge **Competition**.
