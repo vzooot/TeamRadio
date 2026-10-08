@@ -104,10 +104,14 @@ export function lockDate(race) {
 
 // ---------------------------------------------------------------- data
 
+/// Jolpica rate-limits bursts (429), so back off and retry a few times.
 async function jolpica(path) {
-  const res = await fetch(`${JOLPICA}/${path}`, { cf: { cacheTtl: 300 } });
-  if (!res.ok) throw new Error(`jolpica ${res.status} ${path}`);
-  return (await res.json()).MRData;
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(`${JOLPICA}/${path}`, { cf: { cacheTtl: 300 } });
+    if (res.ok) return (await res.json()).MRData;
+    if (res.status !== 429 || attempt >= 3) throw new Error(`jolpica ${res.status} ${path}`);
+    await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
+  }
 }
 
 async function season() {
@@ -382,7 +386,10 @@ export async function runGame(env) {
   const next = races.find((r) => (lockDate(r)?.getTime() ?? 0) > now);
   if (next) {
     const lock = lockDate(next).getTime();
-    if (lock - now < 4 * 86400_000) report.push(await makeStrategistPicks(env, next));
+    // One failing step must not block the others.
+    if (lock - now < 4 * 86400_000) {
+      report.push(await makeStrategistPicks(env, next).catch((e) => ({ strategist: String(e) })));
+    }
   }
 
   // The most recent race that has started at least 3 hours ago.
