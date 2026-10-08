@@ -28,3 +28,6 @@ Marketing/raw/art/*.png
 # Video pipeline: raw Simulator recordings are large and regenerable
 Marketing/videos/raw/
 __pycache__/
+
+# CloudKit server-to-server private key (prediction-game scorer) — never commit
+server/.secrets/
