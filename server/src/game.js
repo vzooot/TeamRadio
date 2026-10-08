@@ -285,7 +285,10 @@ async function azure(env, messages, schema) {
     return null;
   }
   const data = await res.json();
-  try { return JSON.parse(data.choices[0].message.content); } catch { return null; }
+  try { return JSON.parse(data.choices[0].message.content); } catch {
+    console.log("azure unparsable", JSON.stringify(data).slice(0, 300));
+    return null;
+  }
 }
 
 const codeOf = (results, qualifying) => {
@@ -367,7 +370,8 @@ export async function makeStrategistPicks(env, race) {
       },
     },
   });
-  if (!out || new Set([out.p1, out.p2, out.p3]).size !== 3) return { id, skipped: "no valid picks" };
+  if (!out) return { id, skipped: "no answer from Azure" };
+  if (new Set([out.p1, out.p2, out.p3]).size !== 3) return { id, skipped: "podium not three different drivers", out };
   const { reasons, ...picks } = out;
   await env.TOKENS.put(`game:strategist:${id}`, JSON.stringify({ picks, reasons, madeAt: Date.now() }));
   return { id, picks };

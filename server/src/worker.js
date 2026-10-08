@@ -56,7 +56,8 @@ export default {
 
   async scheduled(_event, env, ctx) {
     ctx.waitUntil(checkAndPush(env));
-    ctx.waitUntil(runGame(env).catch((e) => console.log("game", e)));
+    ctx.waitUntil(runGame(env).then((r) => r?.length && console.log("game", JSON.stringify(r)))
+      .catch((e) => console.log("game", e)));
   },
 };
 
