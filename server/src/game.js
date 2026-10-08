@@ -264,8 +264,9 @@ async function rebuildSeason(env, ckEnv, year) {
 
 async function azure(env, messages, schema) {
   if (!env.AZURE_OPENAI_ENDPOINT || !env.AZURE_OPENAI_KEY) return null;
-  // Accepts the endpoint as the portal shows it: with or without /openai/v1.
-  const base = env.AZURE_OPENAI_ENDPOINT.trim().replace(/\/+$/, "").replace(/\/openai\/v1$/, "");
+  // Accepts the endpoint in any form the portal shows (base, /openai/v1, a
+  // full target URI with deployment and api-version): only the host counts.
+  const base = new URL(env.AZURE_OPENAI_ENDPOINT.trim()).origin;
   const res = await fetch(`${base}/openai/v1/chat/completions`, {
     method: "POST",
     headers: { "content-type": "application/json", "api-key": env.AZURE_OPENAI_KEY },
