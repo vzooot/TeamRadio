@@ -1,2 +1,3 @@
 • The Paddock is now one continuous conversation: the chat no longer starts empty every race weekend
 • Clear error messages if the chat or your private messages can't load, instead of an empty screen
+• The sprint-weekend badge no longer hides behind the helmet

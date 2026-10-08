@@ -39,6 +39,10 @@ struct RaceHeroView: View {
                         .padding(.vertical, 5)
                         .background(Theme.accentGradient, in: RoundedRectangle(cornerRadius: 7))
 
+                    Spacer()
+
+                    // Right of centre: the header helmet hangs over the
+                    // middle of this row.
                     if race.isSprintWeekend {
                         Text("SPRINT")
                             .font(.f1(13).italic())
@@ -48,8 +52,6 @@ struct RaceHeroView: View {
                             .padding(.vertical, 5)
                             .background(.yellow, in: RoundedRectangle(cornerRadius: 7))
                     }
-
-                    Spacer()
 
                     Text(race.season)
                         .font(.f1(15).italic())

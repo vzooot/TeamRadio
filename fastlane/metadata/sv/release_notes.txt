@@ -1,2 +1,3 @@
 • Paddock-chatten är nu ett enda pågående samtal: den börjar inte längre tom varje racehelg
 • Tydliga felmeddelanden om chatten eller dina privata meddelanden inte kan laddas, i stället för en tom skärm
+• Sprint-märket gömmer sig inte längre bakom hjälmen
