@@ -13,7 +13,7 @@ Times are demo-timeline seconds from the app's step log
 
 Output: Marketing/videos/out/<name>.mp4 (1080×1920, 30 fps).
 """
-import glob, json, os, subprocess, sys, tempfile
+import glob, json, os, shutil, subprocess, sys, tempfile
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -39,6 +39,15 @@ VIDEOS = {
             (1.0, 2.6, 'They moved *Bahrain* to *Malaysia*?!'),
             (20.6, 5.0, 'A countdown to *every* session'),
             (12.6, 4.4, 'Session info on a real *LED board*'),
+            (27.2, 2.6, 'Pin it to your *Lock Screen*'),
+            (45.2, 3.6, CTA),
+        ],
+    },
+    # The app half of emily-1 (scripts/video/emily.py puts Emily in front of it)
+    'emily-1-app': {
+        'source': 'countdown',
+        'scenes': [
+            (38.9, 3.0, 'A heads-up *15 minutes* before'),
             (27.2, 2.6, 'Pin it to your *Lock Screen*'),
             (45.2, 3.6, CTA),
         ],
@@ -104,7 +113,11 @@ def headline_png(path, text, sub=None):
         y += 96
     if sub:
         d.text((W / 2, y + 26), sub, font=font(38, 'Bold'), fill=(190, 196, 210), anchor='mm')
-    im.save(path)
+    # soft dark shadow so the words hold up over bright footage (floodlights in the Emily shots)
+    shadow = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+    shadow.putalpha(im.getchannel('A').filter(ImageFilter.MaxFilter(9)).filter(ImageFilter.GaussianBlur(14))
+                    .point(lambda a: min(255, int(a * 0.85))))
+    Image.alpha_composite(shadow, im).save(path)
 
 
 def stage_png(path, sw):
@@ -127,7 +140,7 @@ def mask_png(path, sw):
     m.save(path)
 
 
-def render(name, raw=None):
+def render(name, raw=None, out=None, music=True):
     v = VIDEOS[name]
     raw = raw or sorted(glob.glob(os.path.join(RAW, v['source'] + '-*.mov')))[-1]
     offset = json.load(open(raw[:-4] + '.json'))['offset']
@@ -163,7 +176,8 @@ def render(name, raw=None):
         png = os.path.join(tmp, f'h{j}.png')
         headline_png(png, *(text if isinstance(text, tuple) else (text,)))
         args += ['-loop', '1', '-t', f'{total:.3f}', '-i', png]
-        chains.append(f'[{k}:v]format=rgba,fade=t=in:st={t:.2f}:d=0.15:alpha=1,'
+        fade_in = f'fade=t=in:st={t:.2f}:d=0.15:alpha=1,' if j else ''   # frame 0 (the cover) shows it fully
+        chains.append(f'[{k}:v]format=rgba,{fade_in}'
                       f'fade=t=out:st={t + dur - 0.15:.2f}:d=0.15:alpha=1[h{j}]')
         chains.append(f"[{last}][h{j}]overlay=0:0:enable='between(t,{t:.2f},{t + dur:.2f})'[v{j + 1}]")
         last, t, k = f'v{j + 1}', t + dur, k + 1
@@ -180,7 +194,7 @@ def render(name, raw=None):
         k += 1
     tracks = sorted((f for f in glob.glob(os.path.join(MUSIC, '*')) if f.lower().endswith(('.mp3', '.wav', '.m4a'))),
                     key=os.path.getmtime)
-    if tracks:
+    if tracks and music:
         args += ['-stream_loop', '-1', '-i', tracks[-1]]
         chains.append(f'[{k}:a]aresample=48000,aformat=channel_layouts=stereo,atrim=0:{total:.3f},'
                       f'volume=0.45,afade=t=in:d=0.3,afade=t=out:st={total - 0.8:.2f}:d=0.8[music]')
@@ -192,11 +206,12 @@ def render(name, raw=None):
     chains.append(''.join(labels) + f'amix=inputs={len(labels)}:duration=longest:normalize=0,'
                   f'loudnorm=I=-14:TP=-1.5:LRA=11[aud]')   # social-video loudness
 
-    out = os.path.join(OUT, name + '.mp4')
+    out = out or os.path.join(OUT, name + '.mp4')
     args += ['-filter_complex', ';'.join(chains), '-map', f'[{last}]', '-map', '[aud]', '-t', f'{total:.3f}',
              '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-pix_fmt', 'yuv420p', '-r', str(FPS),
              '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', out]
     subprocess.run(args, check=True)
+    shutil.rmtree(tmp, ignore_errors=True)
     print('✓', out, f'({total:.1f}s)')
 
 
