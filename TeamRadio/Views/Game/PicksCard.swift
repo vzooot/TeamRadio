@@ -58,11 +58,9 @@ struct PicksCard: View {
     }
 
     private func eyebrow(_ state: GameViewModel.CardState) -> String {
-        if case let .scored(race, _, _) = state {
-            return "PREDICTION GAME · R\(race.round) \(Self.shortName(race))"
-        }
+        if case let .scored(race, _, _) = state { return "PREDICTION GAME · R\(race.round)" }
         guard let race = game.race else { return "PREDICTION GAME" }
-        return "PREDICTION GAME · R\(race.round) \(Self.shortName(race))"
+        return "PREDICTION GAME · R\(race.round)"
     }
 
     static func shortName(_ race: Race) -> String {

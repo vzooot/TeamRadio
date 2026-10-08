@@ -128,7 +128,7 @@ struct LeaderboardView: View {
                                                        year: year, user: userId)
             errorText = nil
         } catch {
-            errorText = "Couldn't load the leaderboard: \(error.localizedDescription)"
+            errorText = "The leaderboard isn't available right now. Pull down to try again."
         }
     }
 }
