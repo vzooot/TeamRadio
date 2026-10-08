@@ -3,7 +3,9 @@
 // push-to-start. Cron fires every 5 minutes; a KV flag deduplicates.
 //
 // Secrets (wrangler secret put): APNS_KEY (the .p8 PEM), APNS_KEY_ID,
-// APNS_TEAM_ID. KV binding: TOKENS.
+// APNS_TEAM_ID. KV binding: TOKENS. The prediction game lives in game.js.
+
+import { handleGame, runGame } from "./game.js";
 
 const TOPIC = "com.woqomoqo.OneF.push-type.liveactivity";
 const HOSTS = {
@@ -23,6 +25,8 @@ const FLAGS = {
 export default {
   // Devices register their push-to-start tokens here.
   async fetch(request, env) {
+    const game = await handleGame(request, env);
+    if (game) return game;
     const url = new URL(request.url);
     if (request.method === "POST" && url.pathname === "/register") {
       let body;
@@ -52,6 +56,7 @@ export default {
 
   async scheduled(_event, env, ctx) {
     ctx.waitUntil(checkAndPush(env));
+    ctx.waitUntil(runGame(env).catch((e) => console.log("game", e)));
   },
 };
 
