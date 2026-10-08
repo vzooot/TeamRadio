@@ -3,6 +3,9 @@ import SwiftUI
 struct ContentView: View {
     @State private var model = RaceViewModel()
     @State private var showAbout = false
+    @State private var game = GameViewModel()
+    @State private var showPicks = false
+    @State private var showResult = false
 
     var body: some View {
         ZStack {
@@ -33,6 +36,24 @@ struct ContentView: View {
         .sheet(isPresented: $showAbout) {
             AboutView()
         }
+        .task(id: model.nextRace?.id) {
+            guard GameFeature.isEnabled else { return }
+            await game.load(race: model.nextRace, season: model.season)
+        }
+        .sheet(isPresented: $showPicks) {
+            PicksSheet(game: game)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.background)
+        }
+        .sheet(isPresented: $showResult) {
+            if case let .scored(race, score, prediction) = game.cardState(at: .now) {
+                ResultSheet(game: game, race: race, score: score, prediction: prediction)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+                    .presentationBackground(Theme.background)
+            }
+        }
     }
 
     private var loadedContent: some View {
@@ -59,6 +80,11 @@ struct ContentView: View {
 
                     CountdownView(race: race)
                         .id(race.id)
+
+                    if GameFeature.isEnabled, !model.isBrowsing {
+                        PicksCard(game: game, onOpen: { showPicks = true }, onShowResult: { showResult = true })
+                            .id("picks")
+                    }
 
                     WeekendScheduleView(race: race, weather: model.weather)
                         .id("schedule")
@@ -399,3 +425,4 @@ struct FooterView: View {
 #Preview {
     ContentView()
 }
+
