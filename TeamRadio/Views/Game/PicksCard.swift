@@ -78,7 +78,7 @@ struct PicksCard: View {
     private func content(_ state: GameViewModel.CardState, now: Date) -> some View {
         switch state {
         case .open:
-            Text("Call pole, the podium, fastest lap and this week's wildcard. Picks lock when qualifying starts.")
+            Text("Call pole, the podium, fastest lap and this week's wildcard. Picks lock when \(game.lockSessionName) starts.")
                 .font(.system(size: 13))
                 .foregroundStyle(Theme.dimText)
                 .fixedSize(horizontal: false, vertical: true)
@@ -96,7 +96,7 @@ struct PicksCard: View {
                     .foregroundStyle(Theme.dimText)
             }
             if state == .picked {
-                Text("Locks in \(Self.remaining(until: game.lockDate, now: now)) · change them any time before qualifying")
+                Text("Locks in \(Self.remaining(until: game.lockDate, now: now)) · change them any time before \(game.lockSessionName)")
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.faintText)
                 Button(action: onOpen) {
@@ -104,13 +104,13 @@ struct PicksCard: View {
                 }
                 .buttonStyle(GameOutlineButtonStyle())
             } else {
-                Label("Locked at qualifying · scored after the race", systemImage: "lock.fill")
+                Label("Locked at \(game.lockSessionName) · scored after the race", systemImage: "lock.fill")
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.dimText)
             }
 
         case .missed:
-            note("Picks for this round closed when qualifying started. The next round opens after the race.")
+            note("Picks for this round closed when \(game.lockSessionName) started. The next round opens after the race.")
 
         case let .scored(_, score, prediction):
             HStack(alignment: .firstTextBaseline, spacing: 16) {

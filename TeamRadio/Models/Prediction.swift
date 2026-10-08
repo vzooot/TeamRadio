@@ -106,9 +106,15 @@ enum GameRules {
 
     static let maximum = pole + winner + second + third + perfectPodium + fastestLap + wildcard
 
-    /// Picks lock when qualifying starts.
+    /// Picks lock at the weekend's first competitive session: sprint
+    /// qualifying on sprint weekends, so nobody picks after seeing the sprint.
     static func lockDate(for race: Race) -> Date? {
-        race.sessions.first { $0.kind == .qualifying }?.date
+        race.sessions.first { $0.kind == .sprintQualifying || $0.kind == .qualifying }?.date
+    }
+
+    /// The session the picks lock at, as players read it.
+    static func lockSessionName(for race: Race) -> String {
+        race.isSprintWeekend ? "sprint qualifying" : "qualifying"
     }
 
     static func score(_ prediction: Prediction, wildcard: Wildcard,

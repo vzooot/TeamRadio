@@ -56,6 +56,7 @@ final class GameViewModel {
 
     var lockDate: Date? { race.flatMap(GameRules.lockDate(for:)) }
     var wildcard: Wildcard { Wildcard.forRound(race?.roundNumber ?? 1) }
+    var lockSessionName: String { race.map(GameRules.lockSessionName(for:)) ?? "qualifying" }
 
     func isLocked(at now: Date) -> Bool {
         guard let lockDate else { return false }
@@ -128,7 +129,7 @@ final class GameViewModel {
     func lockIn(now: Date = .now) async -> Bool {
         guard let userId, !nickname.isEmpty, draft.isComplete else { return false }
         guard !isLocked(at: now) else {
-            errorText = "Picks are locked: qualifying has started."
+            errorText = "Picks are locked: \(lockSessionName) has started."
             return false
         }
         isSaving = true

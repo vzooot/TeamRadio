@@ -208,7 +208,7 @@ struct PicksSheet: View {
                         .font(.f1(11, weight: .bold))
                         .tracking(1.5)
                         .foregroundStyle(Theme.accent)
-                    Text("Picks lock when qualifying starts. Until then you can change them as often as you like.")
+                    Text("Picks lock when \(game.lockSessionName) starts. Until then you can change them as often as you like.")
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.dimText)
                         .fixedSize(horizontal: false, vertical: true)
