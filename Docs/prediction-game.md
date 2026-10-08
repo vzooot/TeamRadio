@@ -167,9 +167,9 @@ shown on the result card and the result reveal:
 - Stored as `comment` on the player's `Score` record. If generation fails,
   the card simply shows no comment.
 
-### AI analyst
+### AI Strategist
 
-An AI player on the leaderboard that everyone can try to beat.
+The AI Strategist: an AI player on the leaderboard that everyone can try to beat.
 
 - On Thursday of race week the scorer asks a stronger model for a full set of
   picks, giving it only data available before the lock: standings, recent
@@ -182,8 +182,9 @@ An AI player on the leaderboard that everyone can try to beat.
   analyst" on their result.
 - Cost: one request per race, a few cents at most.
 
-Open: the analyst's name and avatar, and whether it counts in the global
-ranking or sits beside it.
+Decided 2026-10-09: it is called **AI Strategist**, and it sits beside the
+global ranking as a benchmark (a marked row), never taking a real player's
+place.
 
 ## Privacy and App Store
 
