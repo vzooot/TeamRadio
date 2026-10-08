@@ -123,13 +123,30 @@ struct PicksCard: View {
                 .foregroundStyle(Theme.accent)
                 .shadow(color: Theme.accent.opacity(0.5), radius: 10)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(score.exactPicks) exact picks")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white)
-                    Text("Leaderboard comes with the next update")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Theme.dimText)
+                    if let me = game.lastBoard?.me, let total = game.lastBoard?.total {
+                        Text("\(me.rank.ordinal) of \(total.formatted())")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.white)
+                    } else {
+                        Text("\(score.exactPicks) exact picks")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }
+                    if let strategist = game.lastBoard?.strategist {
+                        Text(score.total > strategist.points ? "You beat the \(strategist.name) ✓"
+                             : score.total == strategist.points ? "Level with the \(strategist.name)"
+                             : "\(strategist.name) scored \(strategist.points)")
+                            .font(.system(size: 12))
+                            .foregroundStyle(score.total > strategist.points ? PicksStrip.color(.exact) : Theme.dimText)
+                    } else {
+                        Text("Official rank once the race is scored")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Theme.dimText)
+                    }
                 }
+            }
+            if let comment = game.lastBoard?.me?.comment {
+                RadioComment(text: comment)
             }
             PicksStrip(game: game, prediction: prediction, score: score)
             Button(action: onShowResult) {
@@ -277,5 +294,43 @@ struct GameOutlineButtonStyle: ButtonStyle {
             .padding(.vertical, 9)
             .background(RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.accent.opacity(0.5)))
             .opacity(configuration.isPressed ? 0.7 : 1)
+    }
+}
+
+/// The AI post-race comment, styled as a radio message and labelled as AI.
+struct RadioComment: View {
+    let text: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "dot.radiowaves.left.and.right")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(Theme.violet)
+                .padding(.top, 2)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(text)
+                    .font(.system(size: 13, weight: .medium).italic())
+                    .foregroundStyle(.white.opacity(0.9))
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("AI RACE ENGINEER")
+                    .font(.f1(10, weight: .bold))
+                    .tracking(1.5)
+                    .foregroundStyle(Theme.violet)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Theme.violet.opacity(0.12)))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.violet.opacity(0.35)))
+    }
+}
+
+extension Int {
+    /// 1st, 2nd, 3rd, 41st…
+    var ordinal: String {
+        let f = NumberFormatter()
+        f.numberStyle = .ordinal
+        f.locale = Locale(identifier: "en")
+        return f.string(from: NSNumber(value: self)) ?? "\(self)"
     }
 }

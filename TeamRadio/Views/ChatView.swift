@@ -17,7 +17,7 @@ struct ChatView: View {
     @State private var mode: Mode = .room
     @State private var dmPath: [InboxView.DMTarget] = []
 
-    enum Mode { case room, messages }
+    enum Mode { case room, messages, leaderboard }
 
     struct Member: Identifiable {
         let id: String
@@ -320,12 +320,21 @@ struct ChatView: View {
                              selected: mode == .messages || inbox.totalUnread > 0)
                 }
                 .buttonStyle(.plain)
+                if GameFeature.isEnabled {
+                    Button { mode = .leaderboard } label: {
+                        NeonChip(title: "LEADERBOARD", tint: Color(red: 1, green: 0.75, blue: 0.2),
+                                 selected: mode == .leaderboard)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 10)
 
             if mode == .messages {
                 InboxView(model: inbox, myName: model.nickname, suggestions: recentMembers, path: $dmPath)
+            } else if mode == .leaderboard {
+                LeaderboardView()
             } else {
                 roomBody
             }

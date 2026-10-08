@@ -50,6 +50,9 @@ final class GameViewModel {
     var errorText: String?
     /// The last round's picks, scored once its results are in.
     private(set) var lastScored: (race: Race, score: ScoreBreakdown, prediction: Prediction)?
+    /// The official result for the last round from the scorer: rank, total
+    /// players, AI comment and the AI Strategist's score. Nil until scored.
+    private(set) var lastBoard: LeaderboardService.Board?
 
     private var userId: String?
     private var nickname: String { UserDefaults.standard.string(forKey: "chatNickname") ?? "" }
@@ -118,6 +121,8 @@ final class GameViewModel {
         let score = GameRules.score(mine.prediction, wildcard: wildcard,
                                     qualifying: q?.qualifyingResults ?? [], race: classification)
         lastScored = (previous, score, mine.prediction)
+        lastBoard = try? await LeaderboardService.board(scope: .round, round: previous.id,
+                                                        year: previous.season, user: userId)
     }
 
     func driver(_ id: String?) -> GameDriver? {
