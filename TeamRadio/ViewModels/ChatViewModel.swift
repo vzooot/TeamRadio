@@ -59,7 +59,8 @@ final class ChatViewModel {
             }
         }
 
-        // Chat room is scoped to the upcoming race weekend.
+        // One continuous room; new messages are tagged with the upcoming
+        // race weekend, whose name heads the screen.
         if let race = try? await F1API.nextRace() {
             round = "\(race.season)-\(race.round)"
             roundTitle = race.raceName
@@ -70,8 +71,7 @@ final class ChatViewModel {
 
         await refresh()
         if let me = currentUserId {
-            let round = round
-            Task.detached(priority: .utility) { await ChatService.subscribeToRoom(round: round, me: me) }
+            Task.detached(priority: .utility) { await ChatService.subscribeToRoom(me: me) }
         }
         pollTask?.cancel()
         pollTask = Task { [weak self] in
@@ -88,8 +88,7 @@ final class ChatViewModel {
         ChatService.roomPushEnabled = on
         roomPushEnabled = on
         guard let me = currentUserId else { return }
-        let round = round
-        Task.detached(priority: .utility) { await ChatService.subscribeToRoom(round: round, me: me) }
+        Task.detached(priority: .utility) { await ChatService.subscribeToRoom(me: me) }
     }
 
     func stop() {
@@ -100,7 +99,7 @@ final class ChatViewModel {
     func refresh() async {
         guard state == .ready, !round.isEmpty else { return }
         do {
-            let (fetched, cursor) = try await ChatService.messages(round: round)
+            let (fetched, cursor) = try await ChatService.messages()
             // The refresh cursor only seeds pagination before the user has
             // paged back; afterwards the deeper cursor stays authoritative.
             if !hasPaginated {

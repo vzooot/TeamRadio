@@ -15,7 +15,6 @@ final class ChatBadge {
     private(set) var latestText = ""
     private(set) var latestIsPrivate = false
     @ObservationIgnored private var pushObserver: NSObjectProtocol?
-    @ObservationIgnored private var round: String?
     @ObservationIgnored private var userId: String?
 
     private static let lastReadKey = "chatLastReadAt"
@@ -49,12 +48,8 @@ final class ChatBadge {
     }
 
     private func recountNow() async {
-        if round == nil, let race = try? await F1API.nextRace() {
-            round = "\(race.season)-\(race.round)"
-        }
         if userId == nil { userId = await ChatService.currentUserId() }
-        guard let round else { return }
-        await recount(round: round, userId: userId)
+        await recount(userId: userId)
     }
 
     /// Opening the Paddock tab catches up on the room; private threads stay
@@ -65,8 +60,8 @@ final class ChatBadge {
         Self.setAppIconBadge(unread)
     }
 
-    private func recount(round: String, userId: String?) async {
-        guard let (messages, _) = try? await ChatService.messages(round: round, limit: 30) else { return }
+    private func recount(userId: String?) async {
+        guard let (messages, _) = try? await ChatService.messages(limit: 30) else { return }
         let lastRead = Self.lastReadAt
         let blocked = ChatModeration.blockedUsers
         let fresh = messages.filter {

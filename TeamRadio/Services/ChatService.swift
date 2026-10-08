@@ -31,15 +31,18 @@ enum ChatService {
         (try? await container.userRecordID())?.recordName
     }
 
-    /// Latest messages for one race weekend (oldest first), plus a cursor
-    /// that pages further back through the room's full server-side history.
+    /// Latest messages in the paddock (oldest first), plus a cursor that pages
+    /// further back through its full history. The room is one continuous
+    /// conversation across race weekends; each message still records the
+    /// weekend it was sent in (`round`), which is also what the query keys on
+    /// — every message has one, and `round` already has a queryable index.
     /// Sorts on the custom `created` field — custom fields get sortable
     /// indexes automatically in the development schema; the system
     /// creationDate does not.
-    static func messages(round: String, limit: Int = 80) async throws -> (messages: [ChatMessage], older: CKQueryOperation.Cursor?) {
+    static func messages(limit: Int = 80) async throws -> (messages: [ChatMessage], older: CKQueryOperation.Cursor?) {
         let query = CKQuery(
             recordType: "Message",
-            predicate: NSPredicate(format: "round == %@", round)
+            predicate: NSPredicate(format: "round != %@", "")
         )
         query.sortDescriptors = [NSSortDescriptor(key: "created", ascending: false)]
 
@@ -111,28 +114,29 @@ enum ChatService {
 
     static let roomPushKey = "chatRoomPushEnabled"
 
-    /// Push for every room message by someone else this weekend, straight
-    /// from CloudKit. Off = the subscription is removed.
+    /// Push for every room message by someone else, straight from CloudKit.
+    /// Off = the subscription is removed.
     static var roomPushEnabled: Bool {
         get { UserDefaults.standard.object(forKey: roomPushKey) as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: roomPushKey) }
     }
 
-    static func subscribeToRoom(round: String, me: String) async {
+    static func subscribeToRoom(me: String) async {
         let id = "room-\(me)"
         guard roomPushEnabled else {
             _ = try? await database.deleteSubscription(withID: id)
             return
         }
-        // Same round already subscribed → nothing to do; otherwise replace.
+        // Already on the whole-room subscription → nothing to do. Older app
+        // versions subscribed per race weekend; those get replaced.
         if let existing = try? await database.subscription(for: id) as? CKQuerySubscription,
-           existing.predicate.predicateFormat.contains("\"\(round)\"") {
+           !existing.predicate.predicateFormat.contains("round") {
             return
         }
         _ = try? await database.deleteSubscription(withID: id)
         let subscription = CKQuerySubscription(
             recordType: "Message",
-            predicate: NSPredicate(format: "round == %@ AND senderId != %@", round, me),
+            predicate: NSPredicate(format: "senderId != %@", me),
             subscriptionID: id,
             options: [.firesOnRecordCreation])
         let info = CKSubscription.NotificationInfo()
