@@ -270,7 +270,6 @@ async function azure(env, messages, schema) {
     body: JSON.stringify({
       model: env.AZURE_OPENAI_MODEL || "gpt-4.1-mini",
       messages,
-      temperature: 0.8,
       response_format: { type: "json_schema", json_schema: { name: schema.name, strict: true, schema: schema.schema } },
     }),
   });
