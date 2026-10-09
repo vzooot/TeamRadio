@@ -6,6 +6,7 @@ struct ContentView: View {
     @State private var game = GameViewModel()
     @State private var showPicks = false
     @State private var showResult = false
+    @State private var showEmily = false
 
     var body: some View {
         ZStack {
@@ -39,6 +40,11 @@ struct ContentView: View {
         .task(id: model.nextRace?.id) {
             guard GameFeature.isEnabled else { return }
             await game.load(race: model.nextRace, season: model.season)
+        }
+        .sheet(isPresented: $showEmily) {
+            AskEmilyView()
+                .presentationDetents([.large])
+                .presentationBackground(Theme.background)
         }
         .sheet(isPresented: $showPicks) {
             PicksSheet(game: game)
@@ -84,6 +90,7 @@ struct ContentView: View {
                     if GameFeature.isEnabled, !model.isBrowsing {
                         PicksCard(game: game, onOpen: { showPicks = true }, onShowResult: { showResult = true })
                             .id("picks")
+                        AskEmilyCard { showEmily = true }
                     }
 
                     WeekendScheduleView(race: race, weather: model.weather)
