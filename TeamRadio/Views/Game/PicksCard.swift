@@ -76,7 +76,7 @@ struct PicksCard: View {
     private func content(_ state: GameViewModel.CardState, now: Date) -> some View {
         switch state {
         case .open:
-            Text("Call pole, the podium, fastest lap and this week's wildcard. Picks lock when \(game.lockSessionName) starts.")
+            Text("Call pole, the podium, fastest lap and this week's wildcard. Pole locks when qualifying starts, the rest when the race starts.")
                 .font(.system(size: 13))
                 .foregroundStyle(Theme.dimText)
                 .fixedSize(horizontal: false, vertical: true)
@@ -94,7 +94,7 @@ struct PicksCard: View {
                     .foregroundStyle(Theme.dimText)
             }
             if state == .picked {
-                Text("Locks in \(Self.remaining(until: game.lockDate, now: now)) · change them any time before \(game.lockSessionName)")
+                Text(Self.lockStatus(game, now: now))
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.faintText)
                 Button(action: onOpen) {
@@ -102,13 +102,13 @@ struct PicksCard: View {
                 }
                 .buttonStyle(GameOutlineButtonStyle())
             } else {
-                Label("Locked at \(game.lockSessionName) · scored after the race", systemImage: "lock.fill")
+                Label("All picks locked · scored after the race", systemImage: "lock.fill")
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.dimText)
             }
 
         case .missed:
-            note("Picks for this round closed when \(game.lockSessionName) started. The next round opens after the race.")
+            note("Picks for this round closed when the race started. The next round opens after the race.")
 
         case let .scored(_, score, prediction):
             HStack(alignment: .firstTextBaseline, spacing: 16) {
@@ -156,11 +156,12 @@ struct PicksCard: View {
 
     private func lockCountdown(now: Date) -> some View {
         HStack(spacing: 8) {
-            Text("LOCKS IN")
+            let next = game.nextLock(at: now)
+            Text(next?.group == .race ? "RACE PICKS LOCK IN" : "POLE LOCKS IN")
                 .font(.f1(11, weight: .bold))
                 .tracking(2)
                 .foregroundStyle(Theme.faintText)
-            ForEach(Self.parts(until: game.lockDate, now: now), id: \.self) { part in
+            ForEach(Self.parts(until: next?.date, now: now), id: \.self) { part in
                 Text(part)
                     .font(.f1Digits(17))
                     .foregroundStyle(.white)
@@ -185,6 +186,14 @@ struct PicksCard: View {
         let left = max(0, Int(date.timeIntervalSince(now)))
         let d = left / 86400, h = left % 86400 / 3600, m = left % 3600 / 60
         return d > 0 ? ["\(d)D", "\(h)H", "\(m)M"] : ["\(h)H", "\(m)M"]
+    }
+
+    /// "Pole locks in 1d 3h · race picks in 2d 5h", or the race only once
+    /// qualifying has started.
+    static func lockStatus(_ game: GameViewModel, now: Date) -> String {
+        let race = "race picks lock in \(remaining(until: game.lockDate(.race), now: now))"
+        if game.isLocked(.quali, at: now) { return "Pole locked · " + race }
+        return "Pole locks in \(remaining(until: game.lockDate(.quali), now: now)) · " + race
     }
 
     static func remaining(until date: Date?, now: Date) -> String {

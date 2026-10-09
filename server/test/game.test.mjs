@@ -1,5 +1,5 @@
 // Run: node server/test/game.test.mjs  (needs network: reads real Jolpica results)
-import { score, wildcardForRound, resolveWildcard, derSignature, scoreRound, lockDate } from "../src/game.js";
+import { score, wildcardForRound, resolveWildcard, derSignature, scoreRound, lockDate, groupLock, mergePicks } from "../src/game.js";
 import crypto from "node:crypto";
 const ok = (c, m) => { console.log((c ? "PASS " : "FAIL ") + m); if (!c) process.exitCode = 1; };
 const j = async (u) => (await (await fetch(u)).json()).MRData;
@@ -44,8 +44,21 @@ const env = { CK_KEY_ID: "test", CK_PRIVATE_KEY: pem, TOKENS: {
   put: async (k, v) => kv.set(k, v) } };
 const res = await scoreRound(env, "development", cal);
 const round = JSON.parse(kv.get("game:development:round:2026-16"));
-ok(res.players === 2 && res.voided === 1, `2 players scored, 1 late pick voided (${JSON.stringify(res)})`);
+ok(res.players === 3 && res.voided === 1, `legacy record after quali: pole voided, race picks still count (${JSON.stringify(res)})`);
 ok(!round.players.userD, "spoofed record name ignored");
-ok(round.players.userA.points === 47 && round.players.userA.rank === 1 && round.players.userB.rank === 2, "ranking: Alice 47 first, Bob second");
+ok(round.players.userA.points === 47 && round.players.userA.rank === 1 && round.players.userC.rank === 2 && round.players.userB.rank === 3, "ranking: Alice 47, Late 10 (race picks kept), Bob 2");
 ok(JSON.parse(kv.get("game:development:season:2026")).players.userA.points === 47, "season table built");
+// per-session locks: pole at qualifying, the rest at the race
+const q = groupLock(cal, "quali").getTime(), rs = groupLock(cal, "race").getTime();
+const m = mergePicks([
+  { recordName: "pred-2026-16-u1-quali", userId: "u1", name: "One", pole: "a", modified: q - 1000 },
+  { recordName: "pred-2026-16-u1-race", userId: "u1", name: "One", p1: "b", modified: q + 3600_000 },
+  { recordName: "pred-2026-16-u2-quali", userId: "u2", name: "Two", pole: "a", modified: q + 1000 },
+  { recordName: "pred-2026-16-u2-race", userId: "u2", name: "Two", p1: "b", modified: rs + 1000 },
+  { recordName: "pred-2026-16-u1-race", userId: "u3", name: "Spoof", p1: "x", modified: q - 1000 },
+], cal);
+const one = m.players.find(p => p.userId === "u1");
+ok(one?.pole === "a" && one?.p1 === "b", "podium edited after quali still counts, pole kept");
+ok(!m.players.find(p => p.userId === "u2") && m.voided === 2, "pole after quali and podium after race start are voided");
+ok(!m.players.find(p => p.userId === "u3"), "record name must belong to its owner");
 ok(signed["X-Apple-CloudKit-Request-SignatureV1"]?.length > 80 && /Z$/.test(signed["X-Apple-CloudKit-Request-ISO8601Date"]), "CloudKit request carries signature + date headers");

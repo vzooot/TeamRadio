@@ -30,7 +30,35 @@ struct Prediction: Equatable, Codable {
     var podium: [String?] { [p1, p2, p3] }
 
     var isComplete: Bool {
-        [pole, p1, p2, p3, fastestLap, wildcard].allSatisfy { $0 != nil }
+        PickGroup.allCases.allSatisfy(isComplete)
+    }
+
+    func isComplete(_ group: PickGroup) -> Bool {
+        switch group {
+        case .quali: pole != nil
+        case .race: [p1, p2, p3, fastestLap, wildcard].allSatisfy { $0 != nil }
+        }
+    }
+
+    /// Copies one group's picks from another prediction (keeps the rest).
+    mutating func take(_ group: PickGroup, from other: Prediction) {
+        switch group {
+        case .quali: pole = other.pole
+        case .race: (p1, p2, p3, fastestLap, wildcard) = (other.p1, other.p2, other.p3, other.fastestLap, other.wildcard)
+        }
+    }
+}
+
+/// Picks are locked in two groups, each at the start of its session.
+enum PickGroup: String, CaseIterable {
+    case quali, race
+
+    /// "qualifying" / "the race", as players read it.
+    var sessionName: String {
+        switch self {
+        case .quali: "qualifying"
+        case .race: "the race"
+        }
     }
 }
 
@@ -106,15 +134,13 @@ enum GameRules {
 
     static let maximum = pole + winner + second + third + perfectPodium + fastestLap + wildcard
 
-    /// Picks lock at the weekend's first competitive session: sprint
-    /// qualifying on sprint weekends, so nobody picks after seeing the sprint.
-    static func lockDate(for race: Race) -> Date? {
-        race.sessions.first { $0.kind == .sprintQualifying || $0.kind == .qualifying }?.date
-    }
-
-    /// The session the picks lock at, as players read it.
-    static func lockSessionName(for race: Race) -> String {
-        race.isSprintWeekend ? "sprint qualifying" : "qualifying"
+    /// Each pick locks when the session it predicts starts: pole at
+    /// qualifying, everything else at the race.
+    static func lockDate(for race: Race, group: PickGroup) -> Date? {
+        switch group {
+        case .quali: race.sessions.first { $0.kind == .qualifying }?.date
+        case .race: race.startDate
+        }
     }
 
     static func score(_ prediction: Prediction, wildcard: Wildcard,

@@ -95,11 +95,45 @@ export function score(p, wildcard, qualifying, race) {
   return { total, exact, items };
 }
 
-// Picks lock at the first competitive session (sprint qualifying on sprint
-// weekends). Same as GameRules.lockDate in Swift.
+// Each pick locks when its session starts: pole at qualifying, the podium,
+// fastest lap and wildcard at the race. Same as GameRules.lockDate in Swift.
+const at = (s) => (s?.date ? new Date(`${s.date}T${s.time || "00:00:00Z"}`) : null);
+export const GROUP_FIELDS = { quali: ["pole"], race: ["p1", "p2", "p3", "fastestLap", "wildcard"] };
+
+export function groupLock(race, group) {
+  return group === "quali" ? at(race.Qualifying) : at({ date: race.date, time: race.time });
+}
+
+/// The first lock of the weekend (qualifying): the AI Strategist picks
+/// before it and reveals after it.
 export function lockDate(race) {
-  const s = race.SprintQualifying || race.Qualifying;
-  return s?.date ? new Date(`${s.date}T${s.time || "00:00:00Z"}`) : null;
+  return groupLock(race, "quali");
+}
+
+/// Merges each player's records into one prediction, keeping only groups
+/// saved before their lock (server time) and owned by that player.
+/// Records: pred-<round>-<user>-quali / -race, or the early single record
+/// pred-<round>-<user> holding both groups.
+export function mergePicks(records, race) {
+  const id = `${race.season}-${race.round}`;
+  const locks = { quali: groupLock(race, "quali")?.getTime() ?? 0, race: groupLock(race, "race")?.getTime() ?? 0 };
+  const players = {};
+  let voided = 0;
+  for (const r of records) {
+    if (!r.userId) continue;
+    const base = `pred-${id}-${r.userId}`;
+    const groups = r.recordName === base ? ["quali", "race"]
+      : r.recordName === `${base}-quali` ? ["quali"]
+      : r.recordName === `${base}-race` ? ["race"] : [];
+    for (const g of groups) {
+      if (r.modified >= locks[g]) { voided++; continue; }
+      const p = players[r.userId] ||= { userId: r.userId, name: r.name, locked: 0 };
+      for (const f of GROUP_FIELDS[g]) p[f] = r[f];
+      p.locked = Math.max(p.locked, r.modified);
+      if (r.name) p.name = r.name;
+    }
+  }
+  return { players: Object.values(players), voided };
 }
 
 // ---------------------------------------------------------------- data
@@ -194,17 +228,11 @@ export async function scoreRound(env, ckEnv, race) {
   const { results, qualifying } = await raceData(race);
   if (!results.length) return { id, skipped: "no results yet" };
 
-  const lock = lockDate(race)?.getTime() ?? 0;
   const wildcard = wildcardForRound(race.round);
-  const picks = await predictions(env, ckEnv, id);
+  const { players: picks, voided } = mergePicks(await predictions(env, ckEnv, id), race);
 
   const players = {};
-  let voided = 0;
   for (const p of picks) {
-    // Fairness: the record's server-set modification time must be before
-    // the lock, and the record name must match its owner.
-    if (!p.userId || p.recordName !== `pred-${id}-${p.userId}`) continue;
-    if (p.modified >= lock) { voided++; continue; }
     const s = score(p, wildcard, qualifying, results);
     players[p.userId] = { name: p.name || "Player", points: s.total, exact: s.exact, items: s.items, locked: p.modified };
   }
@@ -265,6 +293,23 @@ async function rebuildSeason(env, ckEnv, year) {
 }
 
 // ----------------------------------------------------------- AI extras
+
+/// Plain-text chat completion (Ask the race engineer). Null on any failure.
+export async function azureChat(env, messages) {
+  if (!env.AZURE_OPENAI_ENDPOINT || !env.AZURE_OPENAI_KEY) return null;
+  const base = new URL(env.AZURE_OPENAI_ENDPOINT.trim()).origin;
+  const res = await fetch(`${base}/openai/v1/chat/completions`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "api-key": env.AZURE_OPENAI_KEY },
+    body: JSON.stringify({ model: env.AZURE_OPENAI_MODEL || "gpt-4.1-mini", messages, reasoning_effort: "low" }),
+  });
+  if (!res.ok) {
+    console.log("azure chat", res.status, (await res.text()).slice(0, 300));
+    return null;
+  }
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content || null;
+}
 
 async function azure(env, messages, schema) {
   if (!env.AZURE_OPENAI_ENDPOINT || !env.AZURE_OPENAI_KEY) return null;

@@ -57,21 +57,34 @@ final class GameViewModel {
     private var userId: String?
     private var nickname: String { UserDefaults.standard.string(forKey: "chatNickname") ?? "" }
 
-    var lockDate: Date? { race.flatMap(GameRules.lockDate(for:)) }
     var wildcard: Wildcard { Wildcard.forRound(race?.roundNumber ?? 1) }
-    var lockSessionName: String { race.map(GameRules.lockSessionName(for:)) ?? "qualifying" }
 
-    func isLocked(at now: Date) -> Bool {
-        guard let lockDate else { return false }
-        return now >= lockDate
+    func lockDate(_ group: PickGroup) -> Date? {
+        race.flatMap { GameRules.lockDate(for: $0, group: group) }
+    }
+
+    func isLocked(_ group: PickGroup, at now: Date) -> Bool {
+        guard let date = lockDate(group) else { return false }
+        return now >= date
+    }
+
+    /// The next group to lock and when, nil once the race has started.
+    func nextLock(at now: Date) -> (group: PickGroup, date: Date)? {
+        PickGroup.allCases.compactMap { g in lockDate(g).map { (g, $0) } }.first { $0.1 > now }
+    }
+
+    /// Something can still be saved: every open group is filled in.
+    func canLockIn(at now: Date) -> Bool {
+        let open = PickGroup.allCases.filter { !isLocked($0, at: now) }
+        return !open.isEmpty && open.allSatisfy(draft.isComplete)
     }
 
     func cardState(at now: Date) -> CardState {
         // The last result stays up until three days before the next lock.
-        if let lastScored, let lockDate, now < lockDate.addingTimeInterval(-3 * 86400) {
+        if let lastScored, let first = lockDate(.quali), now < first.addingTimeInterval(-3 * 86400) {
             return .scored(round: lastScored.race, lastScored.score, lastScored.prediction)
         }
-        if isLocked(at: now) { return saved == nil ? .missed : .locked }
+        if isLocked(.race, at: now) { return saved == nil ? .missed : .locked }
         return saved == nil ? .open : .picked
     }
 
@@ -129,18 +142,21 @@ final class GameViewModel {
         drivers.first { $0.id == id }
     }
 
-    /// Saves the draft. Refused after the lock, though only the scorer's
+    /// Saves every group that hasn't locked yet. Only the scorer's
     /// server-time check is authoritative.
     func lockIn(now: Date = .now) async -> Bool {
-        guard let userId, !nickname.isEmpty, draft.isComplete else { return false }
-        guard !isLocked(at: now) else {
-            errorText = "Picks are locked: \(lockSessionName) has started."
+        guard let userId, !nickname.isEmpty, canLockIn(at: now) else {
+            if isLocked(.race, at: now) { errorText = "Picks are locked: the race has started." }
             return false
         }
+        let groups = PickGroup.allCases.filter { !isLocked($0, at: now) }
         isSaving = true
         defer { isSaving = false }
         do {
-            saved = try await PredictionService.save(draft, userId: userId, name: nickname)
+            try await PredictionService.save(draft, groups: groups, userId: userId, name: nickname)
+            var picks = saved?.prediction ?? Prediction(round: draft.round)
+            groups.forEach { picks.take($0, from: draft) }
+            saved = PredictionService.Saved(prediction: picks, groups: (saved?.groups ?? []).union(groups))
             errorText = nil
             return true
         } catch {

@@ -37,7 +37,8 @@ struct PicksSheet: View {
     init(game: GameViewModel) {
         self.game = game
         // Returning players land on the review with everything filled in.
-        _step = State(initialValue: game.draft.isComplete ? .review : .pole)
+        let poleClosed = game.isLocked(.quali, at: .now)
+        _step = State(initialValue: game.draft.isComplete ? .review : poleClosed ? .podium : .pole)
     }
 
     var body: some View {
@@ -47,7 +48,12 @@ struct PicksSheet: View {
                     header
                     stepBar
                     switch step {
-                    case .pole: driverGrid(selected: game.draft.pole) { game.draft.pole = $0; advance() }
+                    case .pole:
+                        if game.isLocked(.quali, at: .now) {
+                            lockedNote("Pole locked when qualifying started.")
+                        } else {
+                            driverGrid(selected: game.draft.pole) { game.draft.pole = $0; advance() }
+                        }
                     case .podium: podium
                     case .fastestLap: driverGrid(selected: game.draft.fastestLap) { game.draft.fastestLap = $0; advance() }
                     case .wildcard: wildcard
@@ -194,7 +200,7 @@ struct PicksSheet: View {
 
     private var review: some View {
         VStack(alignment: .leading, spacing: 8) {
-            reviewRow("POLE", game.draft.pole, edit: .pole)
+            reviewRow("POLE", game.draft.pole, edit: .pole, group: .quali)
             reviewRow("WINNER · P1", game.draft.p1, edit: .podium, slot: 0)
             reviewRow("P2", game.draft.p2, edit: .podium, slot: 1)
             reviewRow("P3", game.draft.p3, edit: .podium, slot: 2)
@@ -202,13 +208,17 @@ struct PicksSheet: View {
             row(label: "WILDCARD", value: "\(game.wildcard.label(for: game.draft.wildcard) ?? "—")  ·  \(game.wildcard.question)",
                 color: Theme.accent, edit: .wildcard)
 
-            if let lock = game.lockDate {
+            if let next = game.nextLock(at: .now) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("🔒 LOCKS \(lock.formatted(.dateTime.weekday(.abbreviated).hour().minute()).uppercased()) · IN \(PicksCard.remaining(until: lock, now: .now).uppercased())")
-                        .font(.f1(11, weight: .bold))
-                        .tracking(1.5)
-                        .foregroundStyle(Theme.accent)
-                    Text("Picks lock when \(game.lockSessionName) starts. Until then you can change them as often as you like.")
+                    ForEach(PickGroup.allCases, id: \.self) { group in
+                        if let lock = game.lockDate(group) {
+                            Text("🔒 \(group == .quali ? "POLE" : "RACE PICKS") · \(lock.formatted(.dateTime.weekday(.abbreviated).hour().minute()).uppercased())\(lock > .now ? " · IN \(PicksCard.remaining(until: lock, now: .now).uppercased())" : " · LOCKED")")
+                                .font(.f1(11, weight: .bold))
+                                .tracking(1.5)
+                                .foregroundStyle(group == next.group ? Theme.accent : Theme.dimText)
+                        }
+                    }
+                    Text("Each pick locks when its session starts: pole at qualifying, the rest at the race. Until then you can change them as often as you like.")
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.dimText)
                         .fixedSize(horizontal: false, vertical: true)
@@ -226,13 +236,20 @@ struct PicksSheet: View {
         }
     }
 
-    private func reviewRow(_ label: String, _ id: String?, edit: Step, slot: Int? = nil) -> some View {
+    private func reviewRow(_ label: String, _ id: String?, edit: Step, slot: Int? = nil, group: PickGroup = .race) -> some View {
         let driver = game.driver(id)
         return row(label: label, value: driver.map { "\($0.code)  ·  \($0.familyName)" } ?? "—",
-                   color: Theme.teamColor(driver?.teamId), edit: edit, slot: slot)
+                   color: Theme.teamColor(driver?.teamId), edit: edit, slot: slot, group: group)
     }
 
-    private func row(label: String, value: String, color: Color, edit: Step, slot: Int? = nil) -> some View {
+    private func lockedNote(_ text: String) -> some View {
+        Label(text, systemImage: "lock.fill")
+            .font(.system(size: 14, weight: .medium))
+            .foregroundStyle(Theme.dimText)
+            .padding(.vertical, 20)
+    }
+
+    private func row(label: String, value: String, color: Color, edit: Step, slot: Int? = nil, group: PickGroup = .race) -> some View {
         HStack(spacing: 12) {
             Capsule().fill(color).frame(width: 4, height: 32)
             VStack(alignment: .leading, spacing: 1) {
@@ -247,12 +264,18 @@ struct PicksSheet: View {
                     .minimumScaleFactor(0.8)
             }
             Spacer(minLength: 0)
-            Button("Edit") {
-                if let slot { activeSlot = slot }
-                withAnimation { step = edit }
+            if game.isLocked(group, at: .now) {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.faintText)
+            } else {
+                Button("Edit") {
+                    if let slot { activeSlot = slot }
+                    withAnimation { step = edit }
+                }
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Theme.accent)
             }
-            .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(Theme.accent)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -276,7 +299,7 @@ struct PicksSheet: View {
                     if game.isSaving { ProgressView().tint(Theme.onAccent) } else { Text("LOCK IN PICKS") }
                 }
                 .buttonStyle(GamePrimaryButtonStyle())
-                .disabled(!game.draft.isComplete || game.isSaving)
+                .disabled(!game.canLockIn(at: .now) || game.isSaving)
             } else if step == .podium, game.draft.podium.contains(where: { $0 == nil }) {
                 Text("PICK \(missingSlots)")
                     .modifier(DisabledLabel())

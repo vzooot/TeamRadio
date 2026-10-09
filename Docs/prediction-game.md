@@ -13,8 +13,9 @@ cards, 2nd-weekend retention.
 
 ## Rules
 
-One set of picks per player per Grand Prix. Picks lock when qualifying starts.
-Until then they can be changed freely.
+One set of picks per player per Grand Prix. Each pick locks when its session
+starts: pole at qualifying, the podium, fastest lap and wildcard at the race
+(decided 2026-10-09). Until then they can be changed freely.
 
 | Pick | Points | Resolved from |
 |---|---|---|
@@ -90,8 +91,9 @@ There is no server in the app today, and CloudKit's public database lets each
 player write their own records. Two things must therefore be enforced outside
 the player's phone:
 
-1. **Locking.** A pick only counts if CloudKit's server-set
-   `modificationDate` is before the qualifying start. The phone clock is never
+1. **Locking.** Picks are stored as two records per player and round
+   (`pred-<round>-<user>-quali` for pole, `-race` for the rest). Each counts
+   only if CloudKit's server-set `modificationDate` is before its session start. The phone clock is never
    trusted. Editing a prediction after the lock moves its `modificationDate`
    past the lock and voids it.
 2. **Scores.** Players never write their own score. A scorer computes every
