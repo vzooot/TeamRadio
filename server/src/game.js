@@ -311,7 +311,7 @@ export async function azureChat(env, messages) {
   return data.choices?.[0]?.message?.content || null;
 }
 
-async function azure(env, messages, schema) {
+export async function azure(env, messages, schema) {
   if (!env.AZURE_OPENAI_ENDPOINT || !env.AZURE_OPENAI_KEY) return null;
   // Accepts the endpoint in any form the portal shows (base, /openai/v1, a
   // full target URI with deployment and api-version): only the host counts.

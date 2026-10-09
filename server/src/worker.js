@@ -7,6 +7,7 @@
 
 import { handleGame, runGame } from "./game.js";
 import { handleAsk } from "./ask.js";
+import { handleGuide } from "./guide.js";
 
 const TOPIC = "com.woqomoqo.OneF.push-type.liveactivity";
 const HOSTS = {
@@ -26,7 +27,7 @@ const FLAGS = {
 export default {
   // Devices register their push-to-start tokens here.
   async fetch(request, env) {
-    const game = (await handleGame(request, env)) || (await handleAsk(request, env));
+    const game = (await handleGame(request, env)) || (await handleAsk(request, env)) || (await handleGuide(request, env));
     if (game) return game;
     const url = new URL(request.url);
     if (request.method === "POST" && url.pathname === "/register") {

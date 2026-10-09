@@ -1,0 +1,143 @@
+{
+ "circuitId": "vegas",
+ "reviewed": true,
+ "source": "track geometry (MultiViewer)",
+ "corners": [
+  {
+   "number": 1,
+   "name": "",
+   "text": "Slow left-hander after a 430 m run. A big stop and a chance to dive down the inside.",
+   "moment": "",
+   "side": "left",
+   "kind": "slow"
+  },
+  {
+   "number": 2,
+   "name": "",
+   "text": "Medium-speed left-hander, straight after Turn 1: a quick change of direction.",
+   "moment": "",
+   "side": "left",
+   "kind": "medium"
+  },
+  {
+   "number": 3,
+   "name": "",
+   "text": "Medium-speed right-hander. Carry the speed and keep the car tidy over the kerbs.",
+   "moment": "",
+   "side": "right",
+   "kind": "medium"
+  },
+  {
+   "number": 4,
+   "name": "",
+   "text": "Fast right-hand sweep. Carry the speed and keep the car tidy over the kerbs.",
+   "moment": "",
+   "side": "right",
+   "kind": "fast"
+  },
+  {
+   "number": 5,
+   "name": "",
+   "text": "Slow right-hander at the end of a 860 m straight. Heavy braking and a prime overtaking spot.",
+   "moment": "",
+   "side": "right",
+   "kind": "slow"
+  },
+  {
+   "number": 6,
+   "name": "",
+   "text": "Flat-out left kink, taken at full throttle with the car settled.",
+   "moment": "",
+   "side": "left",
+   "kind": "kink"
+  },
+  {
+   "number": 7,
+   "name": "",
+   "text": "Medium-speed left-hander. Carry the speed and keep the car tidy over the kerbs.",
+   "moment": "",
+   "side": "left",
+   "kind": "medium"
+  },
+  {
+   "number": 8,
+   "name": "",
+   "text": "Tight right-hand hairpin, straight after Turn 7: a quick change of direction.",
+   "moment": "",
+   "side": "right",
+   "kind": "hairpin"
+  },
+  {
+   "number": 9,
+   "name": "",
+   "text": "Slow left-hander. Traction out of here decides the next straight.",
+   "moment": "",
+   "side": "left",
+   "kind": "slow"
+  },
+  {
+   "number": 10,
+   "name": "",
+   "text": "Fast right-hand sweep. Carry the speed and keep the car tidy over the kerbs.",
+   "moment": "",
+   "side": "right",
+   "kind": "fast"
+  },
+  {
+   "number": 11,
+   "name": "",
+   "text": "Fast left-hand sweep. Carry the speed and keep the car tidy over the kerbs.",
+   "moment": "",
+   "side": "left",
+   "kind": "fast"
+  },
+  {
+   "number": 12,
+   "name": "",
+   "text": "Slow left-hander. Traction out of here decides the next straight.",
+   "moment": "",
+   "side": "left",
+   "kind": "slow"
+  },
+  {
+   "number": 13,
+   "name": "",
+   "text": "Flat-out left kink, taken at full throttle with the car settled.",
+   "moment": "",
+   "side": "left",
+   "kind": "kink"
+  },
+  {
+   "number": 14,
+   "name": "",
+   "text": "Slow left-hander at the end of a 1170 m straight. Heavy braking and a prime overtaking spot.",
+   "moment": "",
+   "side": "left",
+   "kind": "slow"
+  },
+  {
+   "number": 15,
+   "name": "",
+   "text": "Flat-out right kink, straight after Turn 14: a quick change of direction.",
+   "moment": "",
+   "side": "right",
+   "kind": "kink"
+  },
+  {
+   "number": 16,
+   "name": "",
+   "text": "Medium-speed left-hander, straight after Turn 15: a quick change of direction.",
+   "moment": "",
+   "side": "left",
+   "kind": "medium"
+  },
+  {
+   "number": 17,
+   "name": "",
+   "text": "Fast left-hand sweep. Carry the speed and keep the car tidy over the kerbs.",
+   "moment": "",
+   "side": "left",
+   "kind": "fast"
+  }
+ ]
+}
