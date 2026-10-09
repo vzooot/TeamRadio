@@ -28,13 +28,14 @@ knowledge (rules, strategy, tyres); say "I don't have that data" otherwise;
 max 3 sentences; never predict results as fact; no personal data.
 
 Limits and safety:
-- 15 questions per player per day (counted in KV by iCloud user id), so a
-  single user can't run up the bill.
+- 100 questions per player per day (counted in KV by iCloud user id), plus a
+  per-IP ceiling: generous for fans, a stop for scripts.
 - Questions go through the same moderation as the chat; answers are never
   stored with the player's name.
 - Cost: about $0.001 per question with gpt-5-mini. 1,000 questions ≈ $1.
 
-Later: answers spoken in Emily's voice (Azure text to speech, ~$0.015/answer).
+Decided 2026-10-09: text only for now; voice (Azure text to speech,
+~$0.015/answer) maybe later.
 
 ## Circuit guide
 
@@ -69,6 +70,3 @@ Cost: a few dollars once.
 | 1.2.0 | Prediction game + Ask the race engineer | submit ~Oct 19, live for Austin |
 | 1.2.1 | Circuit guide for the six remaining circuits | before Mexico City (Oct 30) |
 
-Open questions:
-1. Emily's answers as text only at first, voice later?
-2. 15 questions per day: right limit?
