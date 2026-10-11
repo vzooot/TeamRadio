@@ -242,7 +242,7 @@ async function dotdTally(env, ckEnv, race) {
   const id = `${race.season}-${race.round}`;
   const key = `game:${ckEnv}:dotd:${id}`;
   const cached = await env.TOKENS.get(key, "json");
-  if (cached && Date.now() - cached.at < 60_000) return cached;
+  if (cached && Date.now() - cached.at < 20_000) return cached;
   const { opens, closes } = dotdWindow(race);
   const counts = {};
   let total = 0, marker;
@@ -608,6 +608,23 @@ export async function handleGame(request, env) {
       return json({ code, title: league.title, members: rows });
     }
     return new Response("not found", { status: 404 });
+  }
+
+  // One player's scored picks for a round (or the AI Strategist's, with its
+  // reasons). Rounds are only stored after scoring, so picks are never
+  // visible before their locks.
+  if (url.pathname === "/game/player") {
+    const round = await env.TOKENS.get(`game:${ckEnv}:round:${q.get("round") || ""}`, "json");
+    if (!round) return json({ error: "not scored" });
+    const user = q.get("user") || "";
+    if (user === "ai-strategist") {
+      const st = round.strategist;
+      if (!st) return json({ error: "no strategist" });
+      return json({ name: "AI Strategist", points: st.points, items: st.items ?? [], reasons: st.reasons ?? null }, 300);
+    }
+    const p = round.players?.[user];
+    if (!p) return json({ error: "no picks" });
+    return json({ name: p.name, points: p.points, rank: p.rank, items: p.items ?? [] }, 300);
   }
 
   // Lights Out reaction leaderboard, per week (Monday-based, UTC).

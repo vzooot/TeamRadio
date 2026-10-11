@@ -9,6 +9,13 @@ struct LeaderboardView: View {
     @State private var isLoading = true
     @State private var errorText: String?
     @State private var showLeagues = false
+    @State private var picksOf: PicksTarget?
+
+    struct PicksTarget: Identifiable {
+        let user: String
+        let name: String
+        var id: String { user }
+    }
 
     var body: some View {
         ScrollView {
@@ -32,6 +39,14 @@ struct LeaderboardView: View {
             .padding(.bottom, 120)
         }
         .refreshable { await load() }
+        .sheet(item: $picksOf) { target in
+            if let round = lastRound {
+                PlayerPicksSheet(round: round, user: target.user, name: target.name)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+                    .presentationBackground(Theme.background)
+            }
+        }
         .task { await load() }
         .onChange(of: scope) { _, _ in Task { await load() } }
     }
@@ -50,7 +65,7 @@ struct LeaderboardView: View {
         } else if let errorText {
             message(errorText)
         } else if let board, !board.top.isEmpty {
-            Text("\(board.total.formatted()) PLAYERS · \(scope == .season ? "SEASON \(lastRound?.season ?? "")" : "ROUND \(lastRound?.round ?? "")")")
+            Text("\(board.total.formatted()) \(board.total == 1 ? "PLAYER" : "PLAYERS") · \(scope == .season ? "SEASON \(lastRound?.season ?? "")" : "ROUND \(lastRound?.round ?? "")")")
                 .font(.f1(11, weight: .bold))
                 .tracking(2)
                 .foregroundStyle(Theme.faintText)
@@ -59,6 +74,12 @@ struct LeaderboardView: View {
             if let me = board.me {
                 LeaderRow(rank: "\(me.rank)", name: "\(me.name) (you)",
                           detail: "\(me.exact) exact", points: me.points, style: .me)
+                    .onTapGesture { showPicks(me.userId, me.name) }
+            }
+            if scope == .round {
+                Text("Tap a player to see their picks.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.faintText)
             }
         } else {
             message("No scores yet. The leaderboard fills up once the first race with picks has been scored.")
@@ -95,6 +116,8 @@ struct LeaderboardView: View {
                 .background(RoundedRectangle(cornerRadius: 16).fill(first ? Theme.accent.opacity(0.12) : Theme.card))
                 .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(first ? Theme.accent : Color.white.opacity(0.08)))
                 .shadow(color: first ? Theme.accent.opacity(0.4) : .clear, radius: 8)
+                .contentShape(Rectangle())
+                .onTapGesture { showPicks(entry.userId, entry.name) }
             }
         }
     }
@@ -104,15 +127,23 @@ struct LeaderboardView: View {
             ForEach(entries) { entry in
                 LeaderRow(rank: "\(entry.rank)", name: entry.name, detail: "\(entry.exact) exact",
                           points: entry.points, style: entry.userId == userId ? .me : .normal)
+                    .onTapGesture { showPicks(entry.userId, entry.name) }
             }
             // The AI Strategist sits beside the ranking as a benchmark.
             if let strategist {
                 LeaderRow(rank: "AI", name: strategist.name, detail: "Benchmark · \(strategist.exact) exact",
                           points: strategist.points, style: .strategist)
+                    .onTapGesture { showPicks("ai-strategist", strategist.name) }
             }
         }
         .background(RoundedRectangle(cornerRadius: 18).fill(Theme.card))
         .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Color.white.opacity(0.08)))
+    }
+
+    /// Picks are only public per round, after scoring.
+    private func showPicks(_ user: String, _ name: String) {
+        guard scope == .round else { return }
+        picksOf = PicksTarget(user: user, name: name)
     }
 
     private func message(_ text: String) -> some View {
@@ -315,5 +346,75 @@ private struct LeaguesPanel: View {
         guard let userId else { return }
         _ = await LeaderboardService.league("leave", user: userId, name: nickname, code: code)
         codesText = codes.filter { $0 != code }.joined(separator: ",")
+    }
+}
+
+/// One player's scored picks for a round, pick by pick.
+private struct PlayerPicksSheet: View {
+    let round: Race
+    let user: String
+    let name: String
+    @State private var picks: LeaderboardService.PlayerPicks?
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("R\(round.round) · \(round.raceName.uppercased())")
+                    .font(.f1(11, weight: .bold)).tracking(2).foregroundStyle(Theme.accent)
+                HStack(alignment: .firstTextBaseline) {
+                    Text(name.uppercased()).font(.f1(22)).foregroundStyle(.white)
+                    Spacer()
+                    if let pts = picks?.points {
+                        Text("\(pts) PTS").font(.f1(20)).foregroundStyle(Theme.accent)
+                    }
+                }
+                if let items = picks?.items {
+                    ForEach(items) { item in row(item) }
+                    if let reasons = picks?.reasons, !reasons.isEmpty {
+                        Text("WHY THE AI PICKED THEM").font(.f1(11, weight: .bold)).tracking(2)
+                            .foregroundStyle(Theme.violet).padding(.top, 8)
+                        ForEach(reasons.sorted { $0.key < $1.key }, id: \.key) { key, text in
+                            Text("\(key.uppercased()): \(text)").font(.system(size: 13)).foregroundStyle(Theme.dimText)
+                        }
+                    }
+                } else if picks?.error != nil {
+                    Text("No picks for this round.").font(.system(size: 13)).foregroundStyle(Theme.dimText)
+                } else {
+                    ProgressView().tint(Theme.accent).frame(maxWidth: .infinity).padding(.top, 30)
+                }
+            }
+            .padding(16)
+            .padding(.top, 8)
+        }
+        .task { picks = await LeaderboardService.playerPicks(round: round.id, user: user) }
+    }
+
+    private func row(_ item: LeaderboardService.PlayerPicks.Item) -> some View {
+        let outcome: ScoreBreakdown.Outcome = item.outcome == "exact" ? .exact : item.outcome == "partial" ? .partial : .miss
+        let label = ScoreBreakdown.Kind(rawValue: item.kind)?.label ?? item.kind.uppercased()
+        return HStack(spacing: 12) {
+            Image(systemName: outcome == .exact ? "checkmark" : outcome == .partial ? "arrow.left.arrow.right" : "xmark")
+                .font(.system(size: 12, weight: .black))
+                .foregroundStyle(PicksStrip.color(outcome))
+                .frame(width: 26, height: 26)
+                .background(Circle().fill(PicksStrip.color(outcome).opacity(0.18)))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(label).font(.f1(11, weight: .bold)).tracking(1.5).foregroundStyle(Theme.faintText)
+                Text(item.kind == "perfectPodium" ? "All three in the right order"
+                     : "Picked \(Self.display(item.picked)) · Result \(Self.display(item.actual))")
+                    .font(.system(size: 14, weight: .semibold)).foregroundStyle(.white)
+            }
+            Spacer(minLength: 0)
+            Text(item.points > 0 ? "+\(item.points)" : "0").font(.f1(16)).foregroundStyle(PicksStrip.color(outcome))
+        }
+        .padding(.horizontal, 12).padding(.vertical, 9)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Theme.card))
+    }
+
+    /// "max_verstappen" → "Verstappen"; wildcard answers stay as they are.
+    static func display(_ id: String?) -> String {
+        guard let id else { return "—" }
+        if ["yes", "no", "0-1", "2-3", "4+"].contains(id) { return id.capitalized }
+        return (id.split(separator: "_").last.map(String.init) ?? id).capitalized
     }
 }

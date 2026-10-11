@@ -114,8 +114,6 @@ struct ContentView: View {
                     SessionAlertsCard(season: model.season)
                         .id("alerts")
 
-                    LockScreenCountdownCard()
-
                     if !Self.demoMode {
                         InviteBanner()
                     }
@@ -325,6 +323,7 @@ struct SessionAlertsCard: View {
     @State private var enabled = NotificationManager.isEnabled
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
         HStack(spacing: 12) {
             Image(systemName: enabled ? "bell.badge.fill" : "bell.slash")
                 .font(.system(size: 20))
@@ -335,7 +334,7 @@ struct SessionAlertsCard: View {
                 Text("SESSION ALERTS")
                     .font(.f1(15).italic())
                     .foregroundStyle(.white)
-                Text("Get notified 15 minutes before every session")
+                Text("A notification 15 minutes before every session")
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.dimText)
             }
@@ -345,6 +344,9 @@ struct SessionAlertsCard: View {
             Toggle("", isOn: $enabled)
                 .labelsHidden()
                 .tint(Theme.accent)
+        }
+        Rectangle().fill(Color.white.opacity(0.06)).frame(height: 1)
+        LockScreenCountdownRow()
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
@@ -452,8 +454,9 @@ struct FooterView: View {
 
 
 /// How early the server starts the Lock Screen countdown for each session,
-/// or off. One choice, applied to every session of the season.
-struct LockScreenCountdownCard: View {
+/// or off. One choice, applied to every session of the season. Sits inside
+/// the Session Alerts card.
+struct LockScreenCountdownRow: View {
     @State private var lead = PushSync.lead
     private let options: [(Int, String)] = [(0, "OFF"), (15, "15 MIN"), (60, "1 H"), (180, "3 H")]
 
@@ -468,8 +471,8 @@ struct LockScreenCountdownCard: View {
                     Text("LOCK SCREEN COUNTDOWN")
                         .font(.f1(15).italic())
                         .foregroundStyle(.white)
-                    Text(lead == 0 ? "Off. Pin sessions yourself with the pin button."
-                         : "Starts by itself before every session, all season")
+                    Text(lead == 0 ? "Off. Pin a session yourself with the pin button."
+                         : "Appears by itself before every session, all season")
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.dimText)
                 }
@@ -483,13 +486,6 @@ struct LockScreenCountdownCard: View {
                 }
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 18)
-                .fill(Theme.card)
-                .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Theme.glassStroke, lineWidth: 1))
-        )
         .onChange(of: lead) { _, value in PushSync.lead = value }
     }
 }
