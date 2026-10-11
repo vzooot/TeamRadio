@@ -47,7 +47,7 @@ struct RootView: View {
     @State private var showMessageToast = false
     @State private var toastDismissTask: Task<Void, Never>?
     @State private var profile: ProfileTarget?
-    @State private var showIntro = !UIAccessibility.isReduceMotionEnabled
+    @State private var showIntro = false   // the lights intro is out; a designed clip replaces it
 
     var body: some View {
         TabView(selection: $selection) {
