@@ -125,7 +125,9 @@ struct DotdCard: View {
                     Text("\(v.pct)%")
                         .font(.f1Digits(14))
                         .foregroundStyle(.white)
-                        .frame(width: 44, alignment: .trailing)
+                        .lineLimit(1)
+                        .fixedSize()
+                        .frame(minWidth: 50, alignment: .trailing)
                 }
             }
             Text(footer)
