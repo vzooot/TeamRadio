@@ -554,6 +554,62 @@ export async function handleGame(request, env) {
     return json({ players: ids.map((id) => data?.players?.[id] && { userId: id, name: data.players[id].name, points: data.players[id].points, exact: data.players[id].exact }).filter(Boolean) });
   }
 
+  // Private leagues: a 6-character code, a name and a member list; the
+  // standings come from the season table, so leagues cost nothing to score.
+  if (url.pathname.startsWith("/game/league")) {
+    let body = {};
+    if (request.method === "POST") {
+      try { body = await request.json(); } catch { return new Response("bad json", { status: 400 }); }
+    }
+    const user = String(body.user || q.get("user") || "").slice(0, 120);
+    const name = String(body.name || "").trim().slice(0, 24);
+    const leagueKey = (code) => `game:${ckEnv}:league:${code}`;
+
+    if (url.pathname === "/game/league/create" && request.method === "POST") {
+      const title = String(body.title || "").trim().slice(0, 30);
+      if (!user || !name || !title) return json({ error: "bad request" });
+      let code;
+      for (let i = 0; i < 8 && !code; i++) {
+        const c = Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[b % 32]).join("");
+        if (!(await env.TOKENS.get(leagueKey(c)))) code = c;
+      }
+      const league = { code, title, owner: user, members: { [user]: name }, createdAt: Date.now() };
+      await env.TOKENS.put(leagueKey(code), JSON.stringify(league));
+      return json({ code, title });
+    }
+
+    if ((url.pathname === "/game/league/join" || url.pathname === "/game/league/leave") && request.method === "POST") {
+      const code = String(body.code || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+      const league = await env.TOKENS.get(leagueKey(code), "json");
+      if (!league) return json({ error: "no league with that code" });
+      if (!user) return json({ error: "bad request" });
+      if (url.pathname.endsWith("/join")) {
+        if (Object.keys(league.members).length >= 200 && !league.members[user]) return json({ error: "league is full" });
+        if (!name) return json({ error: "bad request" });
+        league.members[user] = name;
+      } else {
+        delete league.members[user];
+      }
+      await env.TOKENS.put(leagueKey(code), JSON.stringify(league));
+      return json({ code, title: league.title });
+    }
+
+    if (url.pathname === "/game/league") {
+      const code = String(q.get("code") || "").toUpperCase();
+      const league = await env.TOKENS.get(leagueKey(code), "json");
+      if (!league) return json({ error: "no league with that code" });
+      const year = q.get("year") || new Date().getUTCFullYear();
+      const seasonTable = await env.TOKENS.get(`game:${ckEnv}:season:${year}`, "json");
+      const rows = Object.entries(league.members).map(([userId, memberName]) => {
+        const p = seasonTable?.players?.[userId];
+        return { userId, name: p?.name || memberName, points: p?.points || 0, exact: p?.exact || 0 };
+      }).sort((a, b) => b.points - a.points || b.exact - a.exact || a.name.localeCompare(b.name));
+      rows.forEach((r, i) => { r.rank = i + 1; });
+      return json({ code, title: league.title, members: rows });
+    }
+    return new Response("not found", { status: 404 });
+  }
+
   // Lights Out reaction leaderboard, per week (Monday-based, UTC).
   if (url.pathname === "/game/reaction") {
     const week = reactionWeek();
