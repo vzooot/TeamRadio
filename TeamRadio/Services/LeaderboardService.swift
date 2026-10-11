@@ -49,6 +49,39 @@ enum LeaderboardService {
         let strategist: Strategist?
     }
 
+    struct ReactionBoard: Decodable, Equatable {
+        struct Entry: Decodable, Equatable, Identifiable {
+            let userId: String
+            let name: String
+            let ms: Int
+            let rank: Int
+            var id: String { userId }
+        }
+        struct Me: Decodable, Equatable {
+            let name: String
+            let ms: Int
+            let rank: Int
+        }
+        let total: Int
+        let top: [Entry]
+        let me: Me?
+    }
+
+    /// This week's Lights Out board; with `ms` it also submits a time.
+    static func reaction(user: String?, name: String?, ms: Int?) async -> ReactionBoard? {
+        var components = URLComponents(url: base.appending(path: "reaction"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "env", value: environment)] + (user.map { [URLQueryItem(name: "user", value: $0)] } ?? [])
+        var request = URLRequest(url: components.url!)
+        request.timeoutInterval = 10
+        if let user, let name, let ms {
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try? JSONSerialization.data(withJSONObject: ["user": user, "name": name, "ms": ms])
+        }
+        guard let (data, _) = try? await URLSession.shared.data(for: request) else { return nil }
+        return try? JSONDecoder().decode(ReactionBoard.self, from: data)
+    }
+
     /// The fan vote for driver of the day (counted by the Worker).
     static func dotd(round: String) async -> DotdService.Tally? {
         var components = URLComponents(url: base.appending(path: "dotd"), resolvingAgainstBaseURL: false)!

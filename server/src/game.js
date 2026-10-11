@@ -554,6 +554,36 @@ export async function handleGame(request, env) {
     return json({ players: ids.map((id) => data?.players?.[id] && { userId: id, name: data.players[id].name, points: data.players[id].points, exact: data.players[id].exact }).filter(Boolean) });
   }
 
+  // Lights Out reaction leaderboard, per week (Monday-based, UTC).
+  if (url.pathname === "/game/reaction") {
+    const week = reactionWeek();
+    const key = `game:${ckEnv}:reaction:${week}`;
+    const board = (await env.TOKENS.get(key, "json")) || {};
+    if (request.method === "POST") {
+      let body;
+      try { body = await request.json(); } catch { return new Response("bad json", { status: 400 }); }
+      const user = String(body.user || "").slice(0, 120);
+      const name = String(body.name || "").trim().slice(0, 24);
+      const ms = Math.round(Number(body.ms));
+      // Human limit: anything under 100 ms is a guess, not a reaction.
+      if (!user || !name || !(ms >= 100 && ms <= 2000)) return json({ error: "rejected" });
+      const day = new Date().toISOString().slice(0, 10);
+      const rateKey = `rx:${day}:${user}`;
+      const tries = Number((await env.TOKENS.get(rateKey)) || 0);
+      if (tries >= 200) return json({ error: "limit" });
+      await env.TOKENS.put(rateKey, String(tries + 1), { expirationTtl: 90000 });
+      if (!board[user] || ms < board[user].ms) {
+        board[user] = { name, ms, at: Date.now() };
+        await env.TOKENS.put(key, JSON.stringify(board), { expirationTtl: 86400 * 21 });
+      }
+    }
+    const list = Object.entries(board).map(([userId, v]) => ({ userId, ...v })).sort((a, b) => a.ms - b.ms);
+    list.forEach((e, i) => { e.rank = i + 1; });
+    const me = q.get("user") ? list.find((e) => e.userId === q.get("user")) : null;
+    return json({ week, total: list.length, top: list.slice(0, 20).map(({ userId, name, ms, rank }) => ({ userId, name, ms, rank })),
+                  me: me ? { name: me.name, ms: me.ms, rank: me.rank } : null });
+  }
+
   if (url.pathname === "/game/dotd") {
     const round = q.get("round") || "";
     const race = (await season()).find((r) => `${r.season}-${r.round}` === round);
@@ -582,6 +612,13 @@ export async function handleGame(request, env) {
 }
 
 // --------------------------------------------------------------- helpers
+
+/// "2026-10-12": the Monday that starts the current UTC week.
+function reactionWeek() {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  return d.toISOString().slice(0, 10);
+}
 
 function json(data, maxAge = 0) {
   return new Response(JSON.stringify(data), {
