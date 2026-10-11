@@ -6,8 +6,8 @@
 // key (read-only). Scores are written only here, into KV, so no player can
 // write their own score. The app reads leaderboards from the /game routes.
 //
-// Secrets: CK_KEY_ID + CK_PRIVATE_KEY (PKCS#8 PEM, P-256) — the CloudKit
-// server-to-server key; AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_KEY,
+// Secrets: CK_KEY_ID (Development) + CK_KEY_ID_PRODUCTION + CK_PRIVATE_KEY
+// (PKCS#8 PEM, P-256; one key pair registered in both environments); AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_KEY,
 // AZURE_OPENAI_MODEL — optional, without them the AI extras are skipped.
 // Vars: CK_ENVS, e.g. "development,production".
 
@@ -179,7 +179,7 @@ async function ckRequest(env, ckEnv, op, body) {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "X-Apple-CloudKit-Request-KeyID": env.CK_KEY_ID,
+      "X-Apple-CloudKit-Request-KeyID": ckEnv === "production" ? env.CK_KEY_ID_PRODUCTION : env.CK_KEY_ID,
       "X-Apple-CloudKit-Request-ISO8601Date": date,
       "X-Apple-CloudKit-Request-SignatureV1": b64(derSignature(new Uint8Array(raw))),
     },
