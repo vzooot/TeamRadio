@@ -20,6 +20,9 @@ struct LightsOutView: View {
     @State private var phase: Phase = .ready
     @State private var sequence: Task<Void, Never>?
     @AppStorage("lightsOutBest") private var best: Double = 0
+    @AppStorage("chatNickname") private var nickname = ""
+    @State private var board: LeaderboardService.ReactionBoard?
+    @State private var userId: String?
 
     private static let appStore = URL(string: "https://apps.apple.com/app/id6804406860")!
 
@@ -45,6 +48,10 @@ struct LightsOutView: View {
         .contentShape(Rectangle())
         .onTapGesture { tap() }
         .onDisappear { sequence?.cancel() }
+        .task {
+            userId = await ChatService.currentUserId()
+            board = await LeaderboardService.reaction(user: userId, name: nil, ms: nil)
+        }
     }
 
     // MARK: - Pieces
@@ -108,7 +115,10 @@ struct LightsOutView: View {
     private var status: some View {
         switch phase {
         case .ready:
-            prompt("TAP ANYWHERE TO START", sub: "Wait for the lights to go out, then tap as fast as you can.")
+            VStack(spacing: 18) {
+                prompt("TAP ANYWHERE TO START", sub: "Wait for the lights to go out, then tap as fast as you can.")
+                weeklyBoard
+            }
         case .lighting, .holding:
             prompt("WAIT FOR IT…", sub: "Don't jump the start.")
         case .go:
@@ -128,6 +138,12 @@ struct LightsOutView: View {
                     .font(.f1(11, weight: .bold))
                     .tracking(1.5)
                     .foregroundStyle(seconds <= best ? Color(red: 1, green: 0.75, blue: 0.2) : Theme.dimText)
+                if let me = board?.me, let total = board?.total {
+                    Text("THIS WEEK: #\(me.rank) OF \(total) · BEST \(String(format: "%.3f", Double(me.ms) / 1000))")
+                        .font(.f1(11, weight: .bold))
+                        .tracking(1.5)
+                        .foregroundStyle(Theme.accent)
+                }
                 Text("Tap to go again")
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.faintText)
@@ -178,6 +194,7 @@ struct LightsOutView: View {
         case .go(let out):
             let seconds = CACurrentMediaTime() - out
             if best == 0 || seconds < best { best = seconds }
+            submit(seconds)
             UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
             phase = .result(seconds)
         }
@@ -198,6 +215,44 @@ struct LightsOutView: View {
             try? await Task.sleep(for: .seconds(Double.random(in: 0.2...3.0)))
             if Task.isCancelled { return }
             phase = .go(CACurrentMediaTime())
+        }
+    }
+
+    /// Every finished run goes to the weekly board; the server keeps each
+    /// player's best and ignores anything under 0.100 s.
+    private func submit(_ seconds: Double) {
+        guard let userId, !nickname.isEmpty else { return }
+        let ms = Int((seconds * 1000).rounded())
+        Task { if let updated = await LeaderboardService.reaction(user: userId, name: nickname, ms: ms) { board = updated } }
+    }
+
+    /// Top five this week, under the start prompt.
+    @ViewBuilder
+    private var weeklyBoard: some View {
+        if let top = board?.top, !top.isEmpty {
+            VStack(spacing: 6) {
+                Text("FASTEST THIS WEEK")
+                    .font(.f1(11, weight: .bold))
+                    .tracking(2)
+                    .foregroundStyle(Color(red: 1, green: 0.75, blue: 0.2))
+                ForEach(top.prefix(5)) { e in
+                    HStack {
+                        Text("\(e.rank)").font(.f1(14)).foregroundStyle(Theme.dimText).frame(width: 24, alignment: .leading)
+                        Text(e.name).font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(e.userId == userId ? Theme.accent : .white).lineLimit(1)
+                        Spacer()
+                        Text(String(format: "%.3f", Double(e.ms) / 1000)).font(.f1Digits(14)).foregroundStyle(.white)
+                    }
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: 320)
+            .background(RoundedRectangle(cornerRadius: 14).fill(Theme.card))
+            .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.white.opacity(0.08)))
+        } else if nickname.isEmpty {
+            Text("Pick a Paddock name to get on the weekly leaderboard.")
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.faintText)
         }
     }
 

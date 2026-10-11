@@ -18,7 +18,7 @@ const STRATEGIST_NAME = "AI Strategist";
 // Mirrors GameRules in TeamRadio/Models/Prediction.swift. Keep in sync.
 export const RULES = {
   pole: 5, winner: 10, second: 6, third: 6, podiumWrongSlot: 2,
-  perfectPodium: 10, fastestLap: 5, wildcard: 5,
+  perfectPodium: 10, fastestLap: 5, wildcard: 5, sprintWinner: 5,
 };
 
 export const WILDCARDS = ["poleSitterWins", "retirements", "winningMargin"];
@@ -61,8 +61,13 @@ export function resolveWildcard(kind, qualifying, race) {
   return null;
 }
 
-export function score(p, wildcard, qualifying, race) {
+export function score(p, wildcard, qualifying, race, sprint = []) {
   const items = [];
+  if (p.sprintWinner != null || sprint.length) {
+    const winner = sprint.find((r) => r.position === "1")?.Driver.driverId ?? null;
+    const hit = p.sprintWinner != null && p.sprintWinner === winner;
+    items.push({ kind: "sprint", picked: p.sprintWinner ?? null, actual: winner, points: hit ? RULES.sprintWinner : 0, outcome: hit ? "exact" : "miss" });
+  }
   const id = (r) => r?.Driver.driverId ?? null;
   const pole = id(qualifying.find((r) => r.position === "1"));
   const podium = [1, 2, 3].map((n) => id(race.find((r) => r.position === String(n))));
@@ -98,9 +103,10 @@ export function score(p, wildcard, qualifying, race) {
 // Each pick locks when its session starts: pole at qualifying, the podium,
 // fastest lap and wildcard at the race. Same as GameRules.lockDate in Swift.
 const at = (s) => (s?.date ? new Date(`${s.date}T${s.time || "00:00:00Z"}`) : null);
-export const GROUP_FIELDS = { quali: ["pole"], race: ["p1", "p2", "p3", "fastestLap", "wildcard"] };
+export const GROUP_FIELDS = { sprint: ["sprintWinner"], quali: ["pole"], race: ["p1", "p2", "p3", "fastestLap", "wildcard"] };
 
 export function groupLock(race, group) {
+  if (group === "sprint") return at(race.Sprint);
   return group === "quali" ? at(race.Qualifying) : at({ date: race.date, time: race.time });
 }
 
@@ -116,7 +122,7 @@ export function lockDate(race) {
 /// pred-<round>-<user> holding both groups.
 export function mergePicks(records, race) {
   const id = `${race.season}-${race.round}`;
-  const locks = { quali: groupLock(race, "quali")?.getTime() ?? 0, race: groupLock(race, "race")?.getTime() ?? 0 };
+  const locks = { sprint: groupLock(race, "sprint")?.getTime() ?? 0, quali: groupLock(race, "quali")?.getTime() ?? 0, race: groupLock(race, "race")?.getTime() ?? 0 };
   const players = {};
   let voided = 0;
   for (const r of records) {
@@ -124,7 +130,8 @@ export function mergePicks(records, race) {
     const base = `pred-${id}-${r.userId}`;
     const groups = r.recordName === base ? ["quali", "race"]
       : r.recordName === `${base}-quali` ? ["quali"]
-      : r.recordName === `${base}-race` ? ["race"] : [];
+      : r.recordName === `${base}-race` ? ["race"]
+      : r.recordName === `${base}-sprint` ? ["sprint"] : [];
     for (const g of groups) {
       if (r.modified >= locks[g]) { voided++; continue; }
       const p = players[r.userId] ||= { userId: r.userId, name: r.name, locked: 0 };
@@ -153,13 +160,15 @@ async function season() {
 }
 
 async function raceData(r) {
-  const [res, quali] = await Promise.all([
+  const [res, quali, sprint] = await Promise.all([
     jolpica(`${r.season}/${r.round}/results.json?limit=40`),
     jolpica(`${r.season}/${r.round}/qualifying.json?limit=40`),
+    r.Sprint ? jolpica(`${r.season}/${r.round}/sprint.json?limit=40`) : null,
   ]);
   return {
     results: res.RaceTable.Races[0]?.Results ?? [],
     qualifying: quali.RaceTable.Races[0]?.QualifyingResults ?? [],
+    sprint: sprint?.RaceTable.Races[0]?.SprintResults ?? [],
   };
 }
 
@@ -209,7 +218,7 @@ async function predictions(env, ckEnv, roundId) {
       all.push({
         userId: f("userId"), name: f("name"),
         pole: f("pole"), p1: f("p1"), p2: f("p2"), p3: f("p3"),
-        fastestLap: f("fastestLap"), wildcard: f("wildcard"),
+        fastestLap: f("fastestLap"), wildcard: f("wildcard"), sprintWinner: f("sprintWinner"),
         modified: r.modified?.timestamp ?? r.created?.timestamp ?? 0,
         recordName: r.recordName,
       });
@@ -265,7 +274,7 @@ async function dotdTally(env, ckEnv, race) {
 /// the season table. Idempotent: rerunning replaces the round.
 export async function scoreRound(env, ckEnv, race) {
   const id = `${race.season}-${race.round}`;
-  const { results, qualifying } = await raceData(race);
+  const { results, qualifying, sprint } = await raceData(race);
   if (!results.length) return { id, skipped: "no results yet" };
 
   const wildcard = wildcardForRound(race.round);
@@ -273,7 +282,7 @@ export async function scoreRound(env, ckEnv, race) {
 
   const players = {};
   for (const p of picks) {
-    const s = score(p, wildcard, qualifying, results);
+    const s = score(p, wildcard, qualifying, results, sprint);
     players[p.userId] = { name: p.name || "Player", points: s.total, exact: s.exact, items: s.items, locked: p.modified };
   }
 
@@ -545,6 +554,92 @@ export async function handleGame(request, env) {
     return json({ players: ids.map((id) => data?.players?.[id] && { userId: id, name: data.players[id].name, points: data.players[id].points, exact: data.players[id].exact }).filter(Boolean) });
   }
 
+  // Private leagues: a 6-character code, a name and a member list; the
+  // standings come from the season table, so leagues cost nothing to score.
+  if (url.pathname.startsWith("/game/league")) {
+    let body = {};
+    if (request.method === "POST") {
+      try { body = await request.json(); } catch { return new Response("bad json", { status: 400 }); }
+    }
+    const user = String(body.user || q.get("user") || "").slice(0, 120);
+    const name = String(body.name || "").trim().slice(0, 24);
+    const leagueKey = (code) => `game:${ckEnv}:league:${code}`;
+
+    if (url.pathname === "/game/league/create" && request.method === "POST") {
+      const title = String(body.title || "").trim().slice(0, 30);
+      if (!user || !name || !title) return json({ error: "bad request" });
+      let code;
+      for (let i = 0; i < 8 && !code; i++) {
+        const c = Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[b % 32]).join("");
+        if (!(await env.TOKENS.get(leagueKey(c)))) code = c;
+      }
+      const league = { code, title, owner: user, members: { [user]: name }, createdAt: Date.now() };
+      await env.TOKENS.put(leagueKey(code), JSON.stringify(league));
+      return json({ code, title });
+    }
+
+    if ((url.pathname === "/game/league/join" || url.pathname === "/game/league/leave") && request.method === "POST") {
+      const code = String(body.code || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+      const league = await env.TOKENS.get(leagueKey(code), "json");
+      if (!league) return json({ error: "no league with that code" });
+      if (!user) return json({ error: "bad request" });
+      if (url.pathname.endsWith("/join")) {
+        if (Object.keys(league.members).length >= 200 && !league.members[user]) return json({ error: "league is full" });
+        if (!name) return json({ error: "bad request" });
+        league.members[user] = name;
+      } else {
+        delete league.members[user];
+      }
+      await env.TOKENS.put(leagueKey(code), JSON.stringify(league));
+      return json({ code, title: league.title });
+    }
+
+    if (url.pathname === "/game/league") {
+      const code = String(q.get("code") || "").toUpperCase();
+      const league = await env.TOKENS.get(leagueKey(code), "json");
+      if (!league) return json({ error: "no league with that code" });
+      const year = q.get("year") || new Date().getUTCFullYear();
+      const seasonTable = await env.TOKENS.get(`game:${ckEnv}:season:${year}`, "json");
+      const rows = Object.entries(league.members).map(([userId, memberName]) => {
+        const p = seasonTable?.players?.[userId];
+        return { userId, name: p?.name || memberName, points: p?.points || 0, exact: p?.exact || 0 };
+      }).sort((a, b) => b.points - a.points || b.exact - a.exact || a.name.localeCompare(b.name));
+      rows.forEach((r, i) => { r.rank = i + 1; });
+      return json({ code, title: league.title, members: rows });
+    }
+    return new Response("not found", { status: 404 });
+  }
+
+  // Lights Out reaction leaderboard, per week (Monday-based, UTC).
+  if (url.pathname === "/game/reaction") {
+    const week = reactionWeek();
+    const key = `game:${ckEnv}:reaction:${week}`;
+    const board = (await env.TOKENS.get(key, "json")) || {};
+    if (request.method === "POST") {
+      let body;
+      try { body = await request.json(); } catch { return new Response("bad json", { status: 400 }); }
+      const user = String(body.user || "").slice(0, 120);
+      const name = String(body.name || "").trim().slice(0, 24);
+      const ms = Math.round(Number(body.ms));
+      // Human limit: anything under 100 ms is a guess, not a reaction.
+      if (!user || !name || !(ms >= 100 && ms <= 2000)) return json({ error: "rejected" });
+      const day = new Date().toISOString().slice(0, 10);
+      const rateKey = `rx:${day}:${user}`;
+      const tries = Number((await env.TOKENS.get(rateKey)) || 0);
+      if (tries >= 200) return json({ error: "limit" });
+      await env.TOKENS.put(rateKey, String(tries + 1), { expirationTtl: 90000 });
+      if (!board[user] || ms < board[user].ms) {
+        board[user] = { name, ms, at: Date.now() };
+        await env.TOKENS.put(key, JSON.stringify(board), { expirationTtl: 86400 * 21 });
+      }
+    }
+    const list = Object.entries(board).map(([userId, v]) => ({ userId, ...v })).sort((a, b) => a.ms - b.ms);
+    list.forEach((e, i) => { e.rank = i + 1; });
+    const me = q.get("user") ? list.find((e) => e.userId === q.get("user")) : null;
+    return json({ week, total: list.length, top: list.slice(0, 20).map(({ userId, name, ms, rank }) => ({ userId, name, ms, rank })),
+                  me: me ? { name: me.name, ms: me.ms, rank: me.rank } : null });
+  }
+
   if (url.pathname === "/game/dotd") {
     const round = q.get("round") || "";
     const race = (await season()).find((r) => `${r.season}-${r.round}` === round);
@@ -573,6 +668,13 @@ export async function handleGame(request, env) {
 }
 
 // --------------------------------------------------------------- helpers
+
+/// "2026-10-12": the Monday that starts the current UTC week.
+function reactionWeek() {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  return d.toISOString().slice(0, 10);
+}
 
 function json(data, maxAge = 0) {
   return new Response(JSON.stringify(data), {

@@ -70,12 +70,12 @@ final class GameViewModel {
 
     /// The next group to lock and when, nil once the race has started.
     func nextLock(at now: Date) -> (group: PickGroup, date: Date)? {
-        PickGroup.allCases.compactMap { g in lockDate(g).map { (g, $0) } }.first { $0.1 > now }
+        draft.groups.compactMap { g in lockDate(g).map { (g, $0) } }.sorted { $0.1 < $1.1 }.first { $0.1 > now }
     }
 
     /// Something can still be saved: every open group is filled in.
     func canLockIn(at now: Date) -> Bool {
-        let open = PickGroup.allCases.filter { !isLocked($0, at: now) }
+        let open = draft.groups.filter { !isLocked($0, at: now) }
         return !open.isEmpty && open.allSatisfy(draft.isComplete)
     }
 
@@ -91,7 +91,7 @@ final class GameViewModel {
     func load(race: Race?, season: [Race]) async {
         self.race = race
         guard let race else { return }
-        if draft.round != race.id { draft = Prediction(round: race.id) }
+        if draft.round != race.id { draft = Prediction(round: race.id, hasSprint: race.isSprintWeekend) }
 
         if let standings = try? await F1API.driverStandings(limit: 30) {
             drivers = standings.map {
@@ -112,7 +112,10 @@ final class GameViewModel {
         // "never picked" included.
         if case .success(let fetched) = current {
             saved = fetched
-            if let picks = fetched?.prediction { draft = picks }
+            if var picks = fetched?.prediction {
+                picks.hasSprint = race.isSprintWeekend
+                draft = picks
+            }
         }
         await GameReminders.reschedule(race: race, saved: saved?.groups ?? [])
         await loadLastScore(before: race, season: season, userId: id)
@@ -126,15 +129,18 @@ final class GameViewModel {
         }
         async let results = try? F1API.raceResults(round: previous.round)
         async let quali = try? F1API.qualifying(round: previous.round)
-        let (r, q) = await (results, quali)
+        async let sprint = previous.isSprintWeekend ? try? F1API.sprintResults(round: previous.round) : nil
+        let (r, q, sp) = await (results, quali, sprint)
         guard let classification = r?.results, !classification.isEmpty else {
             lastScored = nil
             return
         }
+        var picks = mine.prediction
+        picks.hasSprint = previous.isSprintWeekend
         let wildcard = Wildcard.forRound(previous.roundNumber)
-        let score = GameRules.score(mine.prediction, wildcard: wildcard,
-                                    qualifying: q?.qualifyingResults ?? [], race: classification)
-        lastScored = (previous, score, mine.prediction)
+        let score = GameRules.score(picks, wildcard: wildcard, qualifying: q?.qualifyingResults ?? [],
+                                    race: classification, sprint: sp?.sprintResults ?? [])
+        lastScored = (previous, score, picks)
         lastBoard = try? await LeaderboardService.board(scope: .round, round: previous.id,
                                                         year: previous.season, user: userId)
     }
@@ -150,12 +156,12 @@ final class GameViewModel {
             if isLocked(.race, at: now) { errorText = "Picks are locked: the race has started." }
             return false
         }
-        let groups = PickGroup.allCases.filter { !isLocked($0, at: now) }
+        let groups = draft.groups.filter { !isLocked($0, at: now) }
         isSaving = true
         defer { isSaving = false }
         do {
             try await PredictionService.save(draft, groups: groups, userId: userId, name: nickname)
-            var picks = saved?.prediction ?? Prediction(round: draft.round)
+            var picks = saved?.prediction ?? Prediction(round: draft.round, hasSprint: draft.hasSprint)
             groups.forEach { picks.take($0, from: draft) }
             saved = PredictionService.Saved(prediction: picks, groups: (saved?.groups ?? []).union(groups))
             await GameReminders.reschedule(race: race, saved: saved?.groups ?? [])

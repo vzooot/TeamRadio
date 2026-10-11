@@ -62,3 +62,14 @@ ok(one?.pole === "a" && one?.p1 === "b", "podium edited after quali still counts
 ok(!m.players.find(p => p.userId === "u2") && m.voided === 2, "pole after quali and podium after race start are voided");
 ok(!m.players.find(p => p.userId === "u3"), "record name must belong to its owner");
 ok(signed["X-Apple-CloudKit-Request-SignatureV1"]?.length > 80 && /Z$/.test(signed["X-Apple-CloudKit-Request-ISO8601Date"]), "CloudKit request carries signature + date headers");
+// sprint winner pick (sprint weekends): 5 points on top, scored from sprint results
+const spr = (await j("https://api.jolpi.ca/ergast/f1/2026/17/sprint.json?limit=40")).RaceTable.Races[0]?.SprintResults ?? [];
+if (spr.length) {
+  const sw = spr.find(r => r.position === "1").Driver.driverId;
+  const withSprint = score({ ...perfect, sprintWinner: sw }, "retirements", quali, R, spr);
+  ok(withSprint.total === 52 && withSprint.items[0].kind === "sprint", `sprint winner adds 5 (${withSprint.total})`);
+  ok(score({ ...perfect, sprintWinner: "nobody" }, "retirements", quali, R, spr).total === 47, "wrong sprint pick adds 0");
+  const ms = mergePicks([{ recordName: "pred-2026-17-u9-sprint", userId: "u9", sprintWinner: sw, modified: 0 }],
+    (await j("https://api.jolpi.ca/ergast/f1/2026.json?limit=30")).RaceTable.Races.find(r => r.round === "17"));
+  ok(ms.players[0]?.sprintWinner === sw, "sprint record merges as the sprint group");
+} else console.log("skip sprint tests: no sprint results");

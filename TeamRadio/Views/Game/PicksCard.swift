@@ -76,7 +76,9 @@ struct PicksCard: View {
     private func content(_ state: GameViewModel.CardState, now: Date) -> some View {
         switch state {
         case .open:
-            Text("Call pole, the podium, fastest lap and this week's wildcard. Pole locks when qualifying starts, the rest when the race starts.")
+            Text(game.draft.hasSprint
+                 ? "Sprint weekend: call the sprint winner, pole, the podium, fastest lap and this week's wildcard. Each pick locks when its session starts."
+                 : "Call pole, the podium, fastest lap and this week's wildcard. Pole locks when qualifying starts, the rest when the race starts.")
                 .font(.system(size: 13))
                 .foregroundStyle(Theme.dimText)
                 .fixedSize(horizontal: false, vertical: true)
@@ -157,7 +159,7 @@ struct PicksCard: View {
     private func lockCountdown(now: Date) -> some View {
         HStack(spacing: 8) {
             let next = game.nextLock(at: now)
-            Text(next?.group == .race ? "RACE PICKS LOCK IN" : "POLE LOCKS IN")
+            Text(next?.group == .race ? "RACE PICKS LOCK IN" : next?.group == .sprint ? "SPRINT PICK LOCKS IN" : "POLE LOCKS IN")
                 .font(.f1(11, weight: .bold))
                 .tracking(2)
                 .foregroundStyle(Theme.faintText)
@@ -193,7 +195,11 @@ struct PicksCard: View {
     static func lockStatus(_ game: GameViewModel, now: Date) -> String {
         let race = "race picks lock in \(remaining(until: game.lockDate(.race), now: now))"
         if game.isLocked(.quali, at: now) { return "Pole locked · " + race }
-        return "Pole locks in \(remaining(until: game.lockDate(.quali), now: now)) · " + race
+        let pole = "Pole locks in \(remaining(until: game.lockDate(.quali), now: now)) · " + race
+        if game.draft.hasSprint, !game.isLocked(.sprint, at: now) {
+            return "Sprint pick locks in \(remaining(until: game.lockDate(.sprint), now: now)) · " + pole.prefix(1).lowercased() + pole.dropFirst()
+        }
+        return pole
     }
 
     static func remaining(until date: Date?, now: Date) -> String {
@@ -229,7 +235,8 @@ struct PicksStrip: View {
     let score: ScoreBreakdown?
 
     var body: some View {
-        let picks: [(String, String?, ScoreBreakdown.Kind)] = [
+        let picks: [(String, String?, ScoreBreakdown.Kind)] =
+            (prediction.hasSprint ? [("SPR", prediction.sprintWinner, .sprint)] : []) + [
             ("POLE", prediction.pole, .pole), ("P1", prediction.p1, .p1), ("P2", prediction.p2, .p2),
             ("P3", prediction.p3, .p3), ("FL", prediction.fastestLap, .fastestLap),
         ]
