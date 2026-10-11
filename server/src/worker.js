@@ -1,5 +1,5 @@
 // Team Radio push worker: starts the session Live Activity on every
-// registered iPhone ~15 minutes before each F1 session, via APNs
+// registered iPhone ~1 hour before each F1 session, via APNs
 // push-to-start. Cron fires every 5 minutes; a KV flag deduplicates.
 //
 // Secrets (wrangler secret put): APNS_KEY (the .p8 PEM), APNS_KEY_ID,
@@ -70,8 +70,8 @@ async function checkAndPush(env) {
   const now = Date.now();
   for (const s of race.sessions) {
     const lead = s.date.getTime() - now;
-    // Fire once inside the 10–20 minute window (cron period is 5 min).
-    if (lead < 10 * 60_000 || lead > 20 * 60_000) continue;
+    // Fire once inside the 55–65 minute window (cron period is 5 min).
+    if (lead < 55 * 60_000 || lead > 65 * 60_000) continue;
     const dedupeKey = "sent:" + s.short + ":" + s.date.toISOString();
     if (await env.TOKENS.get(dedupeKey)) continue;
     await env.TOKENS.put(dedupeKey, "1", { expirationTtl: 86400 });
@@ -136,7 +136,7 @@ async function pushSessionStart(env, race, session) {
       },
       alert: {
         title: `${FLAGS[race.country] || "🏁"} ${session.name} soon`,
-        body: `${race.raceName}: ${session.short} starts in 15 minutes.`,
+        body: `${race.raceName}: ${session.short} starts in 1 hour.`,
       },
     },
   });
