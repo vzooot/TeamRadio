@@ -53,8 +53,8 @@ enum DotdService {
             let pct: Int
             var id: String { driverId }
         }
-        let total: Int
-        let votes: [Vote]
+        var total: Int
+        var votes: [Vote]
     }
 
     static func tally(round: String) async -> Tally? {

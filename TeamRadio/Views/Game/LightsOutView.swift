@@ -49,6 +49,7 @@ struct LightsOutView: View {
         .onTapGesture { tap() }
         .onDisappear { sequence?.cancel() }
         .task {
+            StartSounds.shared.prepare()
             userId = await ChatService.currentUserId()
             board = await LeaderboardService.reaction(user: userId, name: nil, ms: nil)
         }
@@ -87,28 +88,61 @@ struct LightsOutView: View {
         }
     }
 
-    /// The gantry: five columns, two red lights each, on a black housing.
+    /// The gantry as it hangs over the grid: five black housings on a
+    /// crossbar, two large lamps each under a hood. Both lamps of a column
+    /// light together.
     private var gantry: some View {
-        HStack(spacing: 14) {
-            ForEach(0..<5, id: \.self) { column in
-                VStack(spacing: 10) {
-                    ForEach(0..<4, id: \.self) { row in
-                        let on = row >= 2 && column < litCount
-                        Circle()
-                            .fill(on ? Theme.live : Color.white.opacity(0.06))
-                            .overlay(Circle().strokeBorder(Color.black.opacity(0.6), lineWidth: 2))
-                            .frame(width: 40, height: 40)
-                            .shadow(color: on ? Theme.live.opacity(0.9) : .clear, radius: 14)
+        ZStack(alignment: .top) {
+            // the crossbar the housings hang from
+            RoundedRectangle(cornerRadius: 4)
+                .fill(LinearGradient(colors: [Color(white: 0.55), Color(white: 0.3)], startPoint: .top, endPoint: .bottom))
+                .frame(height: 10)
+                .padding(.top, 34)
+            HStack(spacing: 10) {
+                ForEach(0..<5, id: \.self) { column in
+                    let on = column < litCount
+                    VStack(spacing: 8) {
+                        ForEach(0..<2, id: \.self) { _ in lamp(on: on) }
                     }
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(LinearGradient(colors: [Color(white: 0.13), Color(white: 0.04)], startPoint: .top, endPoint: .bottom))
+                    )
+                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.white.opacity(0.1)))
                 }
-                .padding(8)
-                .background(RoundedRectangle(cornerRadius: 12).fill(Color.black))
-                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.white.opacity(0.08)))
             }
         }
-        .animation(.easeOut(duration: 0.06), value: litCount)
+        .animation(.easeOut(duration: 0.05), value: litCount)
         .accessibilityElement()
         .accessibilityLabel("\(litCount) of 5 start lights on")
+    }
+
+    /// A round lamp under a hood: dark lens with a fine LED grid when off,
+    /// glowing red when on.
+    private func lamp(on: Bool) -> some View {
+        ZStack {
+            Circle().fill(on ? Theme.live : Color(white: 0.09))
+            if on {
+                Circle().fill(RadialGradient(colors: [Color.white.opacity(0.55), .clear],
+                                             center: .init(x: 0.4, y: 0.35), startRadius: 0, endRadius: 22))
+            }
+            // LED dot texture
+            Circle()
+                .fill(ImagePaint(image: Image(systemName: "circle.grid.3x3.fill"), scale: 0.18))
+                .opacity(on ? 0.12 : 0.18)
+            Circle().strokeBorder(Color.black.opacity(0.8), lineWidth: 3)
+        }
+        .frame(width: 46, height: 46)
+        .overlay(alignment: .top) {
+            // the hood above each lamp
+            UnevenRoundedRectangle(topLeadingRadius: 6, topTrailingRadius: 6)
+                .fill(Color(white: 0.06))
+                .frame(width: 52, height: 8)
+                .offset(y: -6)
+        }
+        .shadow(color: on ? Theme.live.opacity(0.95) : .clear, radius: 16)
     }
 
     @ViewBuilder
@@ -190,12 +224,14 @@ struct LightsOutView: View {
         case .lighting, .holding:
             sequence?.cancel()
             UINotificationFeedbackGenerator().notificationOccurred(.error)
+            StartSounds.shared.buzz()
             phase = .jumpStart
         case .go(let out):
             let seconds = CACurrentMediaTime() - out
             if best == 0 || seconds < best { best = seconds }
             submit(seconds)
             UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+            StartSounds.shared.radioClick()
             phase = .result(seconds)
         }
     }
@@ -210,6 +246,7 @@ struct LightsOutView: View {
                 if Task.isCancelled { return }
                 phase = n == 5 ? .holding : .lighting(n)
                 haptic.impactOccurred()
+                StartSounds.shared.beep()
             }
             // Like the real procedure: a random hold before lights out.
             try? await Task.sleep(for: .seconds(Double.random(in: 0.2...3.0)))

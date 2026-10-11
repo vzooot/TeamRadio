@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Driver of the day on the Countdown tab: open for four days after each
 /// race. Before voting it asks; after voting it shows the fan result.
@@ -33,23 +34,40 @@ final class DotdModel {
         tally = await DotdService.tally(round: race.id)
     }
 
-    func vote(_ driverId: String) async -> Bool {
+    /// Shows the vote at once (card, bars, total) and saves in the
+    /// background; a failed save puts the old state back.
+    func vote(_ driverId: String) {
         guard let race, let userId else {
             errorText = "Sign in to iCloud to vote."
-            return false
+            return
         }
-        isSaving = true
-        defer { isSaving = false }
-        do {
-            try await DotdService.vote(driverId, round: race.id, userId: userId)
-            myVote = driverId
-            errorText = nil
-            tally = await DotdService.tally(round: race.id)
-            return true
-        } catch {
-            errorText = "Couldn't save your vote: \(error.localizedDescription)"
-            return false
+        let previousVote = myVote, previousTally = tally
+        guard driverId != previousVote else { return }
+        myVote = driverId
+        tally = Self.adjusted(tally, from: previousVote, to: driverId)
+        errorText = nil
+        Task {
+            do {
+                try await DotdService.vote(driverId, round: race.id, userId: userId)
+            } catch {
+                myVote = previousVote
+                tally = previousTally
+                errorText = "Couldn't save your vote: \(error.localizedDescription)"
+            }
         }
+    }
+
+    /// The server's count with this device's change applied, until the
+    /// server catches up on the next load.
+    static func adjusted(_ tally: DotdService.Tally?, from old: String?, to new: String) -> DotdService.Tally {
+        var counts = Dictionary(uniqueKeysWithValues: (tally?.votes ?? []).map { ($0.driverId, $0.count) })
+        var total = tally?.total ?? 0
+        if let old, let c = counts[old], c > 0 { counts[old] = c - 1 } else { total += 1 }
+        counts[new, default: 0] += 1
+        let votes = counts.filter { $0.value > 0 }.sorted { $0.value > $1.value }.map {
+            DotdService.Tally.Vote(driverId: $0.key, count: $0.value, pct: Int((Double($0.value) / Double(max(total, 1)) * 100).rounded()))
+        }
+        return DotdService.Tally(total: total, votes: votes)
     }
 
     func driver(_ id: String?) -> GameDriver? {
@@ -169,11 +187,12 @@ struct DotdSheet: View {
                     ForEach(model.drivers) { driver in
                         DriverTile(driver: driver, selected: driver.id == model.myVote, tag: nil)
                             .onTapGesture {
-                                Task { if await model.vote(driver.id) { dismiss() } }
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                model.vote(driver.id)
+                                dismiss()
                             }
                     }
                 }
-                .disabled(model.isSaving)
             }
             .padding(16)
             .padding(.top, 8)
