@@ -1,3 +1,10 @@
-• Paddock-chatten är nu ett enda pågående samtal: den börjar inte längre tom varje racehelg
-• Tydliga felmeddelanden om chatten eller dina privata meddelanden inte kan laddas, i stället för en tom skärm
-• Sprint-märket gömmer sig inte längre bakom hjälmen
+Team Radios största uppdatering hittills:
+
+• Tippningsspel: tippa pole, pallen, snabbaste varv och en wildcard varje racehelg (plus sprintvinnaren på sprinthelger). Varje tips låses när passet startar
+• Slå AI-strategen: vår AI tippar också. Se vem som träffade bäst efter varje race
+• Topplistor för säsongen och varje deltävling, och privata ligor mot dina vänner
+• Dagens förare: rösta efter varje race och se vad fansen valde
+• Lights Out: testa din startreaktion vid en realistisk F1-startljusportal och klättra på veckans topplista
+• Fråga raceingenjören: Emily svarar på frågor om strategi, resultat och regler (AI)
+• Banguide: tryck på en kurva på 3D-banan
+• Nedräkningen på låsskärmen dyker upp av sig själv före varje pass: välj 15 minuter, 1 timme eller 3 timmar

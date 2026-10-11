@@ -1,1 +1,1 @@
-race,countdown,motorsport,standings,results,circuit,track,session,widget,live,schedule,chat,racing
+f1,formula1,formula,grand,prix,predictions,predict,podium,countdown,standings,results,live,chat

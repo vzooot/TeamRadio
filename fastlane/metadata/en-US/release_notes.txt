@@ -1,3 +1,10 @@
-• The Paddock is now one continuous conversation: the chat no longer starts empty every race weekend
-• Clear error messages if the chat or your private messages can't load, instead of an empty screen
-• The sprint-weekend badge no longer hides behind the helmet
+The biggest Team Radio update yet:
+
+• Prediction game: call pole, the podium, fastest lap and a wildcard every race weekend (plus the sprint winner on sprint weekends). Each pick locks when its session starts
+• Beat the AI Strategist: our AI makes its picks too. See who called it better after every race
+• Leaderboards for the season and every round, and private leagues to play against your friends
+• Driver of the Day: vote after every race and see what the fans picked
+• Lights Out: test your start reaction on a real-looking F1 gantry and climb the weekly leaderboard
+• Ask the race engineer: Emily answers your questions about strategy, results and rules (AI)
+• Circuit guide: tap a corner on the 3D track
+• Lock Screen countdown appears by itself before every session: choose 15 minutes, 1 hour or 3 hours
