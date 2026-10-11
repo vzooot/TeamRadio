@@ -8,6 +8,7 @@ struct LeaderboardView: View {
     @State private var userId: String?
     @State private var isLoading = true
     @State private var errorText: String?
+    @State private var showLeagues = false
 
     var body: some View {
         ScrollView {
@@ -15,8 +16,16 @@ struct LeaderboardView: View {
                 HStack(spacing: 8) {
                     scopeButton("SEASON", .season)
                     scopeButton(lastRound.map { "R\($0.round) \(PicksCard.shortName($0))" } ?? "LAST ROUND", .round)
+                    Button { showLeagues = true } label: {
+                        NeonChip(title: "LEAGUES", tint: Theme.violet, selected: showLeagues)
+                    }
+                    .buttonStyle(.plain)
                 }
-                content
+                if showLeagues {
+                    LeaguesPanel(userId: userId, year: lastRound?.season ?? String(Calendar.current.component(.year, from: .now)))
+                } else {
+                    content
+                }
             }
             .padding(.horizontal, 16)
             .padding(.top, 4)
@@ -28,8 +37,8 @@ struct LeaderboardView: View {
     }
 
     private func scopeButton(_ title: String, _ value: LeaderboardService.Scope) -> some View {
-        Button { scope = value } label: {
-            NeonChip(title: title, tint: Theme.accent, selected: scope == value)
+        Button { scope = value; showLeagues = false } label: {
+            NeonChip(title: title, tint: Theme.accent, selected: scope == value && !showLeagues)
         }
         .buttonStyle(.plain)
     }
@@ -176,5 +185,135 @@ private struct LeaderRow: View {
                 .fill(style == .normal ? Color.clear : tint.opacity(0.12))
                 .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(style == .normal ? Color.clear : tint.opacity(0.7)))
         )
+    }
+}
+
+/// Private leagues: create one and share the code, or join a friend's.
+/// Standings are the members' season points.
+private struct LeaguesPanel: View {
+    let userId: String?
+    let year: String
+
+    @AppStorage("leagueCodes") private var codesText = ""
+    @AppStorage("chatNickname") private var nickname = ""
+    @State private var leagues: [LeaderboardService.League] = []
+    @State private var newTitle = ""
+    @State private var joinCode = ""
+    @State private var busy = false
+    @State private var errorText: String?
+
+    private static let appStore = "https://apps.apple.com/app/id6804406860"
+    private var codes: [String] { codesText.split(separator: ",").map(String.init) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if userId == nil || nickname.isEmpty {
+                Text("Pick a Paddock name (Room tab) to create or join a league.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.dimText)
+            } else {
+                ForEach(leagues) { league in leagueCard(league) }
+                actions
+            }
+            if let errorText {
+                Text(errorText).font(.system(size: 12)).foregroundStyle(Theme.live)
+            }
+        }
+        .task(id: codesText) { await reload() }
+    }
+
+    private func leagueCard(_ league: LeaderboardService.League) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(league.title.uppercased()).font(.f1(17)).foregroundStyle(.white)
+                    Text("CODE \(league.code)").font(.f1(11, weight: .bold)).tracking(2).foregroundStyle(Theme.violet)
+                }
+                Spacer()
+                ShareLink(item: URL(string: Self.appStore)!,
+                          message: Text("Join my Team Radio league \"\(league.title)\" 🏁 Code: \(league.code)")) {
+                    Image(systemName: "square.and.arrow.up").font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.accent)
+                }
+                Menu {
+                    Button("Leave league", role: .destructive) { Task { await leave(league.code) } }
+                } label: {
+                    Image(systemName: "ellipsis").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.dimText)
+                        .frame(width: 30, height: 30)
+                }
+            }
+            ForEach(league.members ?? []) { m in
+                HStack {
+                    Text("\(m.rank)").font(.f1(15)).foregroundStyle(m.userId == userId ? Theme.accent : Theme.dimText)
+                        .frame(width: 26, alignment: .leading)
+                    Text(m.userId == userId ? "\(m.name) (you)" : m.name)
+                        .font(.system(size: 15, weight: .semibold)).foregroundStyle(.white).lineLimit(1)
+                    Spacer()
+                    Text("\(m.points) PTS").font(.f1(15)).foregroundStyle(m.userId == userId ? Theme.accent : .white)
+                }
+            }
+        }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 16).fill(Theme.card))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.violet.opacity(0.4)))
+    }
+
+    private var actions: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(leagues.isEmpty ? "PLAY AGAINST YOUR FRIENDS" : "ANOTHER LEAGUE")
+                .font(.f1(11, weight: .bold)).tracking(2).foregroundStyle(Theme.faintText)
+            HStack(spacing: 8) {
+                TextField("League name", text: $newTitle)
+                    .textFieldStyle(.plain).padding(10)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.06)))
+                Button("CREATE") { Task { await create() } }
+                    .font(.f1(13, weight: .bold)).foregroundStyle(Theme.accent)
+                    .disabled(busy || newTitle.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            HStack(spacing: 8) {
+                TextField("Code from a friend", text: $joinCode)
+                    .textInputAutocapitalization(.characters).autocorrectionDisabled()
+                    .textFieldStyle(.plain).padding(10)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.06)))
+                Button("JOIN") { Task { await join() } }
+                    .font(.f1(13, weight: .bold)).foregroundStyle(Theme.accent)
+                    .disabled(busy || joinCode.count < 6)
+            }
+        }
+    }
+
+    private func reload() async {
+        var loaded: [LeaderboardService.League] = []
+        for code in codes {
+            if let l = await LeaderboardService.leagueStandings(code: code, year: year), l.error == nil { loaded.append(l) }
+        }
+        leagues = loaded
+    }
+
+    private func remember(_ code: String) {
+        if !codes.contains(code) { codesText = (codes + [code]).joined(separator: ",") }
+    }
+
+    private func create() async {
+        guard let userId else { return }
+        busy = true; defer { busy = false }
+        if let l = await LeaderboardService.league("create", user: userId, name: nickname, title: newTitle), l.error == nil {
+            newTitle = ""; errorText = nil; remember(l.code)
+        } else { errorText = "Couldn't create the league. Try again." }
+    }
+
+    private func join() async {
+        guard let userId else { return }
+        busy = true; defer { busy = false }
+        let code = joinCode.uppercased().trimmingCharacters(in: .whitespaces)
+        if let l = await LeaderboardService.league("join", user: userId, name: nickname, code: code) {
+            if let error = l.error { errorText = error.prefix(1).uppercased() + error.dropFirst() + "." }
+            else { joinCode = ""; errorText = nil; remember(l.code) }
+        } else { errorText = "Couldn't join. Check your connection." }
+    }
+
+    private func leave(_ code: String) async {
+        guard let userId else { return }
+        _ = await LeaderboardService.league("leave", user: userId, name: nickname, code: code)
+        codesText = codes.filter { $0 != code }.joined(separator: ",")
     }
 }

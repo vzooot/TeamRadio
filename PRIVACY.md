@@ -1,6 +1,6 @@
 # Team Radio Privacy Policy
 
-_Last updated: September 11, 2026_
+_Last updated: October 11, 2026_
 
 Team Radio collects the minimum needed to run its features, none of it linked
 to your identity, and nothing is ever sold or shared.
@@ -32,6 +32,22 @@ to your identity, and nothing is ever sold or shared.
   its decrypted text to the developer for review; blocking hides all messages
   from that person. New-message notifications are delivered by Apple's
   CloudKit; the notification carries only the sender's name.
+- **Prediction game and leagues.** Your picks are stored in Apple's CloudKit
+  public database under the same anonymous identifier as the chat. After
+  each race our server (hosted on Cloudflare) scores them and publishes a
+  leaderboard showing your paddock name and points. Private leagues store a
+  league name, its code and the paddock names of its members. Driver of the
+  day votes are stored the same way and only counted, never shown per
+  person. Lights Out reaction times appear on a weekly leaderboard with your
+  paddock name.
+- **AI features.** Ask the race engineer sends the question you type to
+  Microsoft Azure OpenAI (EU region) through our server, together with
+  public race data; your name and identity are not sent and questions are
+  not stored. After each race your picks and their score (without your
+  name) are sent the same way to write a short comment shown on your result.
+  AI-written text is labelled as such in the app.
+- **Game reminders.** "Picks are open" reminders are scheduled on your device
+  and need no server.
 - **GIFs in chat.** GIF search inside the Paddock is provided by GIPHY: the
   words you search for are sent to GIPHY to return results, and shared GIFs
   are loaded from GIPHY's servers. GIPHY's own privacy policy applies to
