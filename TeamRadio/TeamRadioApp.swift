@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import UserNotifications
 
 /// Shows private-message pushes as banners even while the app is open, and
@@ -46,6 +47,7 @@ struct RootView: View {
     @State private var showMessageToast = false
     @State private var toastDismissTask: Task<Void, Never>?
     @State private var profile: ProfileTarget?
+    @State private var showIntro = !UIAccessibility.isReduceMotionEnabled
 
     var body: some View {
         TabView(selection: $selection) {
@@ -67,6 +69,13 @@ struct RootView: View {
                 .tag(4)
         }
         .tint(Theme.accent)
+        .overlay {
+            if showIntro {
+                IntroView { showIntro = false }
+                    .transition(.opacity)
+                    .zIndex(1)
+            }
+        }
         .environment(\.openProfile, OpenProfileAction { profile = $0 })
         .sheet(item: $profile) { target in
             ProfileSheet(target: target)
@@ -112,7 +121,7 @@ struct RootView: View {
         .onChange(of: chatBadge.unread) { _, _ in TabBarBadge.tint(private: chatBadge.unreadDMs > 0) }
         .onChange(of: chatBadge.unreadDMs) { _, _ in TabBarBadge.tint(private: chatBadge.unreadDMs > 0) }
         .overlay(alignment: .bottom) {
-            if showMessageToast {
+            if showMessageToast && !showIntro {
                 MessageToast(sender: chatBadge.latestSender, text: chatBadge.latestText, isPrivate: chatBadge.latestIsPrivate) {
                     selection = 3
                     if chatBadge.latestIsPrivate {
