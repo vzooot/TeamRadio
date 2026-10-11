@@ -11,7 +11,7 @@ Marketing/videos/out/<name>-verdict.mp4 (1080×1920, 30 fps)
 """
 import os, subprocess, sys
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import render as R
@@ -84,20 +84,37 @@ def dotd_card(layer, t):
                                anchor='mm', fill=(225, 230, 240, int(255 * T.ease((t - 0.3) / 0.2))))
 
 
+WORDMARK = os.path.join(R.ROOT, 'TeamRadio/Assets.xcassets/HeaderWordmark.imageset/HeaderWordmark.png')
+
+
 def end_card(layer, end, t):
+    """The app's own TEAM RADIO wordmark slams in with a glow, then the
+    App Store search pill. The name is the hero of the last shot."""
     big, sub, search = end
     d = ImageDraw.Draw(layer)
-    e0 = T.ease(t / 0.2)
-    f = T.tf(100)
-    if f.getlength(big) > 900:
-        f = T.tf(round(100 * 900 / f.getlength(big)))
-    T.glow_text(layer, (CX, 1140), big, f, (255, 255, 255, int(255 * e0)), T.CYAN, 0.8 * e0)
-    d.text((CX, 1260), sub, font=T.tf(46, 'Bold'), anchor='mm', fill=T.CYAN + (int(255 * T.ease((t - 0.3) / 0.2)),))
-    k = T.ease((t - 0.6) / 0.2)
-    sf = T.tf(46)
-    w = sf.getlength(search)
-    d.rounded_rectangle([CX - w / 2 - 44, 1360, CX + w / 2 + 44, 1450], 45, fill=T.CYAN + (int(255 * k),))
-    d.text((CX, 1405), search, font=sf, anchor='mm', fill=(6, 10, 18, int(255 * k)))
+    e0 = T.ease(t / 0.18)
+    d.text((CX, 760), big, font=T.tf(54, 'Bold'), anchor='mm', fill=(225, 230, 240, int(255 * e0)))
+    # wordmark: slam from 1.35x to 1x, glow pulses once on landing
+    wm = Image.open(WORDMARK).convert('RGBA')
+    k = T.ease((t - 0.15) / 0.22)
+    scale = (1.35 - 0.35 * k) * 900 / wm.width
+    w, h = int(wm.width * scale), int(wm.height * scale)
+    wm = wm.resize((w, h), Image.LANCZOS)
+    alpha = wm.getchannel('A').point(lambda v: int(v * k))
+    wm.putalpha(alpha)
+    x, y = CX - w // 2, 1010 - h // 2
+    pulse = max(0, 1 - abs(t - 0.4) / 0.5) * 0.9 + 0.35
+    glow = Image.new('L', layer.size, 0)
+    glow.paste(alpha, (x, y))
+    glow = glow.filter(ImageFilter.GaussianBlur(38)).point(lambda v: int(min(255, v * pulse * k)))
+    layer.alpha_composite(Image.merge('RGBA', (*[Image.new('L', layer.size, c) for c in T.CYAN], glow)))
+    layer.alpha_composite(wm, (x, y))
+    d.text((CX, 1215), sub, font=T.tf(44, 'Bold'), anchor='mm', fill=T.CYAN + (int(255 * T.ease((t - 0.6) / 0.2)),))
+    kk = T.ease((t - 0.85) / 0.2)
+    sf = T.tf(48)
+    sw = sf.getlength(search)
+    d.rounded_rectangle([CX - sw / 2 - 46, 1300, CX + sw / 2 + 46, 1394], 47, fill=T.CYAN + (int(255 * kk),))
+    d.text((CX, 1347), search, font=sf, anchor='mm', fill=(6, 10, 18, int(255 * kk)))
 
 
 def main(name):
@@ -127,17 +144,19 @@ def main(name):
             i = min(len(rows) - 1, int((t - ROWS) / ROW_LEN))
             rt = t - ROWS - i * ROW_LEN
             label, ai, actual, team = rows[i]
-            frame = T.zoom(shaded, 1.0 + 0.06 * t / TOTAL, 0.15)
+            frame = T.flash(T.zoom(shaded, 1.0 + 0.06 * t / TOTAL, 0.15), max(0, 0.4 - rt * 4))
             row_card(layer, label, ai, actual, team, rt)
         elif t < DOTD:
             frame = T.dark(T.zoom(shaded, 1.0 + 0.06 * t / TOTAL, 0.15), 0.75)
             score_card(layer, hits, len(rows), t - SCORE)
         elif t < END:
-            frame = T.zoom(shaded, 1.0 + 0.06 * t / TOTAL, 0.15)
+            frame = T.flash(T.zoom(shaded, 1.0 + 0.06 * t / TOTAL, 0.15), max(0, 0.35 - (t - DOTD) * 3))
             dotd_card(layer, t - DOTD)
         else:
-            frame = T.zoom(shaded, 1.0 + 0.06 * t / TOTAL, 0.15)
-            end_card(layer, v['end'], t - END)
+            et = t - END
+            frame = T.dark(T.zoom(shaded, 1.0 + 0.06 * t / TOTAL, 0.15), 0.7)
+            frame = T.flash(frame, max(0, 0.55 - abs(et - 0.37) * 4) if et > 0.15 else 0)
+            end_card(layer, v['end'], et)
         img = Image.fromarray(frame).convert('RGBA')
         img.alpha_composite(layer)
         enc.stdin.write(np.asarray(img.convert('RGB')).tobytes())
