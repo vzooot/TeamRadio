@@ -121,25 +121,22 @@ def main(name):
         t = n / FPS
         layer = Image.new('RGBA', (W, H), (0, 0, 0, 0))
         if t < ROWS:
-            lit = 0 if t >= 1.15 else min(5, int((t - 0.15) / 0.2) + 1) if t >= 0.15 else 0
-            frame = T.lights(T.zoom(shaded, 1.0 + 0.05 * t, 0.2), lit)
+            frame = T.zoom(shaded, 1.0 + 0.06 * t / TOTAL, 0.15)
             T.hook_text(layer, v['hook'], t - 0.05)
         elif t < SCORE:
             i = min(len(rows) - 1, int((t - ROWS) / ROW_LEN))
             rt = t - ROWS - i * ROW_LEN
             label, ai, actual, team = rows[i]
-            shake = int(16 * max(0, 1 - (rt - 0.45) / 0.12)) if 0.45 <= rt < 0.57 else 0
-            frame = np.roll(T.lights(T.zoom(shaded, 1.04, 0.2), 5), shake, axis=1)
-            frame = T.flash(frame, max(0, 0.4 - rt * 4))
+            frame = T.zoom(shaded, 1.0 + 0.06 * t / TOTAL, 0.15)
             row_card(layer, label, ai, actual, team, rt)
         elif t < DOTD:
-            frame = T.dark(T.lights(shaded, 0), 0.8)
+            frame = T.dark(T.zoom(shaded, 1.0 + 0.06 * t / TOTAL, 0.15), 0.75)
             score_card(layer, hits, len(rows), t - SCORE)
         elif t < END:
-            frame = T.flash(T.lights(T.zoom(shaded, 1.03, 0.2), 5), max(0, 0.3 - (t - DOTD) * 3))
+            frame = T.zoom(shaded, 1.0 + 0.06 * t / TOTAL, 0.15)
             dotd_card(layer, t - DOTD)
         else:
-            frame = T.lights(shaded, 5 if int((t - END) * 4) % 2 == 0 or t - END < 1.2 else 0)
+            frame = T.zoom(shaded, 1.0 + 0.06 * t / TOTAL, 0.15)
             end_card(layer, v['end'], t - END)
         img = Image.fromarray(frame).convert('RGBA')
         img.alpha_composite(layer)
