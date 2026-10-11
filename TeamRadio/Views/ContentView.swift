@@ -7,6 +7,8 @@ struct ContentView: View {
     @State private var showPicks = false
     @State private var showResult = false
     @State private var showEmily = false
+    @State private var dotd = DotdModel()
+    @State private var showDotd = false
 
     var body: some View {
         ZStack {
@@ -40,6 +42,13 @@ struct ContentView: View {
         .task(id: model.nextRace?.id) {
             guard GameFeature.isEnabled else { return }
             await game.load(race: model.nextRace, season: model.season)
+            await dotd.load(season: model.season, fallbackDrivers: game.drivers)
+        }
+        .sheet(isPresented: $showDotd) {
+            DotdSheet(model: dotd)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.background)
         }
         .sheet(isPresented: $showEmily) {
             AskEmilyView()
@@ -88,6 +97,7 @@ struct ContentView: View {
                         .id(race.id)
 
                     if GameFeature.isEnabled, !model.isBrowsing {
+                        DotdCard(model: dotd) { showDotd = true }
                         PicksCard(game: game, onOpen: { showPicks = true }, onShowResult: { showResult = true })
                             .id("picks")
                         AskEmilyCard { showEmily = true }

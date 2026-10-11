@@ -49,6 +49,15 @@ enum LeaderboardService {
         let strategist: Strategist?
     }
 
+    /// The fan vote for driver of the day (counted by the Worker).
+    static func dotd(round: String) async -> DotdService.Tally? {
+        var components = URLComponents(url: base.appending(path: "dotd"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "round", value: round),
+                                 URLQueryItem(name: "env", value: environment)]
+        guard let (data, _) = try? await URLSession.shared.data(from: components.url!) else { return nil }
+        return try? JSONDecoder().decode(DotdService.Tally.self, from: data)
+    }
+
     static func board(scope: Scope, round: String? = nil, year: String, user: String?) async throws -> Board {
         var components = URLComponents(url: base.appending(path: "board"), resolvingAgainstBaseURL: false)!
         var items = [URLQueryItem(name: "scope", value: scope.rawValue),

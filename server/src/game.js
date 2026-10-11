@@ -219,6 +219,46 @@ async function predictions(env, ckEnv, roundId) {
   return all;
 }
 
+// ------------------------------------------------------ driver of the day
+
+/// Voting opens 2 h after the race starts (the flag) and closes 4 days later.
+export function dotdWindow(race) {
+  const start = groupLock(race, "race")?.getTime() ?? 0;
+  return { opens: start + 2 * 3600_000, closes: start + 96 * 3600_000 };
+}
+
+/// Counts the fan vote: one record per player (dotd-<round>-<user>), cast
+/// inside the window. Cached for a minute so a busy race night stays cheap.
+async function dotdTally(env, ckEnv, race) {
+  const id = `${race.season}-${race.round}`;
+  const key = `game:${ckEnv}:dotd:${id}`;
+  const cached = await env.TOKENS.get(key, "json");
+  if (cached && Date.now() - cached.at < 60_000) return cached;
+  const { opens, closes } = dotdWindow(race);
+  const counts = {};
+  let total = 0, marker;
+  do {
+    const data = await ckRequest(env, ckEnv, "records/query", {
+      query: { recordType: "DotdVote", filterBy: [{ fieldName: "round", comparator: "EQUALS", fieldValue: { value: id } }] },
+      resultsLimit: 200, ...(marker ? { continuationMarker: marker } : {}),
+    });
+    for (const r of data.records ?? []) {
+      if (r.serverErrorCode) continue;
+      const user = r.fields?.userId?.value, driver = r.fields?.driverId?.value;
+      const at = r.modified?.timestamp ?? 0;
+      if (!user || !driver || r.recordName !== `dotd-${id}-${user}` || at < opens || at > closes) continue;
+      counts[driver] = (counts[driver] || 0) + 1;
+      total++;
+    }
+    marker = data.continuationMarker;
+  } while (marker);
+  const votes = Object.entries(counts).sort((a, b) => b[1] - a[1])
+    .map(([driverId, count]) => ({ driverId, count, pct: Math.round((count / total) * 100) }));
+  const result = { round: id, total, votes, at: Date.now(), closes };
+  await env.TOKENS.put(key, JSON.stringify(result), { expirationTtl: 86400 * 30 });
+  return result;
+}
+
 // --------------------------------------------------------------- scoring
 
 /// Scores one finished round for one CloudKit environment, then rebuilds
@@ -503,6 +543,19 @@ export async function handleGame(request, env) {
     const data = await env.TOKENS.get(`game:${ckEnv}:season:${year}`, "json");
     const ids = (body.ids || []).slice(0, 200);
     return json({ players: ids.map((id) => data?.players?.[id] && { userId: id, name: data.players[id].name, points: data.players[id].points, exact: data.players[id].exact }).filter(Boolean) });
+  }
+
+  if (url.pathname === "/game/dotd") {
+    const round = q.get("round") || "";
+    const race = (await season()).find((r) => `${r.season}-${r.round}` === round);
+    if (!race) return json({ error: "unknown round" }, 0);
+    if (!env.CK_KEY_ID) return json({ round, total: 0, votes: [] });
+    try {
+      return json(await dotdTally(env, ckEnv, race), 30);
+    } catch (e) {
+      console.log("dotd", String(e));
+      return json({ round, total: 0, votes: [], error: "unavailable" });
+    }
   }
 
   if (url.pathname === "/game/strategist") {
