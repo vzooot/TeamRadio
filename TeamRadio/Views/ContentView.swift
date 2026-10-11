@@ -9,6 +9,7 @@ struct ContentView: View {
     @State private var showEmily = false
     @State private var dotd = DotdModel()
     @State private var showDotd = false
+    @State private var showLightsOut = false
 
     var body: some View {
         ZStack {
@@ -43,6 +44,9 @@ struct ContentView: View {
             guard GameFeature.isEnabled else { return }
             await game.load(race: model.nextRace, season: model.season)
             await dotd.load(season: model.season, fallbackDrivers: game.drivers)
+        }
+        .fullScreenCover(isPresented: $showLightsOut) {
+            LightsOutView()
         }
         .sheet(isPresented: $showDotd) {
             DotdSheet(model: dotd)
@@ -101,6 +105,7 @@ struct ContentView: View {
                         PicksCard(game: game, onOpen: { showPicks = true }, onShowResult: { showResult = true })
                             .id("picks")
                         AskEmilyCard { showEmily = true }
+                        LightsOutCard { showLightsOut = true }
                     }
 
                     WeekendScheduleView(race: race, weather: model.weather)
