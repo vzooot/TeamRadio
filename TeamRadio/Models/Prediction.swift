@@ -1,15 +1,10 @@
 import Foundation
 
-/// The prediction game is built on a branch and stays out of release builds
-/// until it ships.
+/// The prediction game and its companions (Ask Emily, circuit guide, driver
+/// of the day). Shipped in 1.2.0; kept as a single switch so it can be
+/// turned off again quickly if a server side breaks.
 enum GameFeature {
-    static var isEnabled: Bool {
-        #if DEBUG
-        true
-        #else
-        false
-        #endif
-    }
+    static let isEnabled = true
 }
 
 /// One player's picks for one grand prix. Drivers are Jolpica driver ids

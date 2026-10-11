@@ -114,6 +114,7 @@ final class GameViewModel {
             saved = fetched
             if let picks = fetched?.prediction { draft = picks }
         }
+        await GameReminders.reschedule(race: race, saved: saved?.groups ?? [])
         await loadLastScore(before: race, season: season, userId: id)
     }
 
@@ -157,6 +158,7 @@ final class GameViewModel {
             var picks = saved?.prediction ?? Prediction(round: draft.round)
             groups.forEach { picks.take($0, from: draft) }
             saved = PredictionService.Saved(prediction: picks, groups: (saved?.groups ?? []).union(groups))
+            await GameReminders.reschedule(race: race, saved: saved?.groups ?? [])
             errorText = nil
             return true
         } catch {

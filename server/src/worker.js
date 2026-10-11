@@ -35,8 +35,10 @@ export default {
       try { body = await request.json(); } catch { return new Response("bad json", { status: 400 }); }
       const token = (body.token || "").toLowerCase();
       const apnsEnv = body.env === "sandbox" ? "sandbox" : "production";
+      // Minutes before each session the countdown starts: 0 (off), 15, 60 or 180.
+      const lead = [0, 15, 60, 180].includes(Number(body.lead)) ? Number(body.lead) : 60;
       if (!/^[0-9a-f]{32,200}$/.test(token)) return new Response("bad token", { status: 400 });
-      await env.TOKENS.put("t:" + token, apnsEnv);
+      await env.TOKENS.put("t:" + token, `${apnsEnv}|${lead}`);
       return new Response("ok");
     }
     if (url.pathname === "/health") return new Response("ok");
@@ -50,7 +52,7 @@ export default {
       if (!race) return new Response("no race data", { status: 502 });
       const next = race.sessions.find((s) => s.date.getTime() > Date.now())
         || { name: "Test Session", short: "TEST", date: new Date(Date.now() + 15 * 60_000), duration: 3600 };
-      await pushSessionStart(env, race, next);
+      await pushSessionStart(env, race, next, 60);
       return new Response("pushed " + next.short);
     }
     return new Response("not found", { status: 404 });
@@ -69,13 +71,16 @@ async function checkAndPush(env) {
 
   const now = Date.now();
   for (const s of race.sessions) {
-    const lead = s.date.getTime() - now;
-    // Fire once inside the 55–65 minute window (cron period is 5 min).
-    if (lead < 55 * 60_000 || lead > 65 * 60_000) continue;
-    const dedupeKey = "sent:" + s.short + ":" + s.date.toISOString();
-    if (await env.TOKENS.get(dedupeKey)) continue;
-    await env.TOKENS.put(dedupeKey, "1", { expirationTtl: 86400 });
-    await pushSessionStart(env, race, s);
+    const left = s.date.getTime() - now;
+    // Each device picks its lead time; fire once per lead inside a ±5 min
+    // window around it (cron period is 5 min).
+    for (const lead of LEADS) {
+      if (left < (lead - 5) * 60_000 || left > (lead + 5) * 60_000) continue;
+      const dedupeKey = `sent:${lead}:${s.short}:${s.date.toISOString()}`;
+      if (await env.TOKENS.get(dedupeKey)) continue;
+      await env.TOKENS.put(dedupeKey, "1", { expirationTtl: 86400 });
+      await pushSessionStart(env, race, s, lead);
+    }
   }
 }
 
@@ -110,7 +115,17 @@ async function nextRace() {
   };
 }
 
-async function pushSessionStart(env, race, session) {
+const LEADS = [15, 60, 180];
+
+/// "env|lead" since 1.2.0; older devices stored just the env (1 hour lead).
+function parseToken(value) {
+  const [apnsEnv, lead] = (value || "production").split("|");
+  return { apnsEnv: apnsEnv === "sandbox" ? "sandbox" : "production", lead: lead === undefined ? 60 : Number(lead) };
+}
+
+const leadText = (lead) => (lead === 15 ? "15 minutes" : lead === 180 ? "3 hours" : "1 hour");
+
+async function pushSessionStart(env, race, session, lead) {
   const jwt = await apnsJWT(env);
   const start = session.date.getTime() / 1000;
   const end = start + session.duration;
@@ -136,7 +151,7 @@ async function pushSessionStart(env, race, session) {
       },
       alert: {
         title: `${FLAGS[race.country] || "🏁"} ${session.name} soon`,
-        body: `${race.raceName}: ${session.short} starts in 1 hour.`,
+        body: `${race.raceName}: ${session.short} starts in ${leadText(lead)}.`,
       },
     },
   });
@@ -144,7 +159,8 @@ async function pushSessionStart(env, race, session) {
   const list = await env.TOKENS.list({ prefix: "t:" });
   for (const key of list.keys) {
     const token = key.name.slice(2);
-    const apnsEnv = (await env.TOKENS.get(key.name)) || "production";
+    const { apnsEnv, lead: wanted } = parseToken(await env.TOKENS.get(key.name));
+    if (wanted !== lead) continue;
     const res = await fetch(`${HOSTS[apnsEnv]}/3/device/${token}`, {
       method: "POST",
       headers: {
