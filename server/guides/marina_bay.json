@@ -1,0 +1,159 @@
+{
+ "circuitId": "marina_bay",
+ "reviewed": true,
+ "source": "track geometry (MultiViewer)",
+ "corners": [
+  {
+   "number": 1,
+   "name": "",
+   "text": "Slow left-hander at the end of a 550 m straight. Heavy braking and a prime overtaking spot.",
+   "moment": "",
+   "side": "left",
+   "kind": "slow"
+  },
+  {
+   "number": 2,
+   "name": "",
+   "text": "Fast right-hand sweep, straight after Turn 1: a quick change of direction.",
+   "moment": "",
+   "side": "right",
+   "kind": "fast"
+  },
+  {
+   "number": 3,
+   "name": "",
+   "text": "Tight left-hand hairpin, straight after Turn 2: a quick change of direction.",
+   "moment": "",
+   "side": "left",
+   "kind": "hairpin"
+  },
+  {
+   "number": 4,
+   "name": "",
+   "text": "Flat-out left kink, taken at full throttle with the car settled.",
+   "moment": "",
+   "side": "left",
+   "kind": "kink"
+  },
+  {
+   "number": 5,
+   "name": "",
+   "text": "Medium-speed right-hander. Carry the speed and keep the car tidy over the kerbs.",
+   "moment": "",
+   "side": "right",
+   "kind": "medium"
+  },
+  {
+   "number": 6,
+   "name": "",
+   "text": "Flat-out right kink, taken at full throttle with the car settled.",
+   "moment": "",
+   "side": "right",
+   "kind": "kink"
+  },
+  {
+   "number": 7,
+   "name": "",
+   "text": "Medium-speed left-hander. Carry the speed and keep the car tidy over the kerbs.",
+   "moment": "",
+   "side": "left",
+   "kind": "medium"
+  },
+  {
+   "number": 8,
+   "name": "",
+   "text": "Slow right-hander. Traction out of here decides the next straight.",
+   "moment": "",
+   "side": "right",
+   "kind": "slow"
+  },
+  {
+   "number": 9,
+   "name": "",
+   "text": "Slow left-hander. Traction out of here decides the next straight.",
+   "moment": "",
+   "side": "left",
+   "kind": "slow"
+  },
+  {
+   "number": 10,
+   "name": "",
+   "text": "Medium-speed left-hander after a 420 m run. A big stop and a chance to dive down the inside.",
+   "moment": "",
+   "side": "left",
+   "kind": "medium"
+  },
+  {
+   "number": 11,
+   "name": "",
+   "text": "Medium-speed right-hander. Carry the speed and keep the car tidy over the kerbs.",
+   "moment": "",
+   "side": "right",
+   "kind": "medium"
+  },
+  {
+   "number": 12,
+   "name": "",
+   "text": "Fast left-hand sweep, straight after Turn 11: a quick change of direction.",
+   "moment": "",
+   "side": "left",
+   "kind": "fast"
+  },
+  {
+   "number": 13,
+   "name": "",
+   "text": "Tight left-hand hairpin. Traction out of here decides the next straight.",
+   "moment": "",
+   "side": "left",
+   "kind": "hairpin"
+  },
+  {
+   "number": 14,
+   "name": "",
+   "text": "Medium-speed right-hander at the end of a 560 m straight. Heavy braking and a prime overtaking spot.",
+   "moment": "",
+   "side": "right",
+   "kind": "medium"
+  },
+  {
+   "number": 15,
+   "name": "",
+   "text": "Fast left-hand sweep. Carry the speed and keep the car tidy over the kerbs.",
+   "moment": "",
+   "side": "left",
+   "kind": "fast"
+  },
+  {
+   "number": 16,
+   "name": "",
+   "text": "Slow right-hander after a 490 m run. A big stop and a chance to dive down the inside.",
+   "moment": "",
+   "side": "right",
+   "kind": "slow"
+  },
+  {
+   "number": 17,
+   "name": "",
+   "text": "Medium-speed left-hander, straight after Turn 16: a quick change of direction.",
+   "moment": "",
+   "side": "left",
+   "kind": "medium"
+  },
+  {
+   "number": 18,
+   "name": "",
+   "text": "Fast left-hand sweep. Carry the speed and keep the car tidy over the kerbs.",
+   "moment": "",
+   "side": "left",
+   "kind": "fast"
+  },
+  {
+   "number": 19,
+   "name": "",
+   "text": "Fast left-hand sweep, straight after Turn 18: a quick change of direction.",
+   "moment": "",
+   "side": "left",
+   "kind": "fast"
+  }
+ ]
+}

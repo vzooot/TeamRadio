@@ -9,17 +9,23 @@ struct TrackSectionView: View {
 
     @State private var resetToken = 0
     @State private var showRealWorld = false
+    @State private var guide: CircuitGuide?
+    @State private var selectedCorner: Int?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionTitle("THE CIRCUIT")
+                .task(id: circuit.circuitId) {
+                    guard GameFeature.isEnabled else { return }
+                    guide = await GuideService.guide(circuitId: circuit.circuitId, corners: map.corners.count)
+                }
 
             VStack(spacing: 0) {
                 ZStack {
                     if showRealWorld, let coordinate = circuit.coordinate {
                         CircuitMapView(coordinate: coordinate)
                     } else {
-                        Track3DView(map: map, resetToken: resetToken)
+                        Track3DView(map: map, resetToken: resetToken, selectedCorner: selectedCorner)
                     }
                 }
                 .frame(height: 300)
@@ -60,6 +66,10 @@ struct TrackSectionView: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.bottom, 14)
+
+                if let guide, !guide.corners.isEmpty {
+                    cornerGuide(guide)
+                }
             }
             .background(
                 RoundedRectangle(cornerRadius: 20)
@@ -87,6 +97,65 @@ struct TrackSectionView: View {
                 }
                 .padding(.leading, 4)
             }
+        }
+    }
+
+    /// Corner chips under the track; the selected corner glows on the map and
+    /// its line shows below.
+    private func cornerGuide(_ guide: CircuitGuide) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("CORNER GUIDE · TAP A CORNER")
+                .font(.f1(10, weight: .bold))
+                .tracking(3)
+                .foregroundStyle(Theme.faintText)
+                .padding(.horizontal, 14)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(guide.corners) { corner in
+                        let on = corner.number == selectedCorner
+                        Button {
+                            withAnimation(.easeOut(duration: 0.2)) { selectedCorner = on ? nil : corner.number }
+                        } label: {
+                            Text("T\(corner.number)")
+                                .font(.f1(13))
+                                .foregroundStyle(on ? Theme.onAccent : .white)
+                                .frame(minWidth: 40)
+                                .padding(.vertical, 7)
+                                .background(Capsule().fill(on ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Color.white.opacity(0.06))))
+                                .overlay(Capsule().strokeBorder(on ? Color.clear : Color.white.opacity(0.1)))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Turn \(corner.number)")
+                    }
+                }
+                .padding(.horizontal, 14)
+            }
+            if let corner = guide.corner(selectedCorner) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(corner.name.isEmpty ? "TURN \(corner.number)" : "TURN \(corner.number) · \(corner.name.uppercased())")
+                        .font(.f1(15).italic())
+                        .foregroundStyle(Theme.accent)
+                    Text(corner.text)
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .fixedSize(horizontal: false, vertical: true)
+                    if !corner.moment.isEmpty {
+                        Text(corner.moment)
+                            .font(.system(size: 13).italic())
+                            .foregroundStyle(Theme.dimText)
+                    }
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 12).fill(Theme.accent.opacity(0.08)))
+                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.accent.opacity(0.3)))
+                .padding(.horizontal, 14)
+                .transition(.opacity)
+            }
+        }
+        .padding(.bottom, 14)
+        .task(id: circuit.circuitId) {
+            selectedCorner = nil
         }
     }
 

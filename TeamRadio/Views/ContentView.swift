@@ -3,6 +3,13 @@ import SwiftUI
 struct ContentView: View {
     @State private var model = RaceViewModel()
     @State private var showAbout = false
+    @State private var game = GameViewModel()
+    @State private var showPicks = false
+    @State private var showResult = false
+    @State private var showEmily = false
+    @State private var dotd = DotdModel()
+    @State private var showDotd = false
+    @State private var showLightsOut = false
 
     var body: some View {
         ZStack {
@@ -33,6 +40,39 @@ struct ContentView: View {
         .sheet(isPresented: $showAbout) {
             AboutView()
         }
+        .task(id: model.nextRace?.id) {
+            guard GameFeature.isEnabled else { return }
+            await game.load(race: model.nextRace, season: model.season)
+            await dotd.load(season: model.season, fallbackDrivers: game.drivers)
+        }
+        .fullScreenCover(isPresented: $showLightsOut) {
+            LightsOutView()
+        }
+        .sheet(isPresented: $showDotd) {
+            DotdSheet(model: dotd)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.background)
+        }
+        .sheet(isPresented: $showEmily) {
+            AskEmilyView()
+                .presentationDetents([.large])
+                .presentationBackground(Theme.background)
+        }
+        .sheet(isPresented: $showPicks) {
+            PicksSheet(game: game)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.background)
+        }
+        .sheet(isPresented: $showResult) {
+            if case let .scored(race, score, prediction) = game.cardState(at: .now) {
+                ResultSheet(game: game, race: race, score: score, prediction: prediction)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+                    .presentationBackground(Theme.background)
+            }
+        }
     }
 
     private var loadedContent: some View {
@@ -60,11 +100,21 @@ struct ContentView: View {
                     CountdownView(race: race)
                         .id(race.id)
 
+                    if GameFeature.isEnabled, !model.isBrowsing {
+                        DotdCard(model: dotd) { showDotd = true }
+                        PicksCard(game: game, onOpen: { showPicks = true }, onShowResult: { showResult = true })
+                            .id("picks")
+                        AskEmilyCard { showEmily = true }
+                        LightsOutCard { showLightsOut = true }
+                    }
+
                     WeekendScheduleView(race: race, weather: model.weather)
                         .id("schedule")
 
                     SessionAlertsCard(season: model.season)
                         .id("alerts")
+
+                    LockScreenCountdownCard()
 
                     if !Self.demoMode {
                         InviteBanner()
@@ -398,4 +448,48 @@ struct FooterView: View {
 
 #Preview {
     ContentView()
+}
+
+
+/// How early the server starts the Lock Screen countdown for each session,
+/// or off. One choice, applied to every session of the season.
+struct LockScreenCountdownCard: View {
+    @State private var lead = PushSync.lead
+    private let options: [(Int, String)] = [(0, "OFF"), (15, "15 MIN"), (60, "1 H"), (180, "3 H")]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                Image(systemName: lead == 0 ? "lock.slash" : "lock.iphone")
+                    .font(.system(size: 20))
+                    .foregroundStyle(lead == 0 ? Theme.dimText : Theme.accent)
+                    .frame(width: 30)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("LOCK SCREEN COUNTDOWN")
+                        .font(.f1(15).italic())
+                        .foregroundStyle(.white)
+                    Text(lead == 0 ? "Off. Pin sessions yourself with the pin button."
+                         : "Starts by itself before every session, all season")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.dimText)
+                }
+            }
+            HStack(spacing: 6) {
+                ForEach(options, id: \.0) { value, label in
+                    Button { lead = value } label: {
+                        NeonChip(title: label, tint: Theme.accent, selected: lead == value)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 18)
+                .fill(Theme.card)
+                .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Theme.glassStroke, lineWidth: 1))
+        )
+        .onChange(of: lead) { _, value in PushSync.lead = value }
+    }
 }

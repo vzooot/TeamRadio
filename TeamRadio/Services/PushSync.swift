@@ -10,6 +10,20 @@ enum PushSync {
     private static let endpoint = URL(string: "https://teamradio-push.eam-adio.workers.dev/register")!
 
     private static var started = false
+    private static let tokenKey = "pushToStartToken"
+    static let leadKey = "autoCountdownLead"
+
+    /// Minutes before each session the server starts the Lock Screen
+    /// countdown: 0 (off), 15, 60 (default) or 180.
+    static var lead: Int {
+        get { UserDefaults.standard.object(forKey: leadKey) as? Int ?? 60 }
+        set {
+            UserDefaults.standard.set(newValue, forKey: leadKey)
+            if let token = UserDefaults.standard.string(forKey: tokenKey) {
+                Task.detached(priority: .utility) { await upload(token) }
+            }
+        }
+    }
 
     static func start() {
         guard !started else { return }
@@ -18,6 +32,7 @@ enum PushSync {
             guard #available(iOS 17.2, *) else { return }
             for await tokenData in Activity<RaceActivityAttributes>.pushToStartTokenUpdates {
                 let token = tokenData.map { String(format: "%02x", $0) }.joined()
+                UserDefaults.standard.set(token, forKey: tokenKey)
                 await upload(token)
             }
         }
@@ -34,7 +49,8 @@ enum PushSync {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: ["token": token, "env": env])
+        let lead = UserDefaults.standard.object(forKey: leadKey) as? Int ?? 60
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["token": token, "env": env, "lead": lead])
         _ = try? await URLSession.shared.data(for: request)
     }
 }

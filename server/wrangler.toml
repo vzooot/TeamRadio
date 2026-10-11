@@ -2,10 +2,14 @@ name = "teamradio-push"
 main = "src/worker.js"
 compatibility_date = "2026-09-01"
 
-# Every 5 minutes: is any session starting in the 10–20 minute window?
+# Every 5 minutes: is any session starting in the 55–65 minute window?
 [triggers]
 crons = ["*/5 * * * *"]
 
 [[kv_namespaces]]
 binding = "TOKENS"
 id = "cbcf7ede1a484ac8b35cd12d5b830367"
+
+[vars]
+# CloudKit environments the prediction-game scorer reads picks from.
+CK_ENVS = "development,production"

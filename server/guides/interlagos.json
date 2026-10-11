@@ -1,0 +1,127 @@
+{
+ "circuitId": "interlagos",
+ "reviewed": true,
+ "source": "track geometry (MultiViewer)",
+ "corners": [
+  {
+   "number": 1,
+   "name": "Senna S",
+   "text": "Slow left-hander at the end of a 600 m straight. Heavy braking and a prime overtaking spot.",
+   "moment": "",
+   "side": "left",
+   "kind": "slow"
+  },
+  {
+   "number": 2,
+   "name": "Senna S",
+   "text": "Medium-speed right-hander, straight after Turn 1: a quick change of direction.",
+   "moment": "",
+   "side": "right",
+   "kind": "medium"
+  },
+  {
+   "number": 3,
+   "name": "",
+   "text": "Flat-out left kink, taken at full throttle with the car settled.",
+   "moment": "",
+   "side": "left",
+   "kind": "kink"
+  },
+  {
+   "number": 4,
+   "name": "Descida do Lago",
+   "text": "Medium-speed left-hander at the end of a 740 m straight. Heavy braking and a prime overtaking spot.",
+   "moment": "",
+   "side": "left",
+   "kind": "medium"
+  },
+  {
+   "number": 5,
+   "name": "",
+   "text": "Fast left-hand sweep. Carry the speed and keep the car tidy over the kerbs.",
+   "moment": "",
+   "side": "left",
+   "kind": "fast"
+  },
+  {
+   "number": 6,
+   "name": "Ferradura",
+   "text": "Fast right-hand sweep. Carry the speed and keep the car tidy over the kerbs.",
+   "moment": "",
+   "side": "right",
+   "kind": "fast"
+  },
+  {
+   "number": 7,
+   "name": "Ferradura",
+   "text": "Fast right-hand sweep. Carry the speed and keep the car tidy over the kerbs.",
+   "moment": "",
+   "side": "right",
+   "kind": "fast"
+  },
+  {
+   "number": 8,
+   "name": "Pinheirinho",
+   "text": "Slow right-hander. Traction out of here decides the next straight.",
+   "moment": "",
+   "side": "right",
+   "kind": "slow"
+  },
+  {
+   "number": 9,
+   "name": "",
+   "text": "Slow left-hander. Traction out of here decides the next straight.",
+   "moment": "",
+   "side": "left",
+   "kind": "slow"
+  },
+  {
+   "number": 10,
+   "name": "Bico de Pato",
+   "text": "Slow right-hander. Traction out of here decides the next straight.",
+   "moment": "",
+   "side": "right",
+   "kind": "slow"
+  },
+  {
+   "number": 11,
+   "name": "Mergulho",
+   "text": "Fast left-hand sweep. Carry the speed and keep the car tidy over the kerbs.",
+   "moment": "",
+   "side": "left",
+   "kind": "fast"
+  },
+  {
+   "number": 12,
+   "name": "Junção",
+   "text": "Medium-speed left-hander. Carry the speed and keep the car tidy over the kerbs.",
+   "moment": "",
+   "side": "left",
+   "kind": "medium"
+  },
+  {
+   "number": 13,
+   "name": "",
+   "text": "Flat-out left kink, straight after Turn 12: a quick change of direction.",
+   "moment": "",
+   "side": "left",
+   "kind": "kink"
+  },
+  {
+   "number": 14,
+   "name": "",
+   "text": "Flat-out left kink, taken at full throttle with the car settled.",
+   "moment": "",
+   "side": "left",
+   "kind": "kink"
+  },
+  {
+   "number": 15,
+   "name": "",
+   "text": "Flat-out left kink, taken at full throttle with the car settled.",
+   "moment": "",
+   "side": "left",
+   "kind": "kink"
+  }
+ ]
+}

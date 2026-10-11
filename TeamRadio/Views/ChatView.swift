@@ -17,7 +17,7 @@ struct ChatView: View {
     @State private var mode: Mode = .room
     @State private var dmPath: [InboxView.DMTarget] = []
 
-    enum Mode { case room, messages }
+    enum Mode { case room, messages, leaderboard }
 
     struct Member: Identifiable {
         let id: String
@@ -25,6 +25,7 @@ struct ChatView: View {
     }
     /// Tapping an avatar or name shows this person's card with a Message button.
     @State private var memberCard: Member?
+    @State private var showEmily = false
 
     /// Jump into a private conversation from anywhere in the room.
     private func openThread(id: String, name: String) {
@@ -260,6 +261,26 @@ struct ChatView: View {
 
                 Spacer()
 
+                // Ask the race engineer (AI).
+                if GameFeature.isEnabled {
+                    Button { showEmily = true } label: {
+                        Image("EmilyAvatar")
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 30, height: 30)
+                            .clipShape(Circle())
+                            .overlay(Circle().strokeBorder(Theme.accent, lineWidth: 1.5))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.trailing, 6)
+                    .accessibilityLabel("Ask Emily, the AI race engineer")
+                    .sheet(isPresented: $showEmily) {
+                        AskEmilyView()
+                            .presentationDetents([.large])
+                            .presentationBackground(Theme.background)
+                    }
+                }
+
                 // Room notifications on/off.
                 Button {
                     model.setRoomPush(!model.roomPushEnabled)
@@ -320,12 +341,21 @@ struct ChatView: View {
                              selected: mode == .messages || inbox.totalUnread > 0)
                 }
                 .buttonStyle(.plain)
+                if GameFeature.isEnabled {
+                    Button { mode = .leaderboard } label: {
+                        NeonChip(title: "LEADERBOARD", tint: Color(red: 1, green: 0.75, blue: 0.2),
+                                 selected: mode == .leaderboard)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 10)
 
             if mode == .messages {
                 InboxView(model: inbox, myName: model.nickname, suggestions: recentMembers, path: $dmPath)
+            } else if mode == .leaderboard {
+                LeaderboardView()
             } else {
                 roomBody
             }

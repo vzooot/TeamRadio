@@ -1,0 +1,167 @@
+{
+ "circuitId": "americas",
+ "reviewed": true,
+ "source": "track geometry (MultiViewer)",
+ "corners": [
+  {
+   "number": 1,
+   "name": "",
+   "text": "Tight left-hand hairpin at the end of a 790 m straight. Heavy braking and a prime overtaking spot.",
+   "moment": "",
+   "side": "left",
+   "kind": "hairpin"
+  },
+  {
+   "number": 2,
+   "name": "",
+   "text": "Fast right-hand sweep. Carry the speed and keep the car tidy over the kerbs.",
+   "moment": "",
+   "side": "right",
+   "kind": "fast"
+  },
+  {
+   "number": 3,
+   "name": "",
+   "text": "Fast left-hand sweep. Carry the speed and keep the car tidy over the kerbs.",
+   "moment": "",
+   "side": "left",
+   "kind": "fast"
+  },
+  {
+   "number": 4,
+   "name": "",
+   "text": "Fast right-hand sweep, straight after Turn 3: a quick change of direction.",
+   "moment": "",
+   "side": "right",
+   "kind": "fast"
+  },
+  {
+   "number": 5,
+   "name": "",
+   "text": "Medium-speed left-hander, straight after Turn 4: a quick change of direction.",
+   "moment": "",
+   "side": "left",
+   "kind": "medium"
+  },
+  {
+   "number": 6,
+   "name": "",
+   "text": "Fast right-hand sweep. Carry the speed and keep the car tidy over the kerbs.",
+   "moment": "",
+   "side": "right",
+   "kind": "fast"
+  },
+  {
+   "number": 7,
+   "name": "",
+   "text": "Medium-speed left-hander. Carry the speed and keep the car tidy over the kerbs.",
+   "moment": "",
+   "side": "left",
+   "kind": "medium"
+  },
+  {
+   "number": 8,
+   "name": "",
+   "text": "Slow right-hander. Traction out of here decides the next straight.",
+   "moment": "",
+   "side": "right",
+   "kind": "slow"
+  },
+  {
+   "number": 9,
+   "name": "",
+   "text": "Medium-speed left-hander, straight after Turn 8: a quick change of direction.",
+   "moment": "",
+   "side": "left",
+   "kind": "medium"
+  },
+  {
+   "number": 10,
+   "name": "",
+   "text": "Fast left-hand sweep. Carry the speed and keep the car tidy over the kerbs.",
+   "moment": "",
+   "side": "left",
+   "kind": "fast"
+  },
+  {
+   "number": 11,
+   "name": "",
+   "text": "Tight left-hand hairpin. Traction out of here decides the next straight.",
+   "moment": "",
+   "side": "left",
+   "kind": "hairpin"
+  },
+  {
+   "number": 12,
+   "name": "",
+   "text": "Slow left-hander at the end of a 1190 m straight. Heavy braking and a prime overtaking spot.",
+   "moment": "",
+   "side": "left",
+   "kind": "slow"
+  },
+  {
+   "number": 13,
+   "name": "",
+   "text": "Slow right-hander. Traction out of here decides the next straight.",
+   "moment": "",
+   "side": "right",
+   "kind": "slow"
+  },
+  {
+   "number": 14,
+   "name": "",
+   "text": "Medium-speed right-hander, straight after Turn 13: a quick change of direction.",
+   "moment": "",
+   "side": "right",
+   "kind": "medium"
+  },
+  {
+   "number": 15,
+   "name": "",
+   "text": "Tight left-hand hairpin. Traction out of here decides the next straight.",
+   "moment": "",
+   "side": "left",
+   "kind": "hairpin"
+  },
+  {
+   "number": 16,
+   "name": "",
+   "text": "Fast right-hand sweep. Carry the speed and keep the car tidy over the kerbs.",
+   "moment": "",
+   "side": "right",
+   "kind": "fast"
+  },
+  {
+   "number": 17,
+   "name": "",
+   "text": "Fast right-hand sweep. Carry the speed and keep the car tidy over the kerbs.",
+   "moment": "",
+   "side": "right",
+   "kind": "fast"
+  },
+  {
+   "number": 18,
+   "name": "",
+   "text": "Fast right-hand sweep. Carry the speed and keep the car tidy over the kerbs.",
+   "moment": "",
+   "side": "right",
+   "kind": "fast"
+  },
+  {
+   "number": 19,
+   "name": "",
+   "text": "Medium-speed left-hander. Carry the speed and keep the car tidy over the kerbs.",
+   "moment": "",
+   "side": "left",
+   "kind": "medium"
+  },
+  {
+   "number": 20,
+   "name": "",
+   "text": "Slow left-hander. Traction out of here decides the next straight.",
+   "moment": "",
+   "side": "left",
+   "kind": "slow"
+  }
+ ]
+}

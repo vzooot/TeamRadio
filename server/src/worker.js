@@ -1,9 +1,13 @@
 // Team Radio push worker: starts the session Live Activity on every
-// registered iPhone ~15 minutes before each F1 session, via APNs
+// registered iPhone ~1 hour before each F1 session, via APNs
 // push-to-start. Cron fires every 5 minutes; a KV flag deduplicates.
 //
 // Secrets (wrangler secret put): APNS_KEY (the .p8 PEM), APNS_KEY_ID,
-// APNS_TEAM_ID. KV binding: TOKENS.
+// APNS_TEAM_ID. KV binding: TOKENS. The prediction game lives in game.js.
+
+import { handleGame, runGame } from "./game.js";
+import { handleAsk } from "./ask.js";
+import { handleGuide } from "./guide.js";
 
 const TOPIC = "com.woqomoqo.OneF.push-type.liveactivity";
 const HOSTS = {
@@ -23,14 +27,18 @@ const FLAGS = {
 export default {
   // Devices register their push-to-start tokens here.
   async fetch(request, env) {
+    const game = (await handleGame(request, env)) || (await handleAsk(request, env)) || (await handleGuide(request, env));
+    if (game) return game;
     const url = new URL(request.url);
     if (request.method === "POST" && url.pathname === "/register") {
       let body;
       try { body = await request.json(); } catch { return new Response("bad json", { status: 400 }); }
       const token = (body.token || "").toLowerCase();
       const apnsEnv = body.env === "sandbox" ? "sandbox" : "production";
+      // Minutes before each session the countdown starts: 0 (off), 15, 60 or 180.
+      const lead = [0, 15, 60, 180].includes(Number(body.lead)) ? Number(body.lead) : 60;
       if (!/^[0-9a-f]{32,200}$/.test(token)) return new Response("bad token", { status: 400 });
-      await env.TOKENS.put("t:" + token, apnsEnv);
+      await env.TOKENS.put("t:" + token, `${apnsEnv}|${lead}`);
       return new Response("ok");
     }
     if (url.pathname === "/health") return new Response("ok");
@@ -44,7 +52,7 @@ export default {
       if (!race) return new Response("no race data", { status: 502 });
       const next = race.sessions.find((s) => s.date.getTime() > Date.now())
         || { name: "Test Session", short: "TEST", date: new Date(Date.now() + 15 * 60_000), duration: 3600 };
-      await pushSessionStart(env, race, next);
+      await pushSessionStart(env, race, next, 60);
       return new Response("pushed " + next.short);
     }
     return new Response("not found", { status: 404 });
@@ -52,6 +60,8 @@ export default {
 
   async scheduled(_event, env, ctx) {
     ctx.waitUntil(checkAndPush(env));
+    ctx.waitUntil(runGame(env).then((r) => r?.length && console.log("game", JSON.stringify(r)))
+      .catch((e) => console.log("game", e)));
   },
 };
 
@@ -61,13 +71,16 @@ async function checkAndPush(env) {
 
   const now = Date.now();
   for (const s of race.sessions) {
-    const lead = s.date.getTime() - now;
-    // Fire once inside the 10–20 minute window (cron period is 5 min).
-    if (lead < 10 * 60_000 || lead > 20 * 60_000) continue;
-    const dedupeKey = "sent:" + s.short + ":" + s.date.toISOString();
-    if (await env.TOKENS.get(dedupeKey)) continue;
-    await env.TOKENS.put(dedupeKey, "1", { expirationTtl: 86400 });
-    await pushSessionStart(env, race, s);
+    const left = s.date.getTime() - now;
+    // Each device picks its lead time; fire once per lead inside a ±5 min
+    // window around it (cron period is 5 min).
+    for (const lead of LEADS) {
+      if (left < (lead - 5) * 60_000 || left > (lead + 5) * 60_000) continue;
+      const dedupeKey = `sent:${lead}:${s.short}:${s.date.toISOString()}`;
+      if (await env.TOKENS.get(dedupeKey)) continue;
+      await env.TOKENS.put(dedupeKey, "1", { expirationTtl: 86400 });
+      await pushSessionStart(env, race, s, lead);
+    }
   }
 }
 
@@ -102,7 +115,17 @@ async function nextRace() {
   };
 }
 
-async function pushSessionStart(env, race, session) {
+const LEADS = [15, 60, 180];
+
+/// "env|lead" since 1.2.0; older devices stored just the env (1 hour lead).
+function parseToken(value) {
+  const [apnsEnv, lead] = (value || "production").split("|");
+  return { apnsEnv: apnsEnv === "sandbox" ? "sandbox" : "production", lead: lead === undefined ? 60 : Number(lead) };
+}
+
+const leadText = (lead) => (lead === 15 ? "15 minutes" : lead === 180 ? "3 hours" : "1 hour");
+
+async function pushSessionStart(env, race, session, lead) {
   const jwt = await apnsJWT(env);
   const start = session.date.getTime() / 1000;
   const end = start + session.duration;
@@ -128,7 +151,7 @@ async function pushSessionStart(env, race, session) {
       },
       alert: {
         title: `${FLAGS[race.country] || "🏁"} ${session.name} soon`,
-        body: `${race.raceName}: ${session.short} starts in 15 minutes.`,
+        body: `${race.raceName}: ${session.short} starts in ${leadText(lead)}.`,
       },
     },
   });
@@ -136,7 +159,8 @@ async function pushSessionStart(env, race, session) {
   const list = await env.TOKENS.list({ prefix: "t:" });
   for (const key of list.keys) {
     const token = key.name.slice(2);
-    const apnsEnv = (await env.TOKENS.get(key.name)) || "production";
+    const { apnsEnv, lead: wanted } = parseToken(await env.TOKENS.get(key.name));
+    if (wanted !== lead) continue;
     const res = await fetch(`${HOSTS[apnsEnv]}/3/device/${token}`, {
       method: "POST",
       headers: {

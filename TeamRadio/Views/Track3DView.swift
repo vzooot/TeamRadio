@@ -9,6 +9,8 @@ struct Track3DView: UIViewRepresentable {
     /// Incrementing this rebuilds the scene, snapping camera and rotation
     /// back to the initial framing.
     var resetToken: Int = 0
+    /// Corner to highlight (circuit guide); nil shows all markers alike.
+    var selectedCorner: Int? = nil
 
     func makeUIView(context: Context) -> SCNView {
         let view = SCNView()
@@ -18,10 +20,32 @@ struct Track3DView: UIViewRepresentable {
         view.scene = TrackSceneBuilder.build(map: map)
         context.coordinator.circuitName = map.circuitName
         context.coordinator.resetToken = resetToken
+        Self.highlight(selectedCorner, in: view)
+        context.coordinator.selectedCorner = selectedCorner
         return view
     }
 
+    /// Selected corner: bigger and cyan; the others dim back.
+    static func highlight(_ number: Int?, in view: SCNView) {
+        view.scene?.rootNode.enumerateChildNodes { node, _ in
+            guard let name = node.name, name.hasPrefix("corner-"), let n = Int(name.dropFirst(7)) else { return }
+            let on = number == n
+            let color: UIColor = on ? UIColor(red: 0.15, green: 0.82, blue: 1, alpha: 1)
+                : UIColor(white: number == nil ? 0.85 : 0.45, alpha: 1)
+            node.geometry?.firstMaterial?.diffuse.contents = color
+            let s: Float = on ? 0.1 : 0.055
+            SCNTransaction.begin()
+            SCNTransaction.animationDuration = 0.25
+            node.scale = SCNVector3(s, s, s)
+            SCNTransaction.commit()
+        }
+    }
+
     func updateUIView(_ view: SCNView, context: Context) {
+        if context.coordinator.selectedCorner != selectedCorner {
+            context.coordinator.selectedCorner = selectedCorner
+            Self.highlight(selectedCorner, in: view)
+        }
         guard context.coordinator.circuitName != map.circuitName
                 || context.coordinator.resetToken != resetToken else { return }
         context.coordinator.circuitName = map.circuitName
@@ -29,6 +53,7 @@ struct Track3DView: UIViewRepresentable {
         view.scene = TrackSceneBuilder.build(map: map)
         // Drop any free camera the user's gestures created.
         view.pointOfView = view.scene?.rootNode.childNodes.first { $0.camera != nil }
+        Self.highlight(selectedCorner, in: view)
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -36,6 +61,7 @@ struct Track3DView: UIViewRepresentable {
     final class Coordinator {
         var circuitName: String?
         var resetToken = 0
+        var selectedCorner: Int?
     }
 }
 
@@ -126,6 +152,7 @@ enum TrackSceneBuilder {
             text.firstMaterial?.diffuse.contents = UIColor(white: 0.85, alpha: 1)
 
             let node = SCNNode(geometry: text)
+            node.name = "corner-\(corner.number)"
             node.scale = SCNVector3(0.055, 0.055, 0.055)
             // Center the glyph on the corner position, lifted off the track.
             let (minB, maxB) = text.boundingBox

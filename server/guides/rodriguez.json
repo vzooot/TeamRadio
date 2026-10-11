@@ -1,0 +1,143 @@
+{
+ "circuitId": "rodriguez",
+ "reviewed": true,
+ "source": "track geometry (MultiViewer)",
+ "corners": [
+  {
+   "number": 1,
+   "name": "",
+   "text": "Medium-speed right-hander at the end of a 1360 m straight. Heavy braking and a prime overtaking spot.",
+   "moment": "",
+   "side": "right",
+   "kind": "medium"
+  },
+  {
+   "number": 2,
+   "name": "",
+   "text": "Slow left-hander, straight after Turn 1: a quick change of direction.",
+   "moment": "",
+   "side": "left",
+   "kind": "slow"
+  },
+  {
+   "number": 3,
+   "name": "",
+   "text": "Medium-speed right-hander, straight after Turn 2: a quick change of direction.",
+   "moment": "",
+   "side": "right",
+   "kind": "medium"
+  },
+  {
+   "number": 4,
+   "name": "",
+   "text": "Slow left-hander at the end of a 700 m straight. Heavy braking and a prime overtaking spot.",
+   "moment": "",
+   "side": "left",
+   "kind": "slow"
+  },
+  {
+   "number": 5,
+   "name": "",
+   "text": "Tight right-hand hairpin, straight after Turn 4: a quick change of direction.",
+   "moment": "",
+   "side": "right",
+   "kind": "hairpin"
+  },
+  {
+   "number": 6,
+   "name": "",
+   "text": "Slow right-hander. Traction out of here decides the next straight.",
+   "moment": "",
+   "side": "right",
+   "kind": "slow"
+  },
+  {
+   "number": 7,
+   "name": "",
+   "text": "Medium-speed left-hander. Carry the speed and keep the car tidy over the kerbs.",
+   "moment": "",
+   "side": "left",
+   "kind": "medium"
+  },
+  {
+   "number": 8,
+   "name": "",
+   "text": "Flat-out right kink, taken at full throttle with the car settled.",
+   "moment": "",
+   "side": "right",
+   "kind": "kink"
+  },
+  {
+   "number": 9,
+   "name": "",
+   "text": "Fast left-hand sweep, straight after Turn 8: a quick change of direction.",
+   "moment": "",
+   "side": "left",
+   "kind": "fast"
+  },
+  {
+   "number": 10,
+   "name": "",
+   "text": "Medium-speed right-hander. Carry the speed and keep the car tidy over the kerbs.",
+   "moment": "",
+   "side": "right",
+   "kind": "medium"
+  },
+  {
+   "number": 11,
+   "name": "",
+   "text": "Fast left-hand sweep, straight after Turn 10: a quick change of direction.",
+   "moment": "",
+   "side": "left",
+   "kind": "fast"
+  },
+  {
+   "number": 12,
+   "name": "Foro Sol stadium",
+   "text": "Medium-speed right-hander after a 550 m run. A big stop and a chance to dive down the inside.",
+   "moment": "",
+   "side": "right",
+   "kind": "medium"
+  },
+  {
+   "number": 13,
+   "name": "Foro Sol stadium",
+   "text": "Tight left-hand hairpin. Traction out of here decides the next straight.",
+   "moment": "",
+   "side": "left",
+   "kind": "hairpin"
+  },
+  {
+   "number": 14,
+   "name": "Foro Sol stadium",
+   "text": "Medium-speed right-hander, straight after Turn 13: a quick change of direction.",
+   "moment": "",
+   "side": "right",
+   "kind": "medium"
+  },
+  {
+   "number": 15,
+   "name": "Foro Sol stadium",
+   "text": "Flat-out right kink, straight after Turn 14: a quick change of direction.",
+   "moment": "",
+   "side": "right",
+   "kind": "kink"
+  },
+  {
+   "number": 16,
+   "name": "Foro Sol stadium",
+   "text": "Slow right-hander, straight after Turn 15: a quick change of direction.",
+   "moment": "",
+   "side": "right",
+   "kind": "slow"
+  },
+  {
+   "number": 17,
+   "name": "",
+   "text": "Fast right-hand sweep. Carry the speed and keep the car tidy over the kerbs.",
+   "moment": "",
+   "side": "right",
+   "kind": "fast"
+  }
+ ]
+}

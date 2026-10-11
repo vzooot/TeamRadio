@@ -8,8 +8,9 @@ enum NotificationManager {
     static let enabledKey = "sessionAlertsEnabled"
     /// Minutes of warning before each session.
     static let leadTime: TimeInterval = 15 * 60
-    /// iOS caps pending local notifications at 64 per app.
-    private static let maxScheduled = 60
+    /// iOS caps pending local notifications at 64 per app; a few stay free
+    /// for the prediction game's reminders.
+    private static let maxScheduled = 58
 
     static var isEnabled: Bool {
         UserDefaults.standard.bool(forKey: enabledKey)
@@ -20,7 +21,7 @@ enum NotificationManager {
     static func setEnabled(_ on: Bool, season: [Race]) async -> Bool {
         guard on else {
             UserDefaults.standard.set(false, forKey: enabledKey)
-            UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+            await removeSessionAlerts()
             return false
         }
 
@@ -49,7 +50,7 @@ enum NotificationManager {
     static func reschedule(season: [Race]) async {
         guard isEnabled else { return }
         let center = UNUserNotificationCenter.current()
-        center.removeAllPendingNotificationRequests()
+        await removeSessionAlerts()
 
         for item in plannedAlerts(season: season) {
             let content = UNMutableNotificationContent()
@@ -68,5 +69,12 @@ enum NotificationManager {
             )
             try? await center.add(request)
         }
+    }
+
+    /// Only this feature's alerts; other features keep theirs.
+    private static func removeSessionAlerts() async {
+        let center = UNUserNotificationCenter.current()
+        let ids = await center.pendingNotificationRequests().map(\.identifier).filter { $0.hasPrefix("session-") }
+        center.removePendingNotificationRequests(withIdentifiers: ids)
     }
 }
