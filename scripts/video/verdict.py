@@ -124,7 +124,6 @@ def main(name):
             lit = 0 if t >= 1.15 else min(5, int((t - 0.15) / 0.2) + 1) if t >= 0.15 else 0
             frame = T.lights(T.zoom(shaded, 1.0 + 0.05 * t, 0.2), lit)
             T.hook_text(layer, v['hook'], t - 0.05)
-            frame = T.static(frame, max(0, 0.5 - t * 2.5) + (max(0, (t - 1.15) / 0.2) * 0.5 if t > 1.15 else 0))
         elif t < SCORE:
             i = min(len(rows) - 1, int((t - ROWS) / ROW_LEN))
             rt = t - ROWS - i * ROW_LEN
@@ -142,8 +141,6 @@ def main(name):
         else:
             frame = T.lights(shaded, 5 if int((t - END) * 4) % 2 == 0 or t - END < 1.2 else 0)
             end_card(layer, v['end'], t - END)
-            if t > TOTAL - 0.3:
-                frame = T.static(frame, (t - (TOTAL - 0.3)) / 0.3 * 0.6)
         img = Image.fromarray(frame).convert('RGBA')
         img.alpha_composite(layer)
         enc.stdin.write(np.asarray(img.convert('RGB')).tobytes())
