@@ -1,16 +1,17 @@
 import SwiftUI
 
-/// Pole → podium → fastest lap → wildcard → review, then "Lock in".
+/// (Sprint winner →) pole → podium → fastest lap → wildcard → review, then "Lock in".
 /// Figma: Prediction Game → Picks — podium / Picks — review.
 struct PicksSheet: View {
     @Bindable var game: GameViewModel
     @Environment(\.dismiss) private var dismiss
 
     enum Step: Int, CaseIterable {
-        case pole, podium, fastestLap, wildcard, review
+        case sprint, pole, podium, fastestLap, wildcard, review
 
         var title: String {
             switch self {
+            case .sprint: "WHO WINS THE SPRINT?"
             case .pole: "WHO TAKES POLE?"
             case .podium: "PICK THE PODIUM"
             case .fastestLap: "FASTEST LAP"
@@ -21,6 +22,7 @@ struct PicksSheet: View {
 
         var caption: String {
             switch self {
+            case .sprint: "SPRINT"
             case .pole: "POLE"
             case .podium: "PODIUM"
             case .fastestLap: "FASTEST LAP"
@@ -37,8 +39,15 @@ struct PicksSheet: View {
     init(game: GameViewModel) {
         self.game = game
         // Returning players land on the review with everything filled in.
+        let sprintOpen = game.draft.hasSprint && !game.isLocked(.sprint, at: .now)
         let poleClosed = game.isLocked(.quali, at: .now)
-        _step = State(initialValue: game.draft.isComplete ? .review : poleClosed ? .podium : .pole)
+        _step = State(initialValue: game.draft.isComplete ? .review
+                      : sprintOpen ? .sprint : poleClosed ? .podium : .pole)
+    }
+
+    /// The steps this weekend has: the sprint step only on sprint weekends.
+    private var steps: [Step] {
+        game.draft.hasSprint ? Step.allCases : Step.allCases.filter { $0 != .sprint }
     }
 
     var body: some View {
@@ -48,6 +57,12 @@ struct PicksSheet: View {
                     header
                     stepBar
                     switch step {
+                    case .sprint:
+                        if game.isLocked(.sprint, at: .now) {
+                            lockedNote("Sprint pick locked when the sprint started.")
+                        } else {
+                            driverGrid(selected: game.draft.sprintWinner) { game.draft.sprintWinner = $0; advance() }
+                        }
                     case .pole:
                         if game.isLocked(.quali, at: .now) {
                             lockedNote("Pole locked when qualifying started.")
@@ -86,7 +101,7 @@ struct PicksSheet: View {
     private var stepBar: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
-                ForEach(Step.allCases, id: \.self) { s in
+                ForEach(steps, id: \.self) { s in
                     Capsule()
                         .fill(s.rawValue <= step.rawValue ? Theme.accent : Color.white.opacity(0.06))
                         .frame(height: 4)
@@ -94,7 +109,7 @@ struct PicksSheet: View {
                         .onTapGesture { if isReachable(s) { withAnimation { step = s } } }
                 }
             }
-            Text("STEP \(step.rawValue + 1) OF \(Step.allCases.count) · \(step.caption)")
+            Text("STEP \((steps.firstIndex(of: step) ?? 0) + 1) OF \(steps.count) · \(step.caption)")
                 .font(.f1(11, weight: .bold))
                 .tracking(2)
                 .foregroundStyle(Theme.dimText)
@@ -106,7 +121,8 @@ struct PicksSheet: View {
     }
 
     private func advance() {
-        guard let next = Step(rawValue: step.rawValue + 1) else { return }
+        guard let i = steps.firstIndex(of: step), i + 1 < steps.count else { return }
+        let next = steps[i + 1]
         withAnimation(.easeInOut(duration: 0.25)) { step = game.draft.isComplete ? .review : next }
     }
 
@@ -200,6 +216,9 @@ struct PicksSheet: View {
 
     private var review: some View {
         VStack(alignment: .leading, spacing: 8) {
+            if game.draft.hasSprint {
+                reviewRow("SPRINT WINNER", game.draft.sprintWinner, edit: .sprint, group: .sprint)
+            }
             reviewRow("POLE", game.draft.pole, edit: .pole, group: .quali)
             reviewRow("WINNER · P1", game.draft.p1, edit: .podium, slot: 0)
             reviewRow("P2", game.draft.p2, edit: .podium, slot: 1)
@@ -210,15 +229,17 @@ struct PicksSheet: View {
 
             if let next = game.nextLock(at: .now) {
                 VStack(alignment: .leading, spacing: 4) {
-                    ForEach(PickGroup.allCases, id: \.self) { group in
+                    ForEach(game.draft.groups, id: \.self) { group in
                         if let lock = game.lockDate(group) {
-                            Text("🔒 \(group == .quali ? "POLE" : "RACE PICKS") · \(lock.formatted(.dateTime.weekday(.abbreviated).hour().minute()).uppercased())\(lock > .now ? " · IN \(PicksCard.remaining(until: lock, now: .now).uppercased())" : " · LOCKED")")
+                            Text("🔒 \(group == .sprint ? "SPRINT" : group == .quali ? "POLE" : "RACE PICKS") · \(lock.formatted(.dateTime.weekday(.abbreviated).hour().minute()).uppercased())\(lock > .now ? " · IN \(PicksCard.remaining(until: lock, now: .now).uppercased())" : " · LOCKED")")
                                 .font(.f1(11, weight: .bold))
                                 .tracking(1.5)
                                 .foregroundStyle(group == next.group ? Theme.accent : Theme.dimText)
                         }
                     }
-                    Text("Each pick locks when its session starts: pole at qualifying, the rest at the race. Until then you can change them as often as you like.")
+                    Text(game.draft.hasSprint
+                         ? "Each pick locks when its session starts: the sprint winner at the sprint, pole at qualifying, the rest at the race. Until then you can change them as often as you like."
+                         : "Each pick locks when its session starts: pole at qualifying, the rest at the race. Until then you can change them as often as you like.")
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.dimText)
                         .fixedSize(horizontal: false, vertical: true)

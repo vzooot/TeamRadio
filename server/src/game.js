@@ -18,7 +18,7 @@ const STRATEGIST_NAME = "AI Strategist";
 // Mirrors GameRules in TeamRadio/Models/Prediction.swift. Keep in sync.
 export const RULES = {
   pole: 5, winner: 10, second: 6, third: 6, podiumWrongSlot: 2,
-  perfectPodium: 10, fastestLap: 5, wildcard: 5,
+  perfectPodium: 10, fastestLap: 5, wildcard: 5, sprintWinner: 5,
 };
 
 export const WILDCARDS = ["poleSitterWins", "retirements", "winningMargin"];
@@ -61,8 +61,13 @@ export function resolveWildcard(kind, qualifying, race) {
   return null;
 }
 
-export function score(p, wildcard, qualifying, race) {
+export function score(p, wildcard, qualifying, race, sprint = []) {
   const items = [];
+  if (p.sprintWinner != null || sprint.length) {
+    const winner = sprint.find((r) => r.position === "1")?.Driver.driverId ?? null;
+    const hit = p.sprintWinner != null && p.sprintWinner === winner;
+    items.push({ kind: "sprint", picked: p.sprintWinner ?? null, actual: winner, points: hit ? RULES.sprintWinner : 0, outcome: hit ? "exact" : "miss" });
+  }
   const id = (r) => r?.Driver.driverId ?? null;
   const pole = id(qualifying.find((r) => r.position === "1"));
   const podium = [1, 2, 3].map((n) => id(race.find((r) => r.position === String(n))));
@@ -98,9 +103,10 @@ export function score(p, wildcard, qualifying, race) {
 // Each pick locks when its session starts: pole at qualifying, the podium,
 // fastest lap and wildcard at the race. Same as GameRules.lockDate in Swift.
 const at = (s) => (s?.date ? new Date(`${s.date}T${s.time || "00:00:00Z"}`) : null);
-export const GROUP_FIELDS = { quali: ["pole"], race: ["p1", "p2", "p3", "fastestLap", "wildcard"] };
+export const GROUP_FIELDS = { sprint: ["sprintWinner"], quali: ["pole"], race: ["p1", "p2", "p3", "fastestLap", "wildcard"] };
 
 export function groupLock(race, group) {
+  if (group === "sprint") return at(race.Sprint);
   return group === "quali" ? at(race.Qualifying) : at({ date: race.date, time: race.time });
 }
 
@@ -116,7 +122,7 @@ export function lockDate(race) {
 /// pred-<round>-<user> holding both groups.
 export function mergePicks(records, race) {
   const id = `${race.season}-${race.round}`;
-  const locks = { quali: groupLock(race, "quali")?.getTime() ?? 0, race: groupLock(race, "race")?.getTime() ?? 0 };
+  const locks = { sprint: groupLock(race, "sprint")?.getTime() ?? 0, quali: groupLock(race, "quali")?.getTime() ?? 0, race: groupLock(race, "race")?.getTime() ?? 0 };
   const players = {};
   let voided = 0;
   for (const r of records) {
@@ -124,7 +130,8 @@ export function mergePicks(records, race) {
     const base = `pred-${id}-${r.userId}`;
     const groups = r.recordName === base ? ["quali", "race"]
       : r.recordName === `${base}-quali` ? ["quali"]
-      : r.recordName === `${base}-race` ? ["race"] : [];
+      : r.recordName === `${base}-race` ? ["race"]
+      : r.recordName === `${base}-sprint` ? ["sprint"] : [];
     for (const g of groups) {
       if (r.modified >= locks[g]) { voided++; continue; }
       const p = players[r.userId] ||= { userId: r.userId, name: r.name, locked: 0 };
@@ -153,13 +160,15 @@ async function season() {
 }
 
 async function raceData(r) {
-  const [res, quali] = await Promise.all([
+  const [res, quali, sprint] = await Promise.all([
     jolpica(`${r.season}/${r.round}/results.json?limit=40`),
     jolpica(`${r.season}/${r.round}/qualifying.json?limit=40`),
+    r.Sprint ? jolpica(`${r.season}/${r.round}/sprint.json?limit=40`) : null,
   ]);
   return {
     results: res.RaceTable.Races[0]?.Results ?? [],
     qualifying: quali.RaceTable.Races[0]?.QualifyingResults ?? [],
+    sprint: sprint?.RaceTable.Races[0]?.SprintResults ?? [],
   };
 }
 
@@ -209,7 +218,7 @@ async function predictions(env, ckEnv, roundId) {
       all.push({
         userId: f("userId"), name: f("name"),
         pole: f("pole"), p1: f("p1"), p2: f("p2"), p3: f("p3"),
-        fastestLap: f("fastestLap"), wildcard: f("wildcard"),
+        fastestLap: f("fastestLap"), wildcard: f("wildcard"), sprintWinner: f("sprintWinner"),
         modified: r.modified?.timestamp ?? r.created?.timestamp ?? 0,
         recordName: r.recordName,
       });
@@ -265,7 +274,7 @@ async function dotdTally(env, ckEnv, race) {
 /// the season table. Idempotent: rerunning replaces the round.
 export async function scoreRound(env, ckEnv, race) {
   const id = `${race.season}-${race.round}`;
-  const { results, qualifying } = await raceData(race);
+  const { results, qualifying, sprint } = await raceData(race);
   if (!results.length) return { id, skipped: "no results yet" };
 
   const wildcard = wildcardForRound(race.round);
@@ -273,7 +282,7 @@ export async function scoreRound(env, ckEnv, race) {
 
   const players = {};
   for (const p of picks) {
-    const s = score(p, wildcard, qualifying, results);
+    const s = score(p, wildcard, qualifying, results, sprint);
     players[p.userId] = { name: p.name || "Player", points: s.total, exact: s.exact, items: s.items, locked: p.modified };
   }
 

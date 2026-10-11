@@ -17,19 +17,27 @@ struct Prediction: Equatable, Codable {
     var p3: String?
     var fastestLap: String?
     var wildcard: String?
+    /// Sprint weekends only.
+    var sprintWinner: String?
+    var hasSprint = false
 
-    init(round: String) {
+    init(round: String, hasSprint: Bool = false) {
         self.round = round
+        self.hasSprint = hasSprint
     }
 
     var podium: [String?] { [p1, p2, p3] }
 
+    /// The groups this weekend has, in lock order.
+    var groups: [PickGroup] { hasSprint ? [.sprint, .quali, .race] : [.quali, .race] }
+
     var isComplete: Bool {
-        PickGroup.allCases.allSatisfy(isComplete)
+        groups.allSatisfy(isComplete)
     }
 
     func isComplete(_ group: PickGroup) -> Bool {
         switch group {
+        case .sprint: sprintWinner != nil
         case .quali: pole != nil
         case .race: [p1, p2, p3, fastestLap, wildcard].allSatisfy { $0 != nil }
         }
@@ -38,19 +46,22 @@ struct Prediction: Equatable, Codable {
     /// Copies one group's picks from another prediction (keeps the rest).
     mutating func take(_ group: PickGroup, from other: Prediction) {
         switch group {
+        case .sprint: sprintWinner = other.sprintWinner
         case .quali: pole = other.pole
         case .race: (p1, p2, p3, fastestLap, wildcard) = (other.p1, other.p2, other.p3, other.fastestLap, other.wildcard)
         }
     }
 }
 
-/// Picks are locked in two groups, each at the start of its session.
+/// Picks lock in groups, each at the start of its session: the sprint
+/// winner (sprint weekends), pole at qualifying, the rest at the race.
 enum PickGroup: String, CaseIterable {
-    case quali, race
+    case sprint, quali, race
 
-    /// "qualifying" / "the race", as players read it.
+    /// "the sprint" / "qualifying" / "the race", as players read it.
     var sessionName: String {
         switch self {
+        case .sprint: "the sprint"
         case .quali: "qualifying"
         case .race: "the race"
         }
@@ -126,6 +137,8 @@ enum GameRules {
     static let perfectPodium = 10
     static let fastestLap = 5
     static let wildcard = 5
+    /// Sprint weekends only, on top of the regular maximum.
+    static let sprintWinner = 5
 
     static let maximum = pole + winner + second + third + perfectPodium + fastestLap + wildcard
 
@@ -133,14 +146,22 @@ enum GameRules {
     /// qualifying, everything else at the race.
     static func lockDate(for race: Race, group: PickGroup) -> Date? {
         switch group {
+        case .sprint: race.sessions.first { $0.kind == .sprint }?.date
         case .quali: race.sessions.first { $0.kind == .qualifying }?.date
         case .race: race.startDate
         }
     }
 
     static func score(_ prediction: Prediction, wildcard: Wildcard,
-                      qualifying: [QualifyingResult], race: [RaceResult]) -> ScoreBreakdown {
+                      qualifying: [QualifyingResult], race: [RaceResult],
+                      sprint: [RaceResult] = []) -> ScoreBreakdown {
         var items: [ScoreBreakdown.Item] = []
+        if prediction.hasSprint || prediction.sprintWinner != nil {
+            let winner = sprint.first { $0.position == "1" }?.driver.driverId
+            let hit = prediction.sprintWinner != nil && prediction.sprintWinner == winner
+            items.append(.init(kind: .sprint, picked: prediction.sprintWinner, actual: winner,
+                               points: hit ? sprintWinner : 0, outcome: hit ? .exact : .miss))
+        }
         let poleId = qualifying.first { $0.position == "1" }?.driver.driverId
         let podium = (1...3).map { p in race.first { $0.position == String(p) }?.driver.driverId }
 
@@ -183,10 +204,11 @@ enum GameRules {
 
 struct ScoreBreakdown: Equatable {
     enum Kind: String {
-        case pole, p1, p2, p3, perfectPodium, fastestLap, wildcard
+        case sprint, pole, p1, p2, p3, perfectPodium, fastestLap, wildcard
 
         var label: String {
             switch self {
+            case .sprint: "SPRINT WINNER"
             case .pole: "POLE"
             case .p1: "WINNER · P1"
             case .p2: "P2"

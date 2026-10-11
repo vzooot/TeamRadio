@@ -38,7 +38,7 @@ enum PredictionService {
         var groups = Set<PickGroup>()
         if case .success(let record)? = results[legacyID(round: round, userId: userId)] {
             prediction = self.prediction(from: record, round: round)
-            groups = Set(PickGroup.allCases)
+            groups = [.quali, .race]
         }
         for group in PickGroup.allCases {
             switch results[recordID(round: round, userId: userId, group: group)] {
@@ -71,6 +71,8 @@ enum PredictionService {
             record["name"] = name
             record["group"] = group.rawValue
             switch group {
+            case .sprint:
+                record["sprintWinner"] = prediction.sprintWinner
             case .quali:
                 record["pole"] = prediction.pole
             case .race:
@@ -92,6 +94,7 @@ enum PredictionService {
         p.p3 = record["p3"] as? String
         p.fastestLap = record["fastestLap"] as? String
         p.wildcard = record["wildcard"] as? String
+        p.sprintWinner = record["sprintWinner"] as? String
         return p
     }
 }
