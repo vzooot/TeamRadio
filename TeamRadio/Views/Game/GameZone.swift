@@ -347,38 +347,21 @@ private struct StrategistCard: View {
         }
     }
 
-    /// The season: big rings between the two totals, every round in 3D
-    /// underneath.
+    /// The season: big rings with both totals beside every round in 3D.
     private func duel(_ rounds: [LeaderboardService.DuelRound]) -> some View {
         let s = season(rounds)
-        return VStack(spacing: 6) {
-            HStack {
-                total("YOU", s.you, Theme.accent, alignment: .leading)
-                Spacer()
-                SeasonDuelRings(you: s.you, ai: s.ai, progress: shown ? 1 : 0,
-                                caption: "\(s.played)/\(s.count)")
-                    .frame(width: 120, height: 120)
-                Spacer()
-                total("AI", s.ai, Theme.violet, alignment: .trailing)
+        return VStack(alignment: .leading, spacing: 8) {
+            roundLine(s, alignment: .leading)
+            HStack(spacing: 12) {
+                SeasonDuelRings(you: s.you, ai: s.ai, progress: shown ? 1 : 0)
+                    .frame(width: 118, height: 118)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Season: you \(Int(s.you)) points, AI \(Int(s.ai)) points")
+                SeasonDuelBars(you: s.youCols, ai: s.aiCols, raced: s.raced, grown: shown, selected: $selected)
+                    .frame(height: 130)
+                    .accessibilityHidden(true)
             }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Season: you \(Int(s.you)) points, AI \(Int(s.ai)) points")
-            SeasonDuelBars(you: s.youCols, ai: s.aiCols, raced: s.raced, grown: shown, selected: $selected)
-                .frame(height: 140)
-                .accessibilityHidden(true)
-            roundLine(s, alignment: .center)
         }
-    }
-
-    private func total(_ label: String, _ value: Double, _ color: Color, alignment: HorizontalAlignment) -> some View {
-        VStack(alignment: alignment, spacing: 0) {
-            CountingText(value: value * (shown ? 1 : 0), prefix: "")
-                .font(.f1Digits(34))
-                .foregroundStyle(color)
-                .shadow(color: color.opacity(0.5), radius: 8)
-            Text(label).font(.f1(10, weight: .heavy)).tracking(2).foregroundStyle(Theme.dimText)
-        }
-        .frame(width: 70, alignment: alignment == .leading ? .leading : .trailing)
     }
 
     /// One tile per pick: yours on top (a cyan "+" while it's still open, a
@@ -442,43 +425,31 @@ private struct SeasonDuelRings: View {
     let ai: Double
     /// 0 empty, 1 full; animating it sweeps the rings and counts the totals up.
     var progress: Double = 1
-    /// Small badge: just the two rings, the totals sit beside it.
-    var compact = false
-    /// Shown in the middle instead of the totals (they sit beside it).
-    var caption: String? = nil
 
     var body: some View {
         let top = max(you, ai, 1) * 1.08
         ZStack {
             ring(you / top * progress, Theme.accent, inset: 0)
-            ring(ai / top * progress, Theme.violet, inset: compact ? 7 : 13)
-            if let caption {
-                VStack(spacing: 0) {
-                    Text(caption).font(.f1Digits(18)).foregroundStyle(.white)
-                    Text("ROUNDS").font(.f1(8, weight: .heavy)).tracking(1.5).foregroundStyle(Theme.dimText)
-                }
-            } else if !compact {
-                VStack(spacing: 0) {
-                    CountingText(value: you * progress, prefix: "")
-                        .font(.f1Digits(18))
-                        .foregroundStyle(.white)
-                    CountingText(value: ai * progress, prefix: "VS ")
-                        .font(.f1(9, weight: .heavy))
-                        .tracking(1)
-                        .foregroundStyle(Theme.violet)
-                }
+            ring(ai / top * progress, Theme.violet, inset: 13)
+            VStack(spacing: 0) {
+                CountingText(value: you * progress, prefix: "")
+                    .font(.f1Digits(18))
+                    .foregroundStyle(.white)
+                CountingText(value: ai * progress, prefix: "VS ")
+                    .font(.f1(9, weight: .heavy))
+                    .tracking(1)
+                    .foregroundStyle(Theme.violet)
             }
         }
     }
 
     private func ring(_ value: Double, _ color: Color, inset: CGFloat) -> some View {
-        let width: CGFloat = compact ? 5 : 9
-        return ZStack {
-            Circle().stroke(color.opacity(0.15), lineWidth: width)
+        ZStack {
+            Circle().stroke(color.opacity(0.15), lineWidth: 9)
             Circle().trim(from: 0, to: value)
-                .stroke(color, style: StrokeStyle(lineWidth: width, lineCap: .round))
+                .stroke(color, style: StrokeStyle(lineWidth: 9, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-                .shadow(color: color.opacity(0.8), radius: compact ? 2 : 4)
+                .shadow(color: color.opacity(0.8), radius: 4)
         }
         .padding(inset)
     }
@@ -773,10 +744,14 @@ private struct SeasonDuelBars: UIViewRepresentable {
 
         let camera = SCNNode()
         camera.camera = SCNCamera()
-        camera.camera?.fieldOfView = 30
-        // back far enough that the swing and tilt never reach the edges
+        // The field of view is set across, so the chart fits the frame's
+        // width whatever its shape — wide enough for the nearer end at the
+        // worst angle a drag can turn it to (~32° off centre).
+        camera.camera?.projectionDirection = .horizontal
+        camera.camera?.fieldOfView = 66
         camera.position = SCNVector3(0, 3.9, 7.1)
-        camera.look(at: SCNVector3(0, 0.35, 0))
+        // aim at the middle of the bars so the chart sits centred
+        camera.look(at: SCNVector3(0, 0.8, 0))
         scene.rootNode.addChildNode(camera)
         return scene
     }
