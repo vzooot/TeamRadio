@@ -15,22 +15,21 @@ struct ContentView: View {
     /// Which way the last race switch went, so the page follows the card.
     @State private var raceEdge: Edge = .trailing
 
-    /// The race's sections dim while a switch is under way.
-    @State private var contentDimmed = false
+    /// The schedule and circuit are on screen (false while a switch swaps them).
+    @State private var sectionsShown = true
 
-    /// Dim, swap, reveal: the content under the card dims quickly, the new
-    /// race's sections are swapped in without animation while it's dim (so
-    /// the rebuild never shows as a stutter), then it fades back up; map
-    /// and weather load after that. nil goes back to the next race.
+    /// Switching race: the countdown stays and updates in place, its digits
+    /// rolling to the new race; the schedule and circuit slip out, are
+    /// swapped while hidden (so no rebuild ever shows as a stutter), then
+    /// rise back in one after the other. Map and weather load after that.
+    /// nil goes back to the next race.
     private func switchRace(to race: Race?) {
-        withAnimation(.easeOut(duration: 0.12)) { contentDimmed = true }
+        sectionsShown = false
         Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(130))
-            var instant = Transaction()
-            instant.disablesAnimations = true
-            withTransaction(instant) { model.show(race) }
+            try? await Task.sleep(for: .milliseconds(110))
+            model.show(race)
             try? await Task.sleep(for: .milliseconds(40))
-            withAnimation(.easeOut(duration: 0.28)) { contentDimmed = false }
+            sectionsShown = true
             await model.refreshExtras()
         }
     }
@@ -147,8 +146,6 @@ struct ContentView: View {
                     }
 
                     CountdownView(race: race)
-                        .id(race.id)
-                        .opacity(contentDimmed ? 0.15 : 1)
 
                     #if DEBUG
                     if BlendDraft.gameZoneInApp {
@@ -172,7 +169,7 @@ struct ContentView: View {
                         WeekendScheduleView(race: race, weather: model.weather, weatherLoading: model.extrasLoading)
                             .id(race.id)
                     }
-                    .opacity(contentDimmed ? 0.15 : 1)
+                    .cascade(sectionsShown, delay: 0)
                     .id("schedule")
 
                     SessionAlertsCard(season: model.season)
@@ -191,7 +188,7 @@ struct ContentView: View {
                             TrackPlaceholder()
                         }
                     }
-                    .opacity(contentDimmed ? 0.15 : 1)
+                    .cascade(sectionsShown, delay: 0.08)
                     .id("trackSection")
                 } else {
                     SeasonOverBanner()
@@ -288,6 +285,18 @@ struct ContentView: View {
         }
         .padding(.horizontal, 4)
         .padding(.top, -8)
+    }
+}
+
+private extension View {
+    /// Slips out fast when hidden, rises back in with a soft spring after
+    /// `delay` when shown (opacity and offset only, so it stays cheap).
+    func cascade(_ shown: Bool, delay: Double) -> some View {
+        self
+            .opacity(shown ? 1 : 0)
+            .offset(y: shown ? 0 : 22)
+            .animation(shown ? .spring(response: 0.45, dampingFraction: 0.8).delay(delay) : .easeIn(duration: 0.1),
+                       value: shown)
     }
 }
 

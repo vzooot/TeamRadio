@@ -196,6 +196,7 @@ private struct PicksHero: View {
             Rectangle().fill(Theme.violet.opacity(0.3)).frame(height: 1).padding(.bottom, 12)
             StrategistCard(game: game, state: state, seasonRounds: seasonRounds, embedded: true)
         }
+        .id("strategist")
     }
 
     private func note(_ text: String) -> some View {
@@ -348,20 +349,34 @@ private struct StrategistCard: View {
         let ai = aiCols.compactMap { $0 }
         // Rounds before the next race have been raced (lighter columns).
         let raced = min(count, max(0, (game.race?.roundNumber ?? count + 1) - 1))
-        return HStack(spacing: 14) {
-            SeasonDuelRings(you: you.reduce(0, +), ai: ai.reduce(0, +), progress: shown ? 1 : 0)
-                .frame(width: 92, height: 92)
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 10) {
-                    if let selected {
-                        // the tapped round
-                        let round = byRound[selected + 1]
+        // A compact season line on top; the 3D bars get the full width below.
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
+                SeasonDuelRings(you: you.reduce(0, +), ai: ai.reduce(0, +), progress: shown ? 1 : 0, compact: true)
+                    .frame(width: 40, height: 40)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("SEASON · \(rounds.count)/\(count)")
+                        .font(.f1(9, weight: .heavy))
+                        .tracking(1.5)
+                        .foregroundStyle(Theme.faintText)
+                    HStack(spacing: 10) {
+                        CountingText(value: you.reduce(0, +) * (shown ? 1 : 0), prefix: "YOU ")
+                            .foregroundStyle(Theme.accent)
+                        CountingText(value: ai.reduce(0, +) * (shown ? 1 : 0), prefix: "AI ")
+                            .foregroundStyle(Theme.violet)
+                    }
+                    .font(.f1(13, weight: .heavy))
+                }
+                Spacer(minLength: 6)
+                if let selected {
+                    // the tapped round
+                    let round = byRound[selected + 1]
+                    VStack(alignment: .trailing, spacing: 2) {
                         Text("R\(selected + 1)\(round?.name.map { " · " + $0.replacingOccurrences(of: " Grand Prix", with: "").uppercased() } ?? "")")
                             .font(.f1(10, weight: .heavy))
                             .tracking(1)
                             .foregroundStyle(.white)
                             .lineLimit(1)
-                        Spacer(minLength: 4)
                         if let round {
                             Text("YOU \(round.you.map(String.init) ?? "—") · AI \(round.ai.map(String.init) ?? "—")")
                                 .font(.f1(10, weight: .heavy))
@@ -372,22 +387,16 @@ private struct StrategistCard: View {
                                 .tracking(1)
                                 .foregroundStyle(Theme.faintText)
                         }
-                    } else {
-                        legend("YOU", Theme.accent)
-                        legend("AI", Theme.violet)
-                        Spacer()
-                        Text("\(rounds.count)/\(count) · TAP A ROUND")
-                            .font(.f1(9, weight: .bold))
-                            .tracking(1)
-                            .foregroundStyle(Theme.faintText)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
                     }
+                } else {
+                    Text("DRAG · TAP A ROUND")
+                        .font(.f1(9, weight: .bold))
+                        .tracking(1)
+                        .foregroundStyle(Theme.faintText)
                 }
-                .frame(height: 14)
-                SeasonDuelBars(you: youCols, ai: aiCols, raced: raced, grown: shown, selected: $selected)
-                    .frame(height: 96)
             }
+            SeasonDuelBars(you: youCols, ai: aiCols, raced: raced, grown: shown, selected: $selected)
+                .frame(height: 150)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Season: you \(Int(you.reduce(0, +))) points, AI \(Int(ai.reduce(0, +))) points")
@@ -435,31 +444,36 @@ private struct SeasonDuelRings: View {
     let ai: Double
     /// 0 empty, 1 full; animating it sweeps the rings and counts the totals up.
     var progress: Double = 1
+    /// Small badge: just the two rings, the totals sit beside it.
+    var compact = false
 
     var body: some View {
         let top = max(you, ai, 1) * 1.08
         ZStack {
             ring(you / top * progress, Theme.accent, inset: 0)
-            ring(ai / top * progress, Theme.violet, inset: 13)
-            VStack(spacing: 0) {
-                CountingText(value: you * progress, prefix: "")
-                    .font(.f1Digits(18))
-                    .foregroundStyle(.white)
-                CountingText(value: ai * progress, prefix: "VS ")
-                    .font(.f1(9, weight: .heavy))
-                    .tracking(1)
-                    .foregroundStyle(Theme.violet)
+            ring(ai / top * progress, Theme.violet, inset: compact ? 7 : 13)
+            if !compact {
+                VStack(spacing: 0) {
+                    CountingText(value: you * progress, prefix: "")
+                        .font(.f1Digits(18))
+                        .foregroundStyle(.white)
+                    CountingText(value: ai * progress, prefix: "VS ")
+                        .font(.f1(9, weight: .heavy))
+                        .tracking(1)
+                        .foregroundStyle(Theme.violet)
+                }
             }
         }
     }
 
     private func ring(_ value: Double, _ color: Color, inset: CGFloat) -> some View {
-        ZStack {
-            Circle().stroke(color.opacity(0.15), lineWidth: 9)
+        let width: CGFloat = compact ? 5 : 9
+        return ZStack {
+            Circle().stroke(color.opacity(0.15), lineWidth: width)
             Circle().trim(from: 0, to: value)
-                .stroke(color, style: StrokeStyle(lineWidth: 9, lineCap: .round))
+                .stroke(color, style: StrokeStyle(lineWidth: width, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-                .shadow(color: color.opacity(0.8), radius: 4)
+                .shadow(color: color.opacity(0.8), radius: compact ? 2 : 4)
         }
         .padding(inset)
     }
@@ -573,21 +587,30 @@ private struct SeasonDuelBars: UIViewRepresentable {
             onSelect?(column == selected ? nil : column)
         }
 
-        /// Drag sideways to turn the chart; it swings on its own again a
-        /// moment after you let go.
+        /// Drag to turn the chart: sideways spins it, up and down tips it
+        /// toward you or away. It moves on its own again a moment after you
+        /// let go.
         @objc func panned(_ gesture: UIPanGestureRecognizer) {
             guard let view = gesture.view as? SCNView,
-                  let chart = view.scene?.rootNode.childNode(withName: "chart", recursively: false) else { return }
+                  let tilt = view.scene?.rootNode.childNode(withName: "tilt", recursively: false),
+                  let chart = tilt.childNode(withName: "chart", recursively: false) else { return }
             switch gesture.state {
             case .began:
                 chart.removeAction(forKey: "swing")
+                tilt.removeAction(forKey: "sway")
             case .changed:
-                chart.eulerAngles.y += Float(gesture.translation(in: view).x) * 0.012
+                let t = gesture.translation(in: view)
+                chart.eulerAngles.y += Float(t.x) * 0.012
+                tilt.eulerAngles.x = min(0.55, max(-0.4, tilt.eulerAngles.x + Float(t.y) * 0.008))
+                tilt.eulerAngles.z *= 0.9
                 gesture.setTranslation(.zero, in: view)
             case .ended, .cancelled:
                 let back = SCNAction.rotateTo(x: 0, y: CGFloat(SeasonDuelBars.restAngle), z: 0, duration: 0.9, usesShortestUnitArc: true)
                 back.timingMode = .easeInEaseOut
                 chart.runAction(.sequence([.wait(duration: 2.5), back, SeasonDuelBars.swing]), forKey: "swing")
+                let level = SCNAction.rotateTo(x: 0, y: 0, z: 0, duration: 0.7, usesShortestUnitArc: true)
+                level.timingMode = .easeOut
+                tilt.runAction(.sequence([level, .wait(duration: 2.7), SeasonDuelBars.sway]), forKey: "sway")
             default:
                 break
             }
@@ -610,6 +633,22 @@ private struct SeasonDuelBars: UIViewRepresentable {
         let left = SCNAction.rotateBy(x: 0, y: -1.5, z: 0, duration: 3.2)
         left.timingMode = .easeInEaseOut
         return .repeatForever(.sequence([right, left]))
+    }
+
+    /// A slower tip and roll on the other axes, out of step with the swing,
+    /// so the chart never moves the same way twice.
+    static var sway: SCNAction {
+        func step(_ x: CGFloat, _ z: CGFloat, _ duration: Double) -> SCNAction {
+            let a = SCNAction.rotateTo(x: x, y: 0, z: z, duration: duration, usesShortestUnitArc: true)
+            a.timingMode = .easeInEaseOut
+            return a
+        }
+        return .repeatForever(.sequence([
+            step(0.22, 0.05, 2.3),
+            step(-0.12, -0.04, 2.6),
+            step(0.08, 0.06, 2.1),
+            step(0, 0, 2.0),
+        ]))
     }
 
     /// Bars rise gently from a fifth of their height with a light stagger,
@@ -654,9 +693,13 @@ private struct SeasonDuelBars: UIViewRepresentable {
     private static func scene(you: [Double?], ai: [Double?], raced: Int) -> SCNScene {
         let scene = SCNScene()
         scene.background.contents = UIColor.clear
+        // tilt (x tip, z roll) carries chart (y swing): the axes move apart
+        let tilt = SCNNode()
+        tilt.name = "tilt"
+        scene.rootNode.addChildNode(tilt)
         let chart = SCNNode()
         chart.name = "chart"
-        scene.rootNode.addChildNode(chart)
+        tilt.addChildNode(chart)
         let n = max(you.count, ai.count, 1)
         let pitch: Float = min(0.42, 7.2 / Float(n))
         let x0 = -Float(n - 1) * pitch / 2
@@ -708,6 +751,7 @@ private struct SeasonDuelBars: UIViewRepresentable {
 
         chart.eulerAngles.y = restAngle
         chart.runAction(swing, forKey: "swing")
+        tilt.runAction(sway, forKey: "sway")
 
         let ambient = SCNNode()
         ambient.light = SCNLight()
@@ -724,7 +768,8 @@ private struct SeasonDuelBars: UIViewRepresentable {
         let camera = SCNNode()
         camera.camera = SCNCamera()
         camera.camera?.fieldOfView = 30
-        camera.position = SCNVector3(0, 3.6, 6.2)
+        // back far enough that the swing and tilt never reach the edges
+        camera.position = SCNVector3(0, 3.9, 7.1)
         camera.look(at: SCNVector3(0, 0.35, 0))
         scene.rootNode.addChildNode(camera)
         return scene

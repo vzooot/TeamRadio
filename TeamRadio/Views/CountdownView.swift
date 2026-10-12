@@ -88,6 +88,12 @@ struct CountdownView: View {
                 }
             }
             .onAppear { pinned = LiveActivityManager.hasPinIntent }
+            // Updated in place when the race changes (the digits roll over):
+            // start again from that race's next session.
+            .onChange(of: race.id) { _, _ in
+                selectedId = nil
+                pinned = LiveActivityManager.hasPinIntent
+            }
             #if DEBUG
             .onChange(of: DemoDirector.shared.sessionIndex) { _, i in
                 if let i, sessions.indices.contains(i) { selectedId = sessions[i].id }
