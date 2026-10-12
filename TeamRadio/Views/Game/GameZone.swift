@@ -248,8 +248,11 @@ private struct StrategistCard: View {
     let seasonRounds: Int
     @State private var history: [LeaderboardService.DuelRound]?
     @State private var revealed: LeaderboardService.PlayerPicks?
-    /// The duel fills (rings sweep, bars grow) each time it scrolls into view.
+    /// The duel fills (rings sweep, bars grow) each time the card scrolls
+    /// into view, and resets once it has left the screen.
     @State private var shown = false
+    /// Round tapped in the 3D chart (index into the season).
+    @State private var selected: Int?
 
     private var scored: (race: Race, score: ScoreBreakdown)? {
         if case let .scored(race, score, _) = state { return (race, score) }
@@ -292,6 +295,13 @@ private struct StrategistCard: View {
                 .fill(LinearGradient(colors: [Theme.card, Theme.violet.opacity(0.14)], startPoint: .leading, endPoint: .trailing))
                 .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Theme.violet.opacity(0.35), lineWidth: 1))
         )
+        .onCardVisibility(show: {
+            guard !shown else { return }
+            withAnimation(.easeOut(duration: 1.1)) { shown = true }
+        }, hide: {
+            shown = false
+            selected = nil
+        })
         .task(id: scored?.race.id) {
             if let race = scored?.race {
                 revealed = await LeaderboardService.playerPicks(round: race.id, user: "ai-strategist")
@@ -326,28 +336,47 @@ private struct StrategistCard: View {
         let aiCols = (1...max(count, 1)).map { byRound[$0]?.ai.map(Double.init) }
         let you = youCols.compactMap { $0 }
         let ai = aiCols.compactMap { $0 }
+        // Rounds before the next race have been raced (lighter columns).
+        let raced = min(count, max(0, (game.race?.roundNumber ?? count + 1) - 1))
         return HStack(spacing: 14) {
             SeasonDuelRings(you: you.reduce(0, +), ai: ai.reduce(0, +), progress: shown ? 1 : 0)
                 .frame(width: 92, height: 92)
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 10) {
-                    legend("YOU", Theme.accent)
-                    legend("AI", Theme.violet)
-                    Spacer()
-                    Text("SEASON · \(rounds.count) OF \(count)")
-                        .font(.f1(9, weight: .bold))
-                        .tracking(1)
-                        .foregroundStyle(Theme.faintText)
+                    if let selected {
+                        // the tapped round
+                        let round = byRound[selected + 1]
+                        Text("R\(selected + 1)\(round?.name.map { " · " + $0.replacingOccurrences(of: " Grand Prix", with: "").uppercased() } ?? "")")
+                            .font(.f1(10, weight: .heavy))
+                            .tracking(1)
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                        Spacer(minLength: 4)
+                        if let round {
+                            Text("YOU \(round.you.map(String.init) ?? "—") · AI \(round.ai.map(String.init) ?? "—")")
+                                .font(.f1(10, weight: .heavy))
+                                .foregroundStyle(Theme.accent)
+                        } else {
+                            Text(selected < raced ? "NOT SCORED" : "TO COME")
+                                .font(.f1(9, weight: .bold))
+                                .tracking(1)
+                                .foregroundStyle(Theme.faintText)
+                        }
+                    } else {
+                        legend("YOU", Theme.accent)
+                        legend("AI", Theme.violet)
+                        Spacer()
+                        Text("\(rounds.count)/\(count) · TAP A ROUND")
+                            .font(.f1(9, weight: .bold))
+                            .tracking(1)
+                            .foregroundStyle(Theme.faintText)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
                 }
-                SeasonDuelBars(you: youCols, ai: aiCols, grown: shown)
+                .frame(height: 14)
+                SeasonDuelBars(you: youCols, ai: aiCols, raced: raced, grown: shown, selected: $selected)
                     .frame(height: 96)
-            }
-        }
-        .onScrolledIntoView { visible in
-            if visible {
-                withAnimation(.easeOut(duration: 1.3)) { shown = true }
-            } else {
-                shown = false
             }
         }
         .accessibilityElement(children: .ignore)
@@ -442,84 +471,181 @@ private struct CountingText: View, Animatable {
 }
 
 private extension View {
-    /// Reports when the view scrolls into and out of view (iOS 18+; on
-    /// iOS 17 it simply counts as visible when it appears).
+    /// Calls `show` once the card is mostly on screen, and `hide` only after
+    /// it has left the screen completely (iOS 18+; on iOS 17 on appear and
+    /// disappear).
     @ViewBuilder
-    func onScrolledIntoView(_ action: @escaping (Bool) -> Void) -> some View {
+    func onCardVisibility(show: @escaping () -> Void, hide: @escaping () -> Void) -> some View {
         if #available(iOS 18, *) {
-            onScrollVisibilityChange(threshold: 0.6, action)
+            self
+                .onScrollVisibilityChange(threshold: 0.5) { if $0 { show() } }
+                .onScrollVisibilityChange(threshold: 0.01) { if !$0 { hide() } }
         } else {
-            onAppear { action(true) }
+            onAppear(perform: show).onDisappear(perform: hide)
         }
     }
 }
 
-/// Points per round as glowing 3D bars, you in front and the AI behind,
-/// swinging side to side so the depth shows (SceneKit, like the circuit
-/// map). The bars grow up from the floor, one after another, when `grown`
-/// turns true and drop back flat when it turns false.
+/// Points per round as glowing 3D bars, you in front and the AI behind, in
+/// a glass column per round of the season: lighter for rounds already
+/// raced, darker for the ones to come (SceneKit, like the circuit map).
+/// The chart swings on its own; drag sideways to turn it, tap a column to
+/// pick a round. The bars rise when `grown` turns true.
 private struct SeasonDuelBars: UIViewRepresentable {
     /// One entry per round of the season; nil where the round isn't scored.
     let you: [Double?]
     let ai: [Double?]
+    /// Rounds already raced.
+    var raced = 0
     var grown = true
+    /// The tapped column (round index), if any.
+    @Binding var selected: Int?
 
-    private var key: [Double] { (you + ai).map { $0 ?? -1 } }
+    private var key: [Double] { (you + ai).map { $0 ?? -1 } + [Double(raced)] }
 
     func makeUIView(context: Context) -> SCNView {
         let view = SCNView()
         view.backgroundColor = .clear
         view.antialiasingMode = .multisampling4X
-        view.isUserInteractionEnabled = false
-        view.scene = Self.scene(you: you, ai: ai)
-        context.coordinator.key = key
+        view.scene = Self.scene(you: you, ai: ai, raced: raced)
+        let coordinator = context.coordinator
+        coordinator.key = key
+        coordinator.raced = raced
+        coordinator.onSelect = { selected = $0 }
+        view.addGestureRecognizer(UITapGestureRecognizer(target: coordinator, action: #selector(Coordinator.tapped(_:))))
+        let pan = UIPanGestureRecognizer(target: coordinator, action: #selector(Coordinator.panned(_:)))
+        pan.delegate = coordinator
+        view.addGestureRecognizer(pan)
         Self.setGrown(grown, in: view, animated: false)
-        context.coordinator.grown = grown
+        coordinator.grown = grown
         return view
     }
 
     func updateUIView(_ view: SCNView, context: Context) {
-        if context.coordinator.key != key {
-            context.coordinator.key = key
-            view.scene = Self.scene(you: you, ai: ai)
+        let coordinator = context.coordinator
+        coordinator.onSelect = { selected = $0 }
+        if coordinator.key != key {
+            coordinator.key = key
+            coordinator.raced = raced
+            view.scene = Self.scene(you: you, ai: ai, raced: raced)
             Self.setGrown(grown, in: view, animated: grown)
-            context.coordinator.grown = grown
-        } else if context.coordinator.grown != grown {
-            context.coordinator.grown = grown
+            coordinator.grown = grown
+            coordinator.selected = nil
+        } else if coordinator.grown != grown {
+            coordinator.grown = grown
             Self.setGrown(grown, in: view, animated: grown)
+        }
+        if coordinator.selected != selected {
+            coordinator.selected = selected
+            Self.highlight(selected, raced: raced, in: view)
         }
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
-    final class Coordinator {
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
         var key: [Double] = []
         var grown = true
+        var raced = 0
+        var selected: Int?
+        var onSelect: ((Int?) -> Void)?
+
+        /// Tap a bar or its column: select that round (again: deselect).
+        @objc func tapped(_ gesture: UITapGestureRecognizer) {
+            guard let view = gesture.view as? SCNView else { return }
+            let hits = view.hitTest(gesture.location(in: view), options: [.searchMode: SCNHitTestSearchMode.all.rawValue])
+            let column = hits.lazy.compactMap { hit -> Int? in
+                guard let name = hit.node.name, name.hasPrefix("bar-") || name.hasPrefix("track-") else { return nil }
+                return Int(name.split(separator: "-").last ?? "")
+            }.first
+            guard let column else { return }
+            UISelectionFeedbackGenerator().selectionChanged()
+            onSelect?(column == selected ? nil : column)
+        }
+
+        /// Drag sideways to turn the chart; it swings on its own again a
+        /// moment after you let go.
+        @objc func panned(_ gesture: UIPanGestureRecognizer) {
+            guard let view = gesture.view as? SCNView,
+                  let chart = view.scene?.rootNode.childNode(withName: "chart", recursively: false) else { return }
+            switch gesture.state {
+            case .began:
+                chart.removeAction(forKey: "swing")
+            case .changed:
+                chart.eulerAngles.y += Float(gesture.translation(in: view).x) * 0.012
+                gesture.setTranslation(.zero, in: view)
+            case .ended, .cancelled:
+                let back = SCNAction.rotateTo(x: 0, y: CGFloat(SeasonDuelBars.restAngle), z: 0, duration: 0.9, usesShortestUnitArc: true)
+                back.timingMode = .easeInEaseOut
+                chart.runAction(.sequence([.wait(duration: 2.5), back, SeasonDuelBars.swing]), forKey: "swing")
+            default:
+                break
+            }
+        }
+
+        /// Only horizontal drags turn the chart; vertical ones scroll the page.
+        func gestureRecognizerShouldBegin(_ gesture: UIGestureRecognizer) -> Bool {
+            guard let pan = gesture as? UIPanGestureRecognizer else { return true }
+            let v = pan.velocity(in: pan.view)
+            return abs(v.x) > abs(v.y)
+        }
     }
 
-    /// Grows each bar from the floor with a short stagger along the
-    /// season, or flattens them all at once.
+    static let restAngle: Float = -0.75
+
+    /// A wide, eased swing so the depth is obvious.
+    static var swing: SCNAction {
+        let right = SCNAction.rotateBy(x: 0, y: 1.5, z: 0, duration: 3.2)
+        right.timingMode = .easeInEaseOut
+        let left = SCNAction.rotateBy(x: 0, y: -1.5, z: 0, duration: 3.2)
+        left.timingMode = .easeInEaseOut
+        return .repeatForever(.sequence([right, left]))
+    }
+
+    /// Bars rise gently from a fifth of their height with a light stagger,
+    /// or sit low and still until the card shows.
     private static func setGrown(_ grown: Bool, in view: SCNView, animated: Bool) {
+        let low: Float = 0.2, duration = 0.55
         view.scene?.rootNode.enumerateChildNodes { node, _ in
             guard let name = node.name, name.hasPrefix("bar-"), let column = Int(name.split(separator: "-").last ?? "") else { return }
             node.removeAction(forKey: "grow")
             guard grown, animated else {
-                node.scale = SCNVector3(1, grown ? 1 : 0.01, 1)
+                node.scale = SCNVector3(1, grown ? 1 : low, 1)
                 return
             }
-            node.scale = SCNVector3(1, 0.01, 1)
-            let rise = SCNAction.customAction(duration: 0.7) { node, elapsed in
-                let t = Float(elapsed / 0.7)
-                let eased = 1 - pow(1 - t, 3)   // ease out
-                node.scale = SCNVector3(1, max(0.01, eased), 1)
+            node.scale = SCNVector3(1, low, 1)
+            let rise = SCNAction.customAction(duration: duration) { node, elapsed in
+                let t = Float(elapsed / duration)
+                let eased = 1 - (1 - t) * (1 - t)   // ease out
+                node.scale = SCNVector3(1, low + (1 - low) * eased, 1)
             }
-            node.runAction(.sequence([.wait(duration: Double(column) * 0.045), rise]), forKey: "grow")
+            node.runAction(.sequence([.wait(duration: Double(column) * 0.02), rise]), forKey: "grow")
         }
     }
 
-    private static func scene(you: [Double?], ai: [Double?]) -> SCNScene {
+    private static let pastAlpha: CGFloat = 0.14
+    private static let futureAlpha: CGFloat = 0.045
+
+    /// The selected round's bars glow and its column brightens.
+    private static func highlight(_ selected: Int?, raced: Int, in view: SCNView) {
+        view.scene?.rootNode.enumerateChildNodes { node, _ in
+            guard let name = node.name, let column = Int(name.split(separator: "-").last ?? "") else { return }
+            let on = column == selected
+            if name.hasPrefix("bar-"), let material = node.geometry?.firstMaterial,
+               let color = material.diffuse.contents as? UIColor {
+                material.emission.contents = color.withAlphaComponent(on ? 0.95 : 0.35)
+            } else if name.hasPrefix("track-") {
+                let base = column < raced ? pastAlpha : futureAlpha
+                node.geometry?.firstMaterial?.diffuse.contents = UIColor(white: 1, alpha: on ? base + 0.16 : base)
+            }
+        }
+    }
+
+    private static func scene(you: [Double?], ai: [Double?], raced: Int) -> SCNScene {
         let scene = SCNScene()
         scene.background.contents = UIColor.clear
         let chart = SCNNode()
+        chart.name = "chart"
         scene.rootNode.addChildNode(chart)
         let n = max(you.count, ai.count, 1)
         let pitch: Float = min(0.42, 7.2 / Float(n))
@@ -529,18 +655,18 @@ private struct SeasonDuelBars: UIViewRepresentable {
         let cyan = UIColor(red: 0.15, green: 0.82, blue: 1, alpha: 1)
         let violet = UIColor(red: 0.52, green: 0.42, blue: 1, alpha: 1)
 
-        // Every round gets a grey glass column, the season still to fill.
-        let glass = SCNMaterial()
-        glass.lightingModel = .constant
-        glass.diffuse.contents = UIColor(white: 1, alpha: 0.07)
-        glass.writesToDepthBuffer = false
-        glass.isDoubleSided = true
+        // A glass column per round: lighter for raced rounds, darker ahead.
         for row in 0..<2 {
             for i in 0..<n {
+                let glass = SCNMaterial()
+                glass.lightingModel = .constant
+                glass.diffuse.contents = UIColor(white: 1, alpha: i < raced ? pastAlpha : futureAlpha)
+                glass.writesToDepthBuffer = false
+                glass.isDoubleSided = true
                 let track = SCNBox(width: CGFloat(pitch * 0.7), height: full, length: CGFloat(pitch * 0.7), chamferRadius: 0.04)
                 track.materials = [glass]
                 let node = SCNNode(geometry: track)
-                node.name = "track"
+                node.name = "track-\(row)-\(i)"
                 node.position = SCNVector3(x0 + Float(i) * pitch, Float(full) / 2, row == 0 ? 0.22 : -0.22)
                 node.renderingOrder = 10
                 chart.addChildNode(node)
@@ -570,13 +696,8 @@ private struct SeasonDuelBars: UIViewRepresentable {
         floor.geometry?.firstMaterial?.lightingModel = .constant
         chart.addChildNode(floor)
 
-        // A wide, eased swing so the depth is obvious.
-        chart.eulerAngles.y = -0.75
-        let swingRight = SCNAction.rotateBy(x: 0, y: 1.5, z: 0, duration: 3.2)
-        swingRight.timingMode = .easeInEaseOut
-        let swingLeft = SCNAction.rotateBy(x: 0, y: -1.5, z: 0, duration: 3.2)
-        swingLeft.timingMode = .easeInEaseOut
-        chart.runAction(.repeatForever(.sequence([swingRight, swingLeft])))
+        chart.eulerAngles.y = restAngle
+        chart.runAction(swing, forKey: "swing")
 
         let ambient = SCNNode()
         ambient.light = SCNLight()
@@ -609,6 +730,10 @@ private struct DotdBoldCard: View {
 
     private static let yellow = [Color(red: 1, green: 0.84, blue: 0.35), Color(red: 1, green: 0.55, blue: 0.2)]
 
+    /// The entrance plays each time the card scrolls in: the suit strides in,
+    /// the star spins, a shine sweeps across, the bars fill and count up.
+    @State private var shown = false
+
     var body: some View {
         Button(action: onVote) {
             VStack(alignment: .leading, spacing: 6) {
@@ -616,9 +741,12 @@ private struct DotdBoldCard: View {
                     Image(systemName: "star.fill")
                         .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(Self.yellow[0])
+                        .rotationEffect(.degrees(shown ? 360 : 0))
+                        .scaleEffect(shown ? 1 : 0.4)
                         .frame(width: 30, height: 30)
                         .background(Circle().fill(Theme.onAccent)
                             .overlay(Circle().strokeBorder(LinearGradient(colors: Self.yellow, startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1.5)))
+                        .shadow(color: Self.yellow[0].opacity(shown ? 0.9 : 0), radius: 8)
                     Text(kicker)
                         .font(.f1(10, weight: .bold))
                         .tracking(1.5)
@@ -628,16 +756,28 @@ private struct DotdBoldCard: View {
                 Text("DRIVER OF THE DAY").font(.f1(22)).foregroundStyle(Theme.onAccent)
                 if model.myVote != nil, let votes = model.tally?.votes, !votes.isEmpty {
                     VStack(spacing: 5) {
-                        ForEach(votes.prefix(3)) { v in
-                            bar(model.driver(v.driverId)?.code ?? String(v.driverId.prefix(3)).uppercased(), Double(v.pct) / 100)
+                        ForEach(Array(votes.prefix(3).enumerated()), id: \.element.id) { index, v in
+                            bar(model.driver(v.driverId)?.code ?? String(v.driverId.prefix(3)).uppercased(),
+                                Double(v.pct) / 100, leader: index == 0, mine: v.driverId == model.myVote)
                         }
                     }
                     .frame(width: 190)
                     .padding(.top, 2)
                 } else {
-                    Text("Who impressed you most?\nTap to vote.")
+                    Text("Who impressed you most?")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Theme.onAccent.opacity(0.8))
+                    Text("TAP TO VOTE")
+                        .font(.f1(12).italic())
+                        .tracking(1.5)
+                        .foregroundStyle(Self.yellow[0])
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Capsule().fill(Theme.onAccent))
+                        .phaseAnimator([1.0, 1.06]) { pill, scale in
+                            pill.scaleEffect(scale)
+                        } animation: { _ in .easeInOut(duration: 0.9) }
+                        .padding(.top, 4)
                 }
             }
             .padding(18)
@@ -653,9 +793,21 @@ private struct DotdBoldCard: View {
                                 .scaledToFit()
                                 .frame(height: 250)
                                 .shadow(color: .black.opacity(0.3), radius: 8, x: -3, y: 6)
-                                .offset(x: -6, y: 14)
+                                .offset(x: shown ? -6 : 130, y: 14)
+                                .rotationEffect(.degrees(shown ? 0 : 6), anchor: .bottom)
                                 .accessibilityHidden(true)
                         }
+                    }
+                    // one sweep of light across the card
+                    .overlay {
+                        GeometryReader { geo in
+                            LinearGradient(colors: [.clear, .white.opacity(0.45), .clear], startPoint: .leading, endPoint: .trailing)
+                                .frame(width: geo.size.width * 0.35)
+                                .rotationEffect(.degrees(18))
+                                .offset(x: shown ? geo.size.width * 1.2 : -geo.size.width * 0.5)
+                                .blendMode(.plusLighter)
+                        }
+                        .allowsHitTesting(false)
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 20))
                     .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
@@ -663,6 +815,12 @@ private struct DotdBoldCard: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Driver of the day vote")
+        .onCardVisibility(show: {
+            guard !shown else { return }
+            withAnimation(.spring(response: 0.8, dampingFraction: 0.75)) { shown = true }
+        }, hide: {
+            shown = false
+        })
     }
 
     /// "FAN VOTE · R17 · 3D LEFT" (short: the suit stands to the right)
@@ -684,17 +842,32 @@ private struct DotdBoldCard: View {
         return "Suits/\(team)"
     }
 
-    private func bar(_ code: String, _ pct: Double) -> some View {
-        HStack(spacing: 8) {
-            Text(code).font(.f1(12)).foregroundStyle(Theme.onAccent).frame(width: 34, alignment: .leading)
+    /// A vote bar that fills and counts up on entrance; the leader gets a
+    /// star, your own pick a ring.
+    private func bar(_ code: String, _ pct: Double, leader: Bool, mine: Bool) -> some View {
+        let shownPct = shown ? pct : 0
+        return HStack(spacing: 8) {
+            HStack(spacing: 3) {
+                Text(code).font(.f1(12)).foregroundStyle(Theme.onAccent)
+                if leader { Image(systemName: "star.fill").font(.system(size: 7, weight: .black)).foregroundStyle(Theme.onAccent) }
+            }
+            .frame(width: 40, alignment: .leading)
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule().fill(Theme.onAccent.opacity(0.12))
-                    Capsule().fill(Theme.onAccent).frame(width: max(4, geo.size.width * pct))
+                    Capsule().fill(Theme.onAccent).frame(width: max(4, geo.size.width * shownPct))
+                    if mine {
+                        Capsule().strokeBorder(Theme.onAccent.opacity(0.6), lineWidth: 1).padding(-2)
+                    }
                 }
             }
             .frame(height: 7)
-            Text("\(Int((pct * 100).rounded()))%").font(.f1Digits(11)).foregroundStyle(Theme.onAccent).frame(width: 34, alignment: .trailing)
+            CountingText(value: shownPct * 100, prefix: "")
+                .font(.f1Digits(11))
+                .foregroundStyle(Theme.onAccent)
+                .overlay(alignment: .trailing) { Text("%").font(.f1Digits(11)).foregroundStyle(Theme.onAccent).offset(x: 10) }
+                .frame(width: 26, alignment: .trailing)
+                .padding(.trailing, 8)
         }
     }
 }
