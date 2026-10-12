@@ -15,6 +15,12 @@ struct DesignLab: View {
             case "gameC": GameDraftC()
             case "cards1": CardsDraft1()
             case "cards2": CardsDraft2()
+            case "cards5": CardsDraft5()
+            case "cards6": CardsDraft6()
+            case "cards7": CardsDraft7()
+            case "cards7b": CardsDraft7(tail: true)
+            case "cards8": CardsDraft8()
+            case "lightsOut": LightsOutView()
             default: Text("unknown draft \(id)").foregroundStyle(.white)
             }
         }
@@ -300,6 +306,292 @@ private struct CardsDraft2: View {
             Text(code).font(.f1(14)).foregroundStyle(.white)
         }
         .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - Mixed sets: every feature its own shape
+
+private let gold = Color(red: 1, green: 0.84, blue: 0.35)
+private let silver = Color(red: 0.82, green: 0.85, blue: 0.9)
+private let bronze = Color(red: 0.86, green: 0.52, blue: 0.3)
+private let paper = Color(red: 0.96, green: 0.95, blue: 0.91)
+private let mclaren = Color(red: 1, green: 0.53, blue: 0)
+private let mercedes = Color(red: 0, green: 0.82, blue: 0.75)
+private let ferrari = Color(red: 0.93, green: 0.1, blue: 0.14)
+private let redbull = Color(red: 0.25, green: 0.35, blue: 0.95)
+
+/// A ticket: half-circle notches on both sides at `notchY`.
+private struct TicketShape: Shape {
+    var notchY: CGFloat
+    var radius: CGFloat = 12
+    var corner: CGFloat = 16
+    func path(in r: CGRect) -> Path {
+        var p = Path(roundedRect: r, cornerRadius: corner)
+        p = p.subtracting(Path(ellipseIn: CGRect(x: r.minX - radius, y: notchY - radius, width: radius * 2, height: radius * 2)))
+        p = p.subtracting(Path(ellipseIn: CGRect(x: r.maxX - radius, y: notchY - radius, width: radius * 2, height: radius * 2)))
+        return p
+    }
+}
+
+/// Broadcast graphic: a parallelogram leaning right.
+private struct Slant: Shape {
+    var lean: CGFloat = 22
+    func path(in r: CGRect) -> Path {
+        Path { p in
+            p.move(to: CGPoint(x: r.minX + lean, y: r.minY))
+            p.addLine(to: CGPoint(x: r.maxX, y: r.minY))
+            p.addLine(to: CGPoint(x: r.maxX - lean, y: r.maxY))
+            p.addLine(to: CGPoint(x: r.minX, y: r.maxY))
+            p.closeSubpath()
+        }
+    }
+}
+
+/// Set 5: podium, betting slip, and a two-up row of photo + gantry tiles.
+private struct CardsDraft5: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 30) {
+                podium
+                ticket
+                HStack(spacing: 12) { emilyTile; lightsTile }
+                    .frame(height: 230)
+            }
+            .padding(16).padding(.top, 46)
+        }
+    }
+
+    // Driver of the day as an actual podium, no container.
+    private var podium: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("FAN VOTE · R17 SINGAPORE").font(.f1(11, weight: .bold)).tracking(2).foregroundStyle(gold)
+                    Text("DRIVER OF THE DAY").font(.f1(24).italic()).foregroundStyle(.white)
+                }
+                Spacer()
+                Text("VOTE").font(.f1(13).italic()).tracking(2).foregroundStyle(.black)
+                    .padding(.horizontal, 16).padding(.vertical, 8).background(Capsule().fill(gold))
+            }
+            HStack(alignment: .bottom, spacing: 6) {
+                step("LEC", "24%", 2, silver, ferrari, 82)
+                step("ANT", "52%", 1, gold, mercedes, 112)
+                step("VER", "18%", 3, bronze, redbull, 66)
+            }
+        }
+    }
+
+    private func step(_ code: String, _ pct: String, _ place: Int, _ metal: Color, _ team: Color, _ h: CGFloat) -> some View {
+        VStack(spacing: 6) {
+            Text(code).font(.f1(20).italic()).foregroundStyle(.white)
+            Capsule().fill(team).frame(width: 34, height: 4)
+            ZStack(alignment: .top) {
+                UnevenRoundedRectangle(topLeadingRadius: 10, topTrailingRadius: 10)
+                    .fill(LinearGradient(colors: [metal, metal.opacity(0.35)], startPoint: .top, endPoint: .bottom))
+                VStack(spacing: 0) {
+                    Text("\(place)").font(.f1Digits(30)).foregroundStyle(.black.opacity(0.75))
+                    Text(pct).font(.f1(12, weight: .bold)).foregroundStyle(.black.opacity(0.55))
+                }
+                .padding(.top, 8)
+            }
+            .frame(height: h)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    // Prediction game as a paper betting slip on the dark page.
+    private var ticket: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("TEAM RADIO · PICK SLIP").font(.f1(11, weight: .bold)).tracking(2).foregroundStyle(.black.opacity(0.45))
+                Spacer()
+                Text("R17").font(.f1(11, weight: .bold)).tracking(2).foregroundStyle(.black.opacity(0.45))
+            }
+            Text("MAKE YOUR PICKS").font(.f1(28).italic()).foregroundStyle(.black).padding(.top, 6)
+            VStack(spacing: 6) {
+                line("POLE", "NOR", mclaren); line("WINNER", "PIA", mclaren); line("FASTEST LAP", "—", .gray)
+            }
+            .padding(.top, 12)
+            // perforation
+            Line().stroke(style: StrokeStyle(lineWidth: 1.5, dash: [5, 5])).foregroundStyle(.black.opacity(0.2))
+                .frame(height: 1).padding(.vertical, 16)
+            HStack {
+                Text("LOCKS SAT 15:00").font(.f1(13, weight: .bold)).tracking(1.5).foregroundStyle(ferrari)
+                Spacer()
+                Text("FINISH SLIP →").font(.f1(13).italic()).tracking(1.5).foregroundStyle(.black)
+            }
+        }
+        .padding(20)
+        .background(TicketShape(notchY: 178).fill(paper))
+        .rotationEffect(.degrees(-1.2))
+        .shadow(color: .black.opacity(0.5), radius: 14, y: 8)
+    }
+
+    private func line(_ label: String, _ code: String, _ team: Color) -> some View {
+        HStack {
+            Text(label).font(.f1(12, weight: .bold)).tracking(1.5).foregroundStyle(.black.opacity(0.5))
+            Spacer()
+            Rectangle().fill(team).frame(width: 4, height: 16)
+            Text(code).font(.f1(18)).foregroundStyle(.black).frame(width: 46, alignment: .leading)
+        }
+    }
+
+    // Half-width portrait photo tile.
+    private var emilyTile: some View {
+        ZStack(alignment: .bottomLeading) {
+            Color.clear.overlay(Image("EmilyAvatar").resizable().scaledToFill()).clipped()
+            LinearGradient(colors: [.clear, .black.opacity(0.9)], startPoint: .center, endPoint: .bottom)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 2) {
+                    ForEach([6, 12, 18, 10, 16, 8, 14, 5], id: \.self) { h in
+                        Capsule().fill(Theme.accent).frame(width: 3, height: CGFloat(h))
+                    }
+                }
+                Text("ASK\nEMILY").font(.f1(24).italic()).foregroundStyle(.white)
+                Text("Race engineer · AI").font(.system(size: 11, weight: .medium)).foregroundStyle(.white.opacity(0.7))
+            }
+            .padding(14)
+        }
+        .frame(maxWidth: .infinity)
+        .clipShape(RoundedRectangle(cornerRadius: 26))
+    }
+
+    // Half-width gantry tile: five lights stacked down, best time big.
+    private var lightsTile: some View {
+        HStack(spacing: 12) {
+            VStack(spacing: 7) {
+                ForEach(0..<5, id: \.self) { _ in
+                    Circle().fill(RadialGradient(colors: [Color(red: 1, green: 0.6, blue: 0.45), Theme.live], center: .init(x: 0.4, y: 0.35), startRadius: 1, endRadius: 14))
+                        .frame(width: 24, height: 24).shadow(color: Theme.live, radius: 8)
+                }
+            }
+            .padding(.vertical, 12).padding(.horizontal, 8)
+            .background(Capsule().fill(Color.black))
+            VStack(alignment: .leading, spacing: 4) {
+                Text("LIGHTS\nOUT").font(.f1(20).italic()).fixedSize().foregroundStyle(.white)
+                Spacer()
+                Text("BEST").font(.f1(10, weight: .bold)).tracking(2).foregroundStyle(.white.opacity(0.5))
+                Text("0.198").font(.f1Digits(24)).foregroundStyle(Theme.live).fixedSize()
+                Text("#4 this week").font(.system(size: 11)).foregroundStyle(.white.opacity(0.6))
+            }
+            .padding(.vertical, 6)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .background(RadialGradient(colors: [Color(red: 0.35, green: 0.04, blue: 0.03), Color(red: 0.07, green: 0.02, blue: 0.02)], center: .leading, startRadius: 0, endRadius: 220))
+        .clipShape(RoundedRectangle(cornerRadius: 26))
+    }
+}
+
+private struct Line: Shape {
+    func path(in r: CGRect) -> Path { Path { p in p.move(to: CGPoint(x: r.minX, y: r.midY)); p.addLine(to: CGPoint(x: r.maxX, y: r.midY)) } }
+}
+
+/// Set 6: TV-graphics language. Magazine-cover vote, timing-tower picks,
+/// radio waveform for Emily, slanted broadcast banner for Lights Out.
+private struct CardsDraft6: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 30) {
+                cover
+                tower
+                radio
+                banner
+            }
+            .padding(16).padding(.top, 46)
+        }
+    }
+
+    // Driver of the day as a magazine cover: giant team-colour number.
+    private var cover: some View {
+        ZStack(alignment: .bottomLeading) {
+            LinearGradient(colors: [mercedes.opacity(0.55), Color(red: 0.02, green: 0.12, blue: 0.12)], startPoint: .topTrailing, endPoint: .bottomLeading)
+            Text("12").font(.system(size: 200, weight: .black, design: .rounded).italic())
+                .foregroundStyle(.white.opacity(0.12))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                .offset(x: 10, y: -30)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("DRIVER OF THE DAY · FAN VOTE").font(.f1(11, weight: .bold)).tracking(2).foregroundStyle(gold)
+                Text("ANTONELLI\nLEADS").font(.f1(36).italic()).foregroundStyle(.white)
+                HStack(spacing: 10) {
+                    Text("52%").font(.f1Digits(22)).foregroundStyle(mercedes)
+                    Text("of 412 votes · who's yours?").font(.system(size: 13, weight: .medium)).foregroundStyle(.white.opacity(0.75))
+                }
+            }
+            .padding(20)
+        }
+        .frame(height: 210)
+        .clipShape(RoundedRectangle(cornerRadius: 4))
+    }
+
+    // Picks as an F1 timing tower: slanted tab on top, team-colour stripes.
+    private var tower: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("YOUR PICKS").font(.f1(14).italic()).tracking(2).foregroundStyle(.black)
+                .padding(.horizontal, 26).padding(.vertical, 8)
+                .background(Slant(lean: 12).fill(.white))
+            VStack(spacing: 2) {
+                row("POLE", "NOR", "NORRIS", mclaren)
+                row("P1", "PIA", "PIASTRI", mclaren)
+                row("P2", "VER", "VERSTAPPEN", redbull)
+                row("P3", "—", "TAP TO PICK", .gray)
+            }
+            .padding(.top, 6)
+            Text("LOCKS SAT 15:00 · BEAT THE AI").font(.f1(11, weight: .bold)).tracking(2).foregroundStyle(Theme.dimText).padding(.top, 10)
+        }
+    }
+
+    private func row(_ slot: String, _ code: String, _ name: String, _ team: Color) -> some View {
+        HStack(spacing: 12) {
+            Text(slot).font(.f1(13, weight: .bold)).foregroundStyle(.white.opacity(0.55)).frame(width: 44, alignment: .leading)
+            Rectangle().fill(team).frame(width: 5, height: 24)
+            Text(code).font(.f1(18)).foregroundStyle(.white).frame(width: 48, alignment: .leading)
+            Text(name).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white.opacity(0.6))
+            Spacer()
+        }
+        .padding(.horizontal, 12).padding(.vertical, 7)
+        .background(Color.white.opacity(0.05))
+    }
+
+    // Emily as an incoming radio message: waveform and a push-to-talk button.
+    private var radio: some View {
+        HStack(spacing: 16) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("● INCOMING · EMILY, RACE ENGINEER").font(.f1(11, weight: .bold)).tracking(1.5).foregroundStyle(Theme.accent)
+                HStack(alignment: .center, spacing: 3) {
+                    ForEach(Array([8, 14, 22, 30, 18, 26, 34, 20, 12, 24, 30, 16, 10, 20, 28, 14, 8, 18, 12, 6].enumerated()), id: \.offset) { _, h in
+                        Capsule().fill(LinearGradient(colors: [Theme.accent, Theme.violet], startPoint: .top, endPoint: .bottom))
+                            .frame(width: 4, height: CGFloat(h))
+                    }
+                }
+                Text("\"Ask me anything about strategy, tyres or the standings.\"")
+                    .font(.system(size: 14, weight: .medium).italic()).foregroundStyle(.white.opacity(0.85))
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "mic.fill").font(.system(size: 22, weight: .bold)).foregroundStyle(Theme.onAccent)
+                .frame(width: 64, height: 64).background(Circle().fill(Theme.accentGradient))
+                .shadow(color: Theme.accent.opacity(0.6), radius: 14)
+        }
+        .padding(.horizontal, 4)
+    }
+
+    // Lights out as a slanted broadcast banner.
+    private var banner: some View {
+        HStack(spacing: 14) {
+            HStack(spacing: 6) {
+                ForEach(0..<5, id: \.self) { _ in
+                    Circle().fill(Theme.live).frame(width: 18, height: 18).shadow(color: Theme.live, radius: 6)
+                }
+            }
+            VStack(alignment: .leading, spacing: 0) {
+                Text("LIGHTS OUT").font(.f1(20).italic()).foregroundStyle(.white)
+                Text("BEST 0.198 · #4").font(.f1(11, weight: .bold)).tracking(1.5).foregroundStyle(.white.opacity(0.7))
+            }
+            Spacer()
+            Image(systemName: "play.fill").font(.system(size: 16, weight: .black)).foregroundStyle(Theme.live)
+        }
+        .padding(.leading, 30).padding(.trailing, 34).padding(.vertical, 18)
+        .background(Slant(lean: 26).fill(LinearGradient(colors: [Color(red: 0.55, green: 0.04, blue: 0.04), Color(red: 0.2, green: 0.02, blue: 0.02)], startPoint: .leading, endPoint: .trailing)))
     }
 }
 #endif
