@@ -48,6 +48,11 @@ struct RootView: View {
     @State private var toastDismissTask: Task<Void, Never>?
     @State private var profile: ProfileTarget?
     @State private var showIntro = false   // the lights intro is out; a designed clip replaces it
+    #if DEBUG
+    private static let designLabOpen = UserDefaults.standard.string(forKey: "DesignLab") != nil
+    #else
+    private static let designLabOpen = false
+    #endif
 
     var body: some View {
         TabView(selection: $selection) {
@@ -124,7 +129,7 @@ struct RootView: View {
         .onChange(of: chatBadge.unread) { _, _ in TabBarBadge.tint(private: chatBadge.unreadDMs > 0) }
         .onChange(of: chatBadge.unreadDMs) { _, _ in TabBarBadge.tint(private: chatBadge.unreadDMs > 0) }
         .overlay(alignment: .bottom) {
-            if showMessageToast && !showIntro {
+            if showMessageToast && !showIntro && !Self.designLabOpen {
                 MessageToast(sender: chatBadge.latestSender, text: chatBadge.latestText, isPrivate: chatBadge.latestIsPrivate) {
                     selection = 3
                     if chatBadge.latestIsPrivate {
