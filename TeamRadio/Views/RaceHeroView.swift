@@ -42,19 +42,8 @@ struct RaceHeroView: View {
                         .padding(.vertical, 5)
                         .background(Theme.accentGradient, in: RoundedRectangle(cornerRadius: 7))
 
+                    // Nothing in the middle: the header helmet hangs over it.
                     Spacer()
-
-                    // Right of centre: the header helmet hangs over the
-                    // middle of this row.
-                    if race.isSprintWeekend {
-                        Text("SPRINT")
-                            .font(.f1(13).italic())
-                            .tracking(1)
-                            .foregroundStyle(.black)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(.yellow, in: RoundedRectangle(cornerRadius: 7))
-                    }
 
                     if let onBack {
                         Button(action: onBack) {
@@ -90,9 +79,22 @@ struct RaceHeroView: View {
                     .minimumScaleFactor(0.6)
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(race.circuit.circuitName)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.85))
+                    HStack(spacing: 8) {
+                        Text(race.circuit.circuitName)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.85))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                        if race.isSprintWeekend {
+                            Text("SPRINT")
+                                .font(.f1(10).italic())
+                                .tracking(1)
+                                .foregroundStyle(.black)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(.yellow, in: RoundedRectangle(cornerRadius: 5))
+                        }
+                    }
                     Text("\(Flags.emoji(for: race.circuit.location.country)) \(race.circuit.location.locality), \(race.circuit.location.country) · \(weekendRange)")
                         .font(.system(size: 13))
                         .foregroundStyle(Theme.dimText)
