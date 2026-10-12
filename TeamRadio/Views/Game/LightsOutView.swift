@@ -37,32 +37,13 @@ struct LightsOutView: View {
                 .ignoresSafeArea()
                 .animation(.easeOut(duration: 0.15), value: litCount)
 
-            VStack(spacing: 28) {
+            VStack(spacing: 22) {
                 header
-                // The hold area: everything between the close and share buttons.
-                VStack(spacing: 28) {
-                    Spacer(minLength: 0)
-                    gantry
-                    status
-                    Spacer(minLength: 0)
-                }
-                .contentShape(Rectangle())
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { _ in
-                            guard !fingerDown else { return }
-                            fingerDown = true
-                            press()
-                        }
-                        .onEnded { _ in
-                            fingerDown = false
-                            release()
-                        }
-                )
-                .accessibilityElement(children: .contain)
-                .accessibilityAction(named: "Start") { press() }
-                .accessibilityAction(named: "Release") { release() }
-                footer
+                Spacer(minLength: 0)
+                gantry
+                status
+                Spacer(minLength: 0)
+                controls
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
@@ -139,7 +120,7 @@ struct LightsOutView: View {
         switch phase {
         case .ready:
             VStack(spacing: 18) {
-                prompt("HOLD TO START", sub: "Hold your finger down like the clutch. Let go the moment the lights go out.")
+                prompt("HOLD THE BRAKE", sub: "The lights come on while you hold. Let go the moment they go out.")
                 weeklyBoard
             }
         case .lighting, .holding:
@@ -147,7 +128,7 @@ struct LightsOutView: View {
         case .go:
             prompt("LET GO!", sub: " ", color: Theme.accent)
         case .jumpStart:
-            prompt("JUMP START", sub: "You let go too early. Hold to try again.", color: Theme.live)
+            prompt("JUMP START", sub: "You let go too early. Drive-through penalty.", color: Theme.live)
         case .result(let seconds):
             VStack(spacing: 8) {
                 Text(Self.verdict(seconds))
@@ -163,10 +144,6 @@ struct LightsOutView: View {
                         .tracking(1.5)
                         .foregroundStyle(Theme.accent)
                 }
-                Text("Hold to go again")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Theme.faintText)
-                    .padding(.top, 4)
             }
         }
     }
@@ -184,33 +161,65 @@ struct LightsOutView: View {
         .frame(minHeight: 90)
     }
 
+    /// The brake pedal while a start is possible; after a run, START AGAIN
+    /// (and sharing a good time). Only the pedal reacts to holding, so a
+    /// stray touch elsewhere can't launch or end a run.
     @ViewBuilder
-    private var footer: some View {
-        if case .result(let seconds) = phase {
-            ShareLink(item: Self.appStore,
-                      message: Text(String(format: "Lights out in %.3f s 🏁 Beat my reaction time on Team Radio:", seconds))) {
-                Text("SHARE YOUR TIME")
+    private var controls: some View {
+        switch phase {
+        case .ready, .lighting, .holding, .go:
+            BrakePedal(pressed: fingerDown)
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { _ in
+                            guard !fingerDown else { return }
+                            fingerDown = true
+                            press()
+                        }
+                        .onEnded { _ in
+                            fingerDown = false
+                            release()
+                        }
+                )
+                .accessibilityElement()
+                .accessibilityLabel("Brake pedal")
+                .accessibilityHint("Hold to start the lights, release when they go out")
+                .accessibilityAction(named: "Hold") { press() }
+                .accessibilityAction(named: "Release") { release() }
+        case .result(let seconds):
+            HStack(spacing: 10) {
+                Button { restart() } label: { Text("START AGAIN") }
+                    .buttonStyle(GamePrimaryButtonStyle())
+                ShareLink(item: Self.appStore,
+                          message: Text(String(format: "Lights out in %.3f s 🏁 Beat my reaction time on Team Radio:", seconds))) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Theme.accent)
+                        .frame(width: 50, height: 46)
+                        .background(RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.accent.opacity(0.5)))
+                }
+                .accessibilityLabel("Share your time")
             }
-            .buttonStyle(GamePrimaryButtonStyle())
-        } else if best > 0 {
-            Text(String(format: "PERSONAL BEST  %.3f s", best))
-                .font(.f1(13, weight: .bold))
-                .tracking(1.5)
-                .foregroundStyle(Theme.dimText)
+        case .jumpStart:
+            Button { restart() } label: { Text("START AGAIN") }
+                .buttonStyle(GamePrimaryButtonStyle())
         }
     }
 
     // MARK: - Logic
 
-    /// Finger down: the clutch bites and the start sequence begins.
+    /// Back to the grid: lights off, waiting for the pedal.
+    private func restart() {
+        sequence?.cancel()
+        fingerDown = false
+        phase = .ready
+    }
+
+    /// Pedal down: the brake is on and the start sequence begins.
     private func press() {
-        switch phase {
-        case .ready, .result, .jumpStart:
-            UIImpactFeedbackGenerator(style: .soft).impactOccurred()
-            start()
-        case .lighting, .holding, .go:
-            break
-        }
+        guard phase == .ready else { return }
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+        start()
     }
 
     /// Finger up: a jump start before lights out, the reaction after.
@@ -288,7 +297,7 @@ struct LightsOutView: View {
                     .font(.f1(11, weight: .bold))
                     .tracking(2)
                     .foregroundStyle(Color(red: 1, green: 0.75, blue: 0.2))
-                ForEach(top.prefix(5)) { e in
+                ForEach(top.prefix(3)) { e in
                     HStack {
                         Text("\(e.rank)").font(.f1(14)).foregroundStyle(Theme.dimText).frame(width: 24, alignment: .leading)
                         Text(e.name).font(.system(size: 14, weight: .semibold))
@@ -317,6 +326,45 @@ struct LightsOutView: View {
         case ..<0.40: "Bogged down a bit"
         default: "Stalled on the grid"
         }
+    }
+}
+
+/// A brake pedal: ridged aluminium on a dark mount, tilting down and
+/// glowing red while it's held.
+private struct BrakePedal: View {
+    let pressed: Bool
+
+    var body: some View {
+        VStack(spacing: 10) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(LinearGradient(colors: [Color(white: pressed ? 0.30 : 0.42), Color(white: 0.16)],
+                                         startPoint: .top, endPoint: .bottom))
+                // grip ridges
+                VStack(spacing: 8) {
+                    ForEach(0..<6, id: \.self) { _ in
+                        Capsule()
+                            .fill(Color.black.opacity(0.55))
+                            .frame(height: 6)
+                            .overlay(alignment: .top) { Capsule().fill(Color.white.opacity(0.18)).frame(height: 1) }
+                    }
+                }
+                .padding(.horizontal, 18)
+                RoundedRectangle(cornerRadius: 20)
+                    .strokeBorder(pressed ? Theme.live : Color.white.opacity(0.18), lineWidth: pressed ? 2.5 : 1)
+            }
+            .frame(width: 112, height: 132)
+            .rotation3DEffect(.degrees(pressed ? 22 : 0), axis: (x: 1, y: 0, z: 0), anchor: .bottom, perspective: 0.5)
+            .scaleEffect(pressed ? 0.96 : 1)
+            .shadow(color: pressed ? Theme.live.opacity(0.7) : .black.opacity(0.6), radius: pressed ? 18 : 10, y: pressed ? 2 : 10)
+            .animation(.spring(response: 0.18, dampingFraction: 0.7), value: pressed)
+            Text(pressed ? "HOLDING…" : "HOLD THE BRAKE")
+                .font(.f1(11, weight: .heavy))
+                .tracking(2)
+                .foregroundStyle(pressed ? Theme.live : Theme.dimText)
+        }
+        .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
     }
 }
 

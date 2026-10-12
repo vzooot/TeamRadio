@@ -288,11 +288,17 @@ private struct StrategistCard: View {
                 .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Theme.violet.opacity(0.35), lineWidth: 1))
         )
         .task(id: scored?.race.id) {
-            if let user = await ChatService.currentUserId() {
-                history = await LeaderboardService.history(user: user)
-            }
             if let race = scored?.race {
                 revealed = await LeaderboardService.playerPicks(round: race.id, user: "ai-strategist")
+            }
+            // Keep asking until the history arrives (offline, server busy).
+            guard let user = await ChatService.currentUserId() else { return }
+            while !Task.isCancelled {
+                if let rounds = await LeaderboardService.history(user: user) {
+                    history = rounds
+                    return
+                }
+                try? await Task.sleep(for: .seconds(20))
             }
         }
     }
@@ -680,20 +686,28 @@ private struct EmilyBar: View {
     }
 }
 
-/// A radio burst in the trio colours.
+/// A radio burst in the trio colours, flowing and breathing like live
+/// audio (still under Reduce Motion).
 struct RadioWave: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
-        Canvas { ctx, size in
-            var path = Path()
-            for x in stride(from: 0, through: size.width, by: 1) {
-                let envelope = sin(Double(x / size.width) * .pi)
-                let wave = sin(Double(x) * 0.35) * 0.6 + sin(Double(x) * 0.11) * 0.4
-                let y = size.height / 2 + CGFloat(wave * envelope) * size.height * 0.45
-                x == 0 ? path.move(to: CGPoint(x: x, y: y)) : path.addLine(to: CGPoint(x: x, y: y))
+        TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion)) { context in
+            let t = reduceMotion ? 0 : context.date.timeIntervalSinceReferenceDate
+            Canvas { ctx, size in
+                // the voice swells and fades every couple of seconds
+                let loudness = 0.55 + 0.45 * abs(sin(t * 1.3)) * (0.7 + 0.3 * sin(t * 3.1))
+                var path = Path()
+                for x in stride(from: 0, through: size.width, by: 1) {
+                    let envelope = sin(Double(x / size.width) * .pi)
+                    let wave = sin(Double(x) * 0.35 - t * 7) * 0.6 + sin(Double(x) * 0.11 + t * 3) * 0.4
+                    let y = size.height / 2 + CGFloat(wave * envelope * loudness) * size.height * 0.45
+                    x == 0 ? path.move(to: CGPoint(x: x, y: y)) : path.addLine(to: CGPoint(x: x, y: y))
+                }
+                ctx.stroke(path, with: .linearGradient(Gradient(colors: [Theme.accent, Theme.violet, Theme.live]),
+                                                       startPoint: .zero, endPoint: CGPoint(x: size.width, y: 0)),
+                           lineWidth: 1.3)
             }
-            ctx.stroke(path, with: .linearGradient(Gradient(colors: [Theme.accent, Theme.violet, Theme.live]),
-                                                   startPoint: .zero, endPoint: CGPoint(x: size.width, y: 0)),
-                       lineWidth: 1.3)
         }
         .accessibilityHidden(true)
     }
