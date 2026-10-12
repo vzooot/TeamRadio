@@ -2,10 +2,11 @@ import QuartzCore
 import SwiftUI
 import UIKit
 
-/// "Lights Out": the F1 start procedure as a reaction test. Five red lights
-/// come on a second apart, hold for a random 0.2–3 s, go out, and the player
-/// taps. Tapping before lights out is a jump start. Best time stays on the
-/// device; the result can be shared with the App Store link.
+/// "Lights Out": the F1 start procedure as a reaction test. The player holds
+/// a finger down like the clutch; five red lights come on a second apart,
+/// hold for a random 0.2–3 s and go out, and the player lets go. Letting go
+/// before lights out is a jump start. Best time stays on the device; the
+/// result can be shared with the App Store link.
 struct LightsOutView: View {
     enum Phase: Equatable {
         case ready
@@ -19,6 +20,7 @@ struct LightsOutView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var phase: Phase = .ready
     @State private var sequence: Task<Void, Never>?
+    @State private var fingerDown = false
     @AppStorage("lightsOutBest") private var best: Double = 0
     @AppStorage("chatNickname") private var nickname = ""
     @State private var board: LeaderboardService.ReactionBoard?
@@ -36,17 +38,34 @@ struct LightsOutView: View {
 
             VStack(spacing: 28) {
                 header
-                Spacer(minLength: 0)
-                gantry
-                status
-                Spacer(minLength: 0)
+                // The hold area: everything between the close and share buttons.
+                VStack(spacing: 28) {
+                    Spacer(minLength: 0)
+                    gantry
+                    status
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { _ in
+                            guard !fingerDown else { return }
+                            fingerDown = true
+                            press()
+                        }
+                        .onEnded { _ in
+                            fingerDown = false
+                            release()
+                        }
+                )
+                .accessibilityElement(children: .contain)
+                .accessibilityAction(named: "Start") { press() }
+                .accessibilityAction(named: "Release") { release() }
                 footer
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
         }
-        .contentShape(Rectangle())
-        .onTapGesture { tap() }
         .onDisappear { sequence?.cancel() }
         .task {
             StartSounds.shared.prepare()
@@ -117,15 +136,15 @@ struct LightsOutView: View {
         switch phase {
         case .ready:
             VStack(spacing: 18) {
-                prompt("TAP ANYWHERE TO START", sub: "Wait for the lights to go out, then tap as fast as you can.")
+                prompt("HOLD TO START", sub: "Hold your finger down like the clutch. Let go the moment the lights go out.")
                 weeklyBoard
             }
         case .lighting, .holding:
-            prompt("WAIT FOR IT…", sub: "Don't jump the start.")
+            prompt("HOLD IT…", sub: "Don't let go before lights out.")
         case .go:
-            prompt("GO GO GO!", sub: " ", color: Theme.accent)
+            prompt("LET GO!", sub: " ", color: Theme.accent)
         case .jumpStart:
-            prompt("JUMP START", sub: "Drive-through penalty. Tap to try again.", color: Theme.live)
+            prompt("JUMP START", sub: "You let go too early. Hold to try again.", color: Theme.live)
         case .result(let seconds):
             VStack(spacing: 8) {
                 Text(Self.verdict(seconds))
@@ -141,7 +160,7 @@ struct LightsOutView: View {
                         .tracking(1.5)
                         .foregroundStyle(Theme.accent)
                 }
-                Text("Tap to go again")
+                Text("Hold to go again")
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.faintText)
                     .padding(.top, 4)
@@ -180,10 +199,22 @@ struct LightsOutView: View {
 
     // MARK: - Logic
 
-    private func tap() {
+    /// Finger down: the clutch bites and the start sequence begins.
+    private func press() {
         switch phase {
         case .ready, .result, .jumpStart:
+            UIImpactFeedbackGenerator(style: .soft).impactOccurred()
             start()
+        case .lighting, .holding, .go:
+            break
+        }
+    }
+
+    /// Finger up: a jump start before lights out, the reaction after.
+    private func release() {
+        switch phase {
+        case .ready, .result, .jumpStart:
+            break
         case .lighting, .holding:
             sequence?.cancel()
             UINotificationFeedbackGenerator().notificationOccurred(.error)
@@ -359,7 +390,7 @@ private struct ReactionTimer: View {
         switch phase {
         case .ready: "REACTION TIME"
         case .lighting, .holding: "WAIT FOR LIGHTS OUT"
-        case .go: "TAP!"
+        case .go: "LET GO!"
         case .result: "SECONDS"
         case .jumpStart: "JUMP START"
         }

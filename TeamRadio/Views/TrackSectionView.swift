@@ -25,7 +25,9 @@ struct TrackSectionView: View {
                     if showRealWorld, let coordinate = circuit.coordinate {
                         CircuitMapView(coordinate: coordinate)
                     } else {
-                        Track3DView(map: map, resetToken: resetToken, selectedCorner: selectedCorner)
+                        Track3DView(map: map, resetToken: resetToken, selectedCorner: selectedCorner) { number in
+                            withAnimation(.easeOut(duration: 0.2)) { selectedCorner = number }
+                        }
                     }
                 }
                 .frame(height: 300)
@@ -37,7 +39,10 @@ struct TrackSectionView: View {
                             }
                         }
                         if !showRealWorld {
-                            circleButton("arrow.counterclockwise") { resetToken += 1 }
+                            circleButton("arrow.counterclockwise") {
+                                selectedCorner = nil
+                                resetToken += 1
+                            }
                         }
                     }
                     .padding(10)
@@ -45,7 +50,7 @@ struct TrackSectionView: View {
 
                 Text(showRealWorld
                      ? "APPLE MAPS · THE REAL VENUE"
-                     : "DRAG TO ROTATE · PINCH TO ZOOM")
+                     : "DRAG · PINCH · TAP A TURN TO ZOOM IN")
                     .font(.f1(10, weight: .bold))
                     .tracking(3)
                     .foregroundStyle(Theme.faintText)
@@ -109,26 +114,34 @@ struct TrackSectionView: View {
                 .tracking(3)
                 .foregroundStyle(Theme.faintText)
                 .padding(.horizontal, 14)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(guide.corners) { corner in
-                        let on = corner.number == selectedCorner
-                        Button {
-                            withAnimation(.easeOut(duration: 0.2)) { selectedCorner = on ? nil : corner.number }
-                        } label: {
-                            Text("T\(corner.number)")
-                                .font(.f1(13))
-                                .foregroundStyle(on ? Theme.onAccent : .white)
-                                .frame(minWidth: 40)
-                                .padding(.vertical, 7)
-                                .background(Capsule().fill(on ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Color.white.opacity(0.06))))
-                                .overlay(Capsule().strokeBorder(on ? Color.clear : Color.white.opacity(0.1)))
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(guide.corners) { corner in
+                            let on = corner.number == selectedCorner
+                            Button {
+                                withAnimation(.easeOut(duration: 0.2)) { selectedCorner = on ? nil : corner.number }
+                            } label: {
+                                Text("T\(corner.number)")
+                                    .font(.f1(13))
+                                    .foregroundStyle(on ? Theme.onAccent : .white)
+                                    .frame(minWidth: 40)
+                                    .padding(.vertical, 7)
+                                    .background(Capsule().fill(on ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Color.white.opacity(0.06))))
+                                    .overlay(Capsule().strokeBorder(on ? Color.clear : Color.white.opacity(0.1)))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Turn \(corner.number)")
+                            .id(corner.number)
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Turn \(corner.number)")
                     }
+                    .padding(.horizontal, 14)
                 }
-                .padding(.horizontal, 14)
+                // A turn tapped on the map scrolls its chip into view.
+                .onChange(of: selectedCorner) { _, number in
+                    guard let number else { return }
+                    withAnimation { proxy.scrollTo(number, anchor: .center) }
+                }
             }
             if let corner = guide.corner(selectedCorner) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -156,6 +169,14 @@ struct TrackSectionView: View {
         .padding(.bottom, 14)
         .task(id: circuit.circuitId) {
             selectedCorner = nil
+            #if DEBUG
+            // -FocusCorner N: select a turn after launch, for screenshots
+            let n = UserDefaults.standard.integer(forKey: "FocusCorner")
+            if n > 0 {
+                try? await Task.sleep(for: .seconds(6))
+                selectedCorner = n
+            }
+            #endif
         }
     }
 

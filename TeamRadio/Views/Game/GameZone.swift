@@ -29,12 +29,10 @@ struct GameZone: View {
                 }
                 PicksPanel(game: game, state: state, now: now,
                            onOpen: { if case .scored = state { onResult() } else { onPicks() } })
-                HStack(spacing: 12) {
-                    if dotd.race != nil {
-                        DotdTile(model: dotd, now: now, onVote: onVote)
-                    }
-                    LightsOutTile(onPlay: onLightsOut)
+                if dotd.race != nil {
+                    DotdTile(model: dotd, now: now, onVote: onVote)
                 }
+                LightsOutTile(onPlay: onLightsOut)
                 EmilyBar(onTap: onEmily)
             }
         }
@@ -306,30 +304,23 @@ private struct DotdTile: View {
 
     var body: some View {
         Button(action: onVote) {
-            VStack(alignment: .leading, spacing: 10) {
-                TileHeading(text: "DRIVER OF THE DAY")
-                if model.myVote != nil, let lead = model.tally?.votes.first {
-                    let driver = model.driver(lead.driverId)
-                    LEDText(text: driver?.code ?? String(lead.driverId.prefix(3)).uppercased(), pitch: 5.6,
-                            color: Theme.teamColor(driver?.teamId))
-                    Text("\(lead.pct)% · \(model.tally?.total ?? 0) votes")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white)
-                } else {
-                    LEDText(text: "???", pitch: 5.6, color: Theme.violet)
-                    Text("Who impressed you most?")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
-                }
+            VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    Text(model.myVote == nil ? "VOTE →" : "CHANGE →")
-                        .font(.f1(12).italic())
-                        .tracking(1.5)
-                        .foregroundStyle(Theme.accent)
+                    TileHeading(text: "DRIVER OF THE DAY")
                     Spacer(minLength: 4)
                     if let left = timeLeft { ZoneChip(text: left) }
+                }
+                HStack(spacing: 16) {
+                    if model.myVote != nil, let lead = model.tally?.votes.first {
+                        let driver = model.driver(lead.driverId)
+                        LEDText(text: driver?.code ?? String(lead.driverId.prefix(3)).uppercased(), pitch: 5.6,
+                                color: Theme.teamColor(driver?.teamId))
+                        detail("\(lead.pct)% of \(model.tally?.total ?? 0) votes", action: "CHANGE →")
+                    } else {
+                        LEDText(text: "???", pitch: 5.6, color: Theme.violet)
+                        detail("Who impressed you most?", action: "VOTE →")
+                    }
+                    Spacer(minLength: 0)
                 }
             }
             .padding(14)
@@ -338,6 +329,18 @@ private struct DotdTile: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Driver of the day vote")
+    }
+
+    private func detail(_ text: String, action: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(text)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white)
+            Text(action)
+                .font(.f1(12).italic())
+                .tracking(1.5)
+                .foregroundStyle(Theme.accent)
+        }
     }
 
     /// "4D LEFT", "9H LEFT" until the vote closes.
@@ -358,23 +361,28 @@ private struct LightsOutTile: View {
 
     var body: some View {
         Button(action: onPlay) {
-            VStack(alignment: .leading, spacing: 10) {
-                TileHeading(text: "LIGHTS OUT")
-                LEDText(text: best > 0 ? String(format: "%.3f", best) : "-.---", pitch: 5)
-                Text(subtitle)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
-                HStack(spacing: 5) {
-                    ForEach(0..<5, id: \.self) { _ in
-                        Circle().fill(Theme.live).frame(width: 8, height: 8).shadow(color: Theme.live, radius: 3)
-                    }
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    TileHeading(text: "LIGHTS OUT")
                     Spacer(minLength: 4)
-                    Text("PLAY ▸")
-                        .font(.f1(12).italic())
-                        .tracking(1.5)
-                        .foregroundStyle(Theme.live)
+                    HStack(spacing: 5) {
+                        ForEach(0..<5, id: \.self) { _ in
+                            Circle().fill(Theme.live).frame(width: 8, height: 8).shadow(color: Theme.live, radius: 3)
+                        }
+                    }
+                }
+                HStack(spacing: 16) {
+                    LEDText(text: best > 0 ? String(format: "%.3f", best) : "-.---", pitch: 5)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(subtitle)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.white)
+                        Text("PLAY ▸")
+                            .font(.f1(12).italic())
+                            .tracking(1.5)
+                            .foregroundStyle(Theme.live)
+                    }
+                    Spacer(minLength: 0)
                 }
             }
             .padding(14)
