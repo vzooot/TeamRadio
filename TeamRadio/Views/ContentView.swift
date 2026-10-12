@@ -53,6 +53,18 @@ struct ContentView: View {
             }
             #endif
             await dotd.load(season: model.season, fallbackDrivers: game.drivers)
+            #if DEBUG
+            // -FakeVote YES: a cast vote and a three-way tally, for screenshots
+            if UserDefaults.standard.bool(forKey: "FakeVote"), dotd.drivers.count > 2 {
+                let d = dotd.drivers
+                dotd.myVote = d[1].id
+                dotd.tally = DotdService.Tally(total: 412, votes: [
+                    .init(driverId: d[1].id, count: 214, pct: 52),
+                    .init(driverId: d[0].id, count: 124, pct: 30),
+                    .init(driverId: d[2].id, count: 74, pct: 18),
+                ])
+            }
+            #endif
         }
         .fullScreenCover(isPresented: $showLightsOut) {
             LightsOutView()

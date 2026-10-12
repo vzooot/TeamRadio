@@ -729,8 +729,8 @@ private struct DotdBoldCard: View {
     let now: Date
     let onVote: () -> Void
 
-    /// Proper yellow, only a breath of warmth towards the right.
-    private static let yellow = [Color(red: 1, green: 0.88, blue: 0.22), Color(red: 1, green: 0.8, blue: 0.08)]
+    /// Pure, bright yellow; no orange.
+    private static let yellow = [Color(red: 1, green: 0.9, blue: 0.24), Color(red: 1, green: 0.87, blue: 0.16)]
     private static let ink = Theme.onAccent
 
     /// The entrance plays each time the card scrolls in: the suit strides in,
@@ -750,14 +750,8 @@ private struct DotdBoldCard: View {
             VStack(alignment: .leading, spacing: 10) {
                 header
                 if let driver = spotlight { spotlightRow(driver) }
-                if voted, let votes = model.tally?.votes {
-                    VStack(spacing: 5) {
-                        ForEach(Array(votes.prefix(3).enumerated()), id: \.element.id) { index, v in
-                            bar(model.driver(v.driverId)?.code ?? String(v.driverId.prefix(3)).uppercased(),
-                                Double(v.pct) / 100, leader: index == 0, mine: v.driverId == model.myVote)
-                        }
-                    }
-                    .frame(width: 200)
+                if voted {
+                    podium
                 } else {
                     candidates
                 }
@@ -929,32 +923,122 @@ private struct DotdBoldCard: View {
             .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.white.opacity(0.45), lineWidth: 1))
     }
 
-    /// A vote bar that fills and counts up on entrance; the leader gets a
-    /// star, your own pick a ring.
-    private func bar(_ code: String, _ pct: Double, leader: Bool, mine: Bool) -> some View {
-        let shownPct = shown ? pct : 0
-        return HStack(spacing: 8) {
-            HStack(spacing: 3) {
-                Text(code).font(.f1(12)).foregroundStyle(Self.ink)
-                if leader { Image(systemName: "star.fill").font(.system(size: 7, weight: .black)).foregroundStyle(Self.ink) }
-            }
-            .frame(width: 40, alignment: .leading)
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Self.ink.opacity(0.12))
-                    Capsule().fill(Self.ink).frame(width: max(4, geo.size.width * shownPct))
-                    if mine {
-                        Capsule().strokeBorder(Self.ink.opacity(0.6), lineWidth: 1).padding(-2)
+    private struct Entry: Identifiable {
+        let driverId: String
+        let code: String
+        let team: Color
+        let pct: Double
+        var id: String { driverId }
+    }
+
+    /// The three most-voted drivers; if fewer have votes, the podium
+    /// finishers fill the gaps at 0%.
+    private var entries: [Entry] {
+        var list: [Entry] = (model.tally?.votes ?? []).prefix(3).map { v in
+            let d = model.driver(v.driverId)
+            return Entry(driverId: v.driverId, code: d?.code ?? String(v.driverId.prefix(3)).uppercased(),
+                         team: Theme.teamColor(d?.teamId), pct: Double(v.pct) / 100)
+        }
+        for d in model.drivers where list.count < 3 && !list.contains(where: { $0.driverId == d.id }) {
+            list.append(Entry(driverId: d.id, code: d.code, team: Theme.teamColor(d.teamId), pct: 0))
+        }
+        return list
+    }
+
+    /// The fan vote as a 3D podium: the leader in the middle, second left,
+    /// third right; team-coloured columns rise and the shares count up.
+    private var podium: some View {
+        let top3 = entries
+        let order = top3.count == 3 ? [top3[1], top3[0], top3[2]] : top3
+        return HStack(alignment: .bottom, spacing: 8) {
+            ForEach(order) { entry in
+                let leader = entry.id == top3.first?.id
+                let mine = entry.driverId == model.myVote
+                let barHeight: CGFloat = shown ? 10 + entry.pct * 80 : 4
+                VStack(spacing: 4) {
+                    // the share rides on top of its column as it rises
+                    VStack(spacing: 2) {
+                        HStack(spacing: 1) {
+                            CountingText(value: (shown ? entry.pct : 0) * 100, prefix: "")
+                            Text("%")
+                        }
+                        .font(.f1Digits(leader ? 14 : 12))
+                        .foregroundStyle(Self.ink)
+                        PrismBar(height: barHeight, color: entry.team, width: leader ? 34 : 28)
+                            .frame(width: 52, height: barHeight + 16)
                     }
+                    .frame(height: 112, alignment: .bottom)
+                    HStack(spacing: 3) {
+                        if leader { Image(systemName: "crown.fill").font(.system(size: 8, weight: .black)) }
+                        Text(entry.code).font(.f1(13))
+                    }
+                    .foregroundStyle(Self.ink)
+                    .fixedSize()
+                    Text(mine ? "YOU" : " ")
+                        .font(.f1(8, weight: .heavy))
+                        .tracking(1)
+                        .foregroundStyle(Self.yellow[0])
+                        .padding(.horizontal, 5).padding(.vertical, 1)
+                        .background(Capsule().fill(mine ? Self.ink : .clear))
                 }
+                .frame(width: 60)
             }
-            .frame(height: 7)
-            CountingText(value: shownPct * 100, prefix: "")
-                .font(.f1Digits(11))
-                .foregroundStyle(Self.ink)
-                .overlay(alignment: .trailing) { Text("%").font(.f1Digits(11)).foregroundStyle(Self.ink).offset(x: 10) }
-                .frame(width: 26, alignment: .trailing)
-                .padding(.trailing, 8)
+        }
+        .frame(maxWidth: 210, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(top3.map { "\($0.code) \(Int(($0.pct * 100).rounded())) percent" }.joined(separator: ", "))
+    }
+}
+
+/// A 3D column: a team-coloured front with a gloss stripe, a lit top and a
+/// shaded side, standing on a soft shadow. `height` animates.
+private struct PrismBar: View, Animatable {
+    var height: CGFloat
+    let color: Color
+    let width: CGFloat
+
+    var animatableData: CGFloat {
+        get { height }
+        set { height = newValue }
+    }
+
+    var body: some View {
+        Canvas { ctx, size in
+            let dx = width * 0.34, dy = width * 0.22
+            let base = size.height - 4
+            let x0 = (size.width - width - dx) / 2
+            let top = base - height
+
+            // ground shadow
+            ctx.fill(Path(ellipseIn: CGRect(x: x0 - 4, y: base - 4, width: width + dx + 8, height: 10)),
+                     with: .color(.black.opacity(0.18)))
+
+            var side = Path()
+            side.move(to: CGPoint(x: x0 + width, y: top))
+            side.addLine(to: CGPoint(x: x0 + width + dx, y: top - dy))
+            side.addLine(to: CGPoint(x: x0 + width + dx, y: base - dy))
+            side.addLine(to: CGPoint(x: x0 + width, y: base))
+            side.closeSubpath()
+            ctx.fill(side, with: .color(color))
+            ctx.fill(side, with: .color(.black.opacity(0.35)))
+
+            var cap = Path()
+            cap.move(to: CGPoint(x: x0, y: top))
+            cap.addLine(to: CGPoint(x: x0 + dx, y: top - dy))
+            cap.addLine(to: CGPoint(x: x0 + width + dx, y: top - dy))
+            cap.addLine(to: CGPoint(x: x0 + width, y: top))
+            cap.closeSubpath()
+            ctx.fill(cap, with: .color(color))
+            ctx.fill(cap, with: .color(.white.opacity(0.4)))
+
+            let front = Path(CGRect(x: x0, y: top, width: width, height: height))
+            ctx.fill(front, with: .linearGradient(Gradient(colors: [color, color.opacity(0.8)]),
+                                                  startPoint: CGPoint(x: x0, y: top), endPoint: CGPoint(x: x0, y: base)))
+            // gloss stripe
+            if height > 6 {
+                ctx.fill(Path(CGRect(x: x0 + width * 0.16, y: top + 3, width: width * 0.12, height: height - 6)),
+                         with: .color(.white.opacity(0.28)))
+            }
         }
     }
 }
