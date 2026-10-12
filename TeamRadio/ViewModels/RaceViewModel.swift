@@ -21,6 +21,9 @@ final class RaceViewModel {
     /// Hourly forecast at the displayed race's circuit, keyed by UTC hour
     /// (Open-Meteo only reaches ~16 days ahead, so far rounds have none).
     var weather: [Date: WeatherPoint] = [:]
+    /// Weather and the track map are on their way for the displayed race
+    /// (the screen shows shimmering placeholders meanwhile).
+    var extrasLoading = false
 
     /// What the countdown tab shows: the browsed round, else the next one.
     var displayRace: Race? { selectedRace ?? nextRace }
@@ -75,6 +78,7 @@ final class RaceViewModel {
         }
         trackMap = mapCache[race.circuit.circuitId]
         weather = [:]
+        extrasLoading = true
         let task = Task { [weak self] in
             async let map: TrackMap? = self?.mapCache[race.circuit.circuitId] != nil ? nil
                 : try? await TrackAPI.trackMap(circuitId: race.circuit.circuitId, season: race.season)
@@ -90,6 +94,7 @@ final class RaceViewModel {
                 self.trackMap = loadedMap
             }
             self.weather = loadedWeather ?? [:]
+            self.extrasLoading = false
         }
         extrasTask = task
         await task.value

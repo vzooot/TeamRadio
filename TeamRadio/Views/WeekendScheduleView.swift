@@ -5,6 +5,8 @@ import SwiftUI
 struct WeekendScheduleView: View {
     let race: Race
     var weather: [Date: WeatherPoint] = [:]
+    /// The forecast is on its way: rows show a shimmer where it will go.
+    var weatherLoading = false
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
@@ -21,7 +23,8 @@ struct WeekendScheduleView: View {
                             session: session,
                             now: now,
                             isNext: session.id == nextId,
-                            weather: WeatherAPI.point(for: session.date, in: weather)
+                            weather: WeatherAPI.point(for: session.date, in: weather),
+                            weatherLoading: weatherLoading
                         )
                         if session.id != sessions.last?.id {
                             Divider().overlay(Color.white.opacity(0.06))
@@ -53,6 +56,7 @@ struct SessionRow: View {
     let now: Date
     let isNext: Bool
     var weather: WeatherPoint?
+    var weatherLoading = false
 
     private var isLive: Bool {
         session.date <= now && now < session.date.addingTimeInterval(session.kind.expectedDuration)
@@ -94,6 +98,8 @@ struct SessionRow: View {
                     Text("\(weather.symbol) \(Int(weather.temperature.rounded()))° · \(weather.precipProbability)% rain")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(weather.precipProbability >= 40 ? Color(red: 0.4, green: 0.7, blue: 1.0) : Theme.dimText)
+                } else if weatherLoading, !isPast {
+                    Shimmer(cornerRadius: 4).frame(width: 84, height: 11)
                 }
             }
 

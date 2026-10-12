@@ -1,6 +1,23 @@
 import SwiftUI
 import UIKit
 
+private extension View {
+    /// Calls `action` with the index of the box in the middle as the strip
+    /// scrolls (iOS 18+; on iOS 17 the strip simply has no ticks).
+    @ViewBuilder
+    func onScrollTicks(pitch: CGFloat, _ action: @escaping (Int) -> Void) -> some View {
+        if #available(iOS 18, *) {
+            onScrollGeometryChange(for: Int.self) { geo in
+                Int(((geo.contentOffset.x + geo.contentInsets.leading) / pitch).rounded())
+            } action: { _, index in
+                action(index)
+            }
+        } else {
+            self
+        }
+    }
+}
+
 /// The race hero card with two ways to travel through the season:
 /// swipe left or right for the next or previous grand prix, or press and
 /// hold to open a strip of the season's race boxes over the card. The strip
@@ -11,9 +28,9 @@ struct RaceHeroCarousel: View {
     let race: Race
     /// True while the strip is open (the page holds still meanwhile).
     @Binding var dockActive: Bool
+    /// Which way the switch goes (shared so the page below follows).
+    @Binding var edge: Edge
     let onSelect: (Race) -> Void
-
-    @State private var edge: Edge = .trailing
     @State private var width: CGFloat = 0
     @State private var height: CGFloat = 0
     /// The race box in the middle of the strip.
@@ -92,8 +109,23 @@ struct RaceHeroCarousel: View {
     private func open() {
         guard !dockActive else { return }
         centeredId = race.id
+        tickIndex = index
         dockActive = true
+        StartSounds.shared.prepare()
+        detent.prepare()
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+    }
+
+    /// A dial detent: a rigid tap and a short mechanical tick each time a
+    /// box crosses the middle.
+    private let detent = UIImpactFeedbackGenerator(style: .rigid)
+    @State private var tickIndex: Int?
+
+    private func passed(_ i: Int) {
+        guard i != tickIndex, season.indices.contains(i) else { return }
+        tickIndex = i
+        detent.impactOccurred(intensity: 0.7)
+        StartSounds.shared.tick()
     }
 
     private func close() {
@@ -114,6 +146,7 @@ struct RaceHeroCarousel: View {
     }
 
     private let boxWidth: CGFloat = 92
+    private let spacing: CGFloat = 10
 
     private var strip: some View {
         ZStack(alignment: .topTrailing) {
@@ -126,7 +159,7 @@ struct RaceHeroCarousel: View {
 
             ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 14) {
+                LazyHStack(spacing: spacing) {
                     ForEach(season) { r in
                         Button { pick(r) } label: {
                             RoundCard(race: r, isNext: r.id == nextRaceId, isSelected: r.id == race.id)
@@ -148,7 +181,9 @@ struct RaceHeroCarousel: View {
                 .padding(.vertical, 24)
             }
             .contentMargins(.horizontal, max((width - boxWidth) / 2, 0), for: .scrollContent)
-            .scrollTargetBehavior(.viewAligned)
+            // a flick can carry across several races before it snaps
+            .scrollTargetBehavior(.viewAligned(limitBehavior: .never))
+            .onScrollTicks(pitch: boxWidth + spacing) { passed($0) }
             .frame(height: height)
             .onAppear {
                 // open centred on the race in the card
@@ -167,7 +202,7 @@ struct RaceHeroCarousel: View {
             .padding(10)
             .accessibilityLabel("Close")
 
-            Text("SCROLL · TAP A RACE")
+            Text("SCROLL · TAP A RACE TO GO")
                 .font(.f1(9, weight: .heavy))
                 .tracking(2)
                 .foregroundStyle(Theme.dimText)

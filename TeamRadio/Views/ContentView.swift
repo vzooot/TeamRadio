@@ -10,8 +10,17 @@ struct ContentView: View {
     @State private var dotd = DotdModel()
     @State private var showDotd = false
     @State private var showLightsOut = false
-    /// The race dock is up: the page holds still while the finger scrubs.
+    /// The race strip is open: the page holds still meanwhile.
     @State private var raceDock = false
+    /// Which way the last race switch went, so the page follows the card.
+    @State private var raceEdge: Edge = .trailing
+
+    /// The race's sections slide in from the side the card moved to (the
+    /// old ones leave at once so nothing stacks).
+    private var raceSwitch: AnyTransition {
+        .asymmetric(insertion: .opacity.combined(with: .offset(x: raceEdge == .trailing ? 60 : -60)),
+                    removal: .identity)
+    }
 
     var body: some View {
         ZStack {
@@ -114,7 +123,7 @@ struct ContentView: View {
 
                 if let race = model.displayRace {
 
-                    RaceHeroCarousel(season: model.season, race: race, dockActive: $raceDock) { picked in
+                    RaceHeroCarousel(season: model.season, race: race, dockActive: $raceDock, edge: $raceEdge) { picked in
                         Task { await model.select(picked) }
                     }
                     .id("hero")
@@ -126,6 +135,7 @@ struct ContentView: View {
 
                     CountdownView(race: race)
                         .id(race.id)
+                        .transition(raceSwitch)
 
                     #if DEBUG
                     if BlendDraft.gameZoneInApp {
@@ -142,8 +152,12 @@ struct ContentView: View {
                             .id("picks")
                     }
 
-                    WeekendScheduleView(race: race, weather: model.weather)
-                        .id("schedule")
+                    VStack {
+                        WeekendScheduleView(race: race, weather: model.weather, weatherLoading: model.extrasLoading)
+                            .id(race.id)
+                            .transition(raceSwitch)
+                    }
+                    .id("schedule")
 
                     SessionAlertsCard(season: model.season)
                         .id("alerts")
@@ -152,10 +166,16 @@ struct ContentView: View {
                         InviteBanner()
                     }
 
-                    if let map = model.trackMap {
-                        TrackSectionView(map: map, circuit: race.circuit)
-                            .id("trackSection")
+                    VStack {
+                        if let map = model.trackMap {
+                            TrackSectionView(map: map, circuit: race.circuit)
+                                .id(race.circuit.circuitId)
+                                .transition(raceSwitch)
+                        } else if model.extrasLoading {
+                            TrackPlaceholder()
+                        }
                     }
+                    .id("trackSection")
                 } else {
                     SeasonOverBanner()
                 }
@@ -167,6 +187,8 @@ struct ContentView: View {
                 if !model.season.isEmpty {
                     SeasonView(season: model.season, nextRaceId: model.nextRace?.id,
                                selectedId: model.displayRace?.id) { race in
+                        let from = model.season.firstIndex { $0.id == model.displayRace?.id } ?? 0
+                        raceEdge = (model.season.firstIndex { $0.id == race.id } ?? 0) >= from ? .trailing : .leading
                         Task { await model.select(race) }
                         withAnimation(.easeInOut(duration: 0.45)) { proxy.scrollTo("hero", anchor: .top) }
                     }
@@ -177,6 +199,8 @@ struct ContentView: View {
             .padding(.horizontal, 16)
             .padding(.top, 8)
             .padding(.bottom, 32)
+            .animation(.snappy(duration: 0.4), value: model.displayRace?.id)
+            .animation(.easeOut(duration: 0.3), value: model.extrasLoading)
         }
         .scrollDisabled(raceDock)
         .refreshable { await model.load() }

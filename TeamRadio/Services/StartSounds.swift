@@ -59,6 +59,25 @@ final class StartSounds {
         if !player.isPlaying { player.play() }
     }
 
+    /// A dial detent: a very short, dry mechanical tick.
+    func tick() {
+        start()
+        let frames = AVAudioFrameCount(format.sampleRate * 0.012)
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames),
+              let data = buffer.floatChannelData?[0] else { return }
+        buffer.frameLength = frames
+        for i in 0..<Int(frames) {
+            let t = Double(i) / format.sampleRate
+            let decay = exp(-t * 900)
+            // a click of noise over a high body resonance
+            let noise = Double.random(in: -1...1) * 0.6
+            let body = sin(2 * Double.pi * 2600 * t) * 0.5
+            data[i] = Float((noise + body) * decay * 0.22)
+        }
+        player.scheduleBuffer(buffer, completionHandler: nil)
+        if !player.isPlaying { player.play() }
+    }
+
     /// Reaction recorded.
     func radioClick() {
         start()
