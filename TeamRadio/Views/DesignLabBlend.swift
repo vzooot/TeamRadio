@@ -313,6 +313,8 @@ struct GameZoneDraft: View {
         case "a": ZoneSheet()
         case "b": ZoneSectors()
         case "c": ZoneGlass()
+        case "d": ZoneLiquidTiles()
+        case "e": ZoneFloating()
         default: BlendDraft(embedded: true, gameZone: true)
         }
     }
@@ -627,6 +629,281 @@ private struct ZoneGlass: View {
         }
         .padding(8).padding(.leading, 2)
         .glassPanel(Capsule(), light: Theme.violet, lightOffset: CGSize(width: 0, height: 10))
+    }
+}
+
+// MARK: - Liquid glass variants (iOS 26 glass, app colour code)
+
+@available(iOS 26, *)
+private func liquid(tint: Color?, clear: Bool, interactive: Bool) -> Glass {
+    let base: Glass = clear ? .clear : .regular
+    let tinted = tint.map { base.tint($0) } ?? base
+    return interactive ? tinted.interactive() : tinted
+}
+
+/// Real Liquid Glass on iOS 26, material before.
+private struct LiquidGlass: ViewModifier {
+    var shape: AnyShape
+    var tint: Color? = nil
+    var clear = false
+    var interactive = false
+    var union: String? = nil
+    var namespace: Namespace.ID? = nil
+
+    func body(content: Content) -> some View {
+        if #available(iOS 26, *) {
+            if let union, let namespace {
+                content.glassEffect(liquid(tint: tint, clear: clear, interactive: interactive), in: shape)
+                    .glassEffectUnion(id: union, namespace: namespace)
+            } else {
+                content.glassEffect(liquid(tint: tint, clear: clear, interactive: interactive), in: shape)
+            }
+        } else {
+            content.background(.ultraThinMaterial, in: shape)
+        }
+    }
+}
+
+private extension View {
+    func liquid(_ shape: some Shape, tint: Color? = nil, clear: Bool = false, interactive: Bool = false,
+                union: String? = nil, in namespace: Namespace.ID? = nil) -> some View {
+        modifier(LiquidGlass(shape: AnyShape(shape), tint: tint, clear: clear, interactive: interactive,
+                             union: union, namespace: namespace))
+    }
+
+    /// The glass prominent button in the accent colour.
+    @ViewBuilder
+    func prominentGlass() -> some View {
+        if #available(iOS 26, *) {
+            buttonStyle(.glassProminent).tint(Theme.accent)
+        } else {
+            buttonStyle(.borderedProminent).tint(Theme.accent)
+        }
+    }
+}
+
+/// Groups sibling glass so it renders, blends and morphs together.
+private struct LiquidContainer<Content: View>: View {
+    var spacing: CGFloat = 12
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        if #available(iOS 26, *) {
+            GlassEffectContainer(spacing: spacing) { content }
+        } else {
+            content
+        }
+    }
+}
+
+/// Trio-colour light under the zone, for the glass to bend and reflect.
+private struct TrioLight: View {
+    var body: some View {
+        ZStack {
+            Circle().fill(Theme.accent).frame(width: 240).blur(radius: 70).opacity(0.55).offset(x: -110, y: -120)
+            Circle().fill(Theme.violet).frame(width: 220).blur(radius: 80).opacity(0.5).offset(x: 120, y: 40)
+            Circle().fill(Theme.live).frame(width: 200).blur(radius: 80).opacity(0.45).offset(x: -60, y: 210)
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+// D: C's layout as true liquid glass. One container; the vote and Lights Out
+// tiles are a single unioned glass shape; buttons are prominent glass.
+private struct ZoneLiquidTiles: View {
+    @Namespace private var glass
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                SectionTitle("GAME ZONE")
+                Spacer()
+                countdownChip("LOCKS IN 12D 12H")
+            }
+            LiquidContainer(spacing: 14) {
+                VStack(spacing: 12) {
+                    picks
+                    HStack(spacing: 6) { dotd; lights }
+                    emily
+                }
+            }
+        }
+        .background(TrioLight())
+    }
+
+    private var picks: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("MAKE YOUR PICKS").font(.f1(22).italic()).foregroundStyle(Theme.chromeText)
+            HStack(spacing: 8) {
+                pill("POLE", "NOR", papaya)
+                pill("WIN", "PIA", papaya)
+                pill("FL", "+", nil)
+            }
+            HStack {
+                HStack(spacing: 2) {
+                    ForEach(0..<6, id: \.self) { i in
+                        Capsule().fill(i < 3 ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Color.white.opacity(0.15))).frame(width: 14, height: 3)
+                    }
+                }
+                Text("3 OF 6").font(.f1(10, weight: .heavy)).tracking(1.2).foregroundStyle(Theme.dimText)
+                Spacer()
+                Button {} label: {
+                    Text("FINISH →").font(.f1(13).italic()).tracking(1.5).foregroundStyle(Theme.onAccent)
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                }
+                .prominentGlass()
+            }
+        }
+        .padding(18)
+        .liquid(RoundedRectangle(cornerRadius: 28))
+    }
+
+    /// A pick as a tinted panel inside the glass: team colour when picked, cyan "next" when open.
+    private func pill(_ label: String, _ code: String, _ team: Color?) -> some View {
+        VStack(spacing: 3) {
+            Text(label).font(.f1(10, weight: .heavy)).tracking(1.5).foregroundStyle(team == nil ? Theme.accent : Theme.dimText)
+            Text(code).font(.f1(22)).foregroundStyle(team == nil ? Theme.accent : .white)
+        }
+        .frame(maxWidth: .infinity).padding(.vertical, 10)
+        .background(RoundedRectangle(cornerRadius: 16).fill((team ?? Theme.accent).opacity(team == nil ? 0.12 : 0.18)))
+        .overlay(alignment: .bottom) {
+            Capsule().fill(team ?? Theme.accent).frame(width: 22, height: 3).padding(.bottom, 5)
+                .shadow(color: team ?? Theme.accent, radius: 3)
+        }
+    }
+
+    private var dotd: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) { TrioSlashes(height: 11); smallCaps("DRIVER OF THE DAY") }
+            LEDText(text: "ANT", pitch: 5.6, color: mercedes)
+            Text("52% · 412 votes").font(.system(size: 12, weight: .semibold)).foregroundStyle(.white)
+            Text("VOTE →").font(.f1(12).italic()).tracking(1.5).foregroundStyle(Theme.accent)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .liquid(RoundedRectangle(cornerRadius: 26), union: "duo", in: glass)
+    }
+
+    private var lights: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) { TrioSlashes(height: 11); smallCaps("LIGHTS OUT") }
+            LEDText(text: "0.198", pitch: 5)
+            Text("Best · P4 this week").font(.system(size: 12, weight: .semibold)).foregroundStyle(.white)
+            Text("PLAY ▸").font(.f1(12).italic()).tracking(1.5).foregroundStyle(Theme.live)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .liquid(RoundedRectangle(cornerRadius: 26), tint: Theme.live.opacity(0.12), union: "duo", in: glass)
+    }
+
+    private var emily: some View {
+        HStack(spacing: 12) {
+            Color.clear.overlay(Image("EmilyAvatar").resizable().scaledToFill())
+                .frame(width: 44, height: 44).clipShape(Circle())
+            VStack(alignment: .leading, spacing: 2) {
+                Text("ASK EMILY").font(.f1(16).italic()).foregroundStyle(Theme.chromeText)
+                Text("AI race engineer").font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.dimText)
+            }
+            Spacer()
+            Button {} label: {
+                Image(systemName: "mic.fill").font(.system(size: 17, weight: .bold)).foregroundStyle(Theme.onAccent)
+                    .frame(width: 30, height: 30)
+            }
+            .prominentGlass()
+        }
+        .padding(8).padding(.leading, 2)
+        .liquid(Capsule(), tint: Theme.violet.opacity(0.15))
+    }
+}
+
+// E: no cards. Floating glass controls like Control Center: three round pick
+// buttons, a prominent finish button, a two-part glass dock for the vote and
+// Lights Out, and Emily as a glass orb joined to a glass prompt.
+private struct ZoneFloating: View {
+    @Namespace private var glass
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                SectionTitle("GAME ZONE")
+                Spacer()
+                countdownChip("LOCKS IN 12D 12H")
+            }
+            Text("MAKE YOUR PICKS").font(.f1(26).italic()).foregroundStyle(Theme.chromeText)
+                .padding(.top, 4)
+            LiquidContainer(spacing: 16) {
+                VStack(spacing: 16) {
+                    HStack(spacing: 16) {
+                        orb("POLE", "NOR", papaya)
+                        orb("WIN", "PIA", papaya)
+                        orb("FL", "+", nil)
+                    }
+                    Button {} label: {
+                        Text("FINISH YOUR PICKS").font(.f1(15).italic()).tracking(2).foregroundStyle(Theme.onAccent)
+                            .frame(maxWidth: .infinity).padding(.vertical, 6)
+                    }
+                    .prominentGlass()
+                    dock
+                    emily
+                }
+            }
+        }
+        .background(TrioLight())
+    }
+
+    /// A round, interactive glass button per pick, tinted with the team colour.
+    private func orb(_ label: String, _ code: String, _ team: Color?) -> some View {
+        VStack(spacing: 2) {
+            Text(code).font(.f1(24)).foregroundStyle(team == nil ? Theme.accent : .white)
+            Text(label).font(.f1(9, weight: .heavy)).tracking(1.5).foregroundStyle(team == nil ? Theme.accent : Theme.dimText)
+        }
+        .frame(width: 96, height: 96)
+        .liquid(Circle(), tint: team.map { $0.opacity(0.35) } ?? Theme.accent.opacity(0.12), interactive: true)
+        .frame(maxWidth: .infinity)
+    }
+
+    /// Vote and Lights Out as two halves of one glass dock.
+    private var dock: some View {
+        HStack(spacing: 4) {
+            HStack(spacing: 12) {
+                LEDText(text: "ANT", pitch: 4.4, color: mercedes)
+                VStack(alignment: .leading, spacing: 3) {
+                    smallCaps("DOTD")
+                    Text("52%").font(.system(size: 13, weight: .bold)).foregroundStyle(.white)
+                }
+            }
+            .padding(.horizontal, 16).padding(.vertical, 16)
+            .frame(maxWidth: .infinity)
+            .liquid(Capsule(), interactive: true, union: "dock", in: glass)
+            HStack(spacing: 12) {
+                LEDText(text: "0.198", pitch: 3.6)
+                VStack(alignment: .leading, spacing: 3) {
+                    smallCaps("BEST")
+                    Text("P4").font(.system(size: 13, weight: .bold)).foregroundStyle(.white)
+                }
+            }
+            .padding(.horizontal, 16).padding(.vertical, 16)
+            .frame(maxWidth: .infinity)
+            .liquid(Capsule(), tint: Theme.live.opacity(0.18), interactive: true, union: "dock", in: glass)
+        }
+    }
+
+    /// Emily: a glass orb with her face, joined to a glass prompt.
+    private var emily: some View {
+        HStack(spacing: 4) {
+            Color.clear.overlay(Image("EmilyAvatar").resizable().scaledToFill())
+                .frame(width: 50, height: 50).clipShape(Circle())
+                .padding(6)
+                .shadow(color: Theme.violet.opacity(0.8), radius: 8)
+                .liquid(Circle())
+            HStack {
+                Text("Ask Emily anything…").font(.system(size: 15, weight: .medium)).foregroundStyle(.white.opacity(0.8))
+                Spacer()
+                Image(systemName: "mic.fill").font(.system(size: 16, weight: .bold)).foregroundStyle(Theme.accent)
+            }
+            .padding(.horizontal, 18).frame(height: 62)
+            .liquid(Capsule(), interactive: true)
+        }
     }
 }
 
