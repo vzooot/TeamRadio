@@ -63,7 +63,17 @@ final class RaceViewModel {
 
     /// Browse another round (nil returns to the next race).
     func select(_ race: Race?) async {
+        show(race)
+        await loadExtras(for: displayRace)
+    }
+
+    /// Switch the displayed race at once (call inside an animation); the
+    /// map and weather follow with `refreshExtras()`.
+    func show(_ race: Race?) {
         selectedRace = race?.id == nextRace?.id ? nil : race
+    }
+
+    func refreshExtras() async {
         await loadExtras(for: displayRace)
     }
 

@@ -1,3 +1,4 @@
+import AudioToolbox
 import SwiftUI
 import UIKit
 
@@ -111,7 +112,6 @@ struct RaceHeroCarousel: View {
         centeredId = race.id
         tickIndex = index
         dockActive = true
-        StartSounds.shared.prepare()
         DialHaptics.shared.prepare()
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
@@ -128,8 +128,9 @@ struct RaceHeroCarousel: View {
         lastTick = .now
         let strength: Float = gap < 0.05 ? 0.45 : gap < 0.12 ? 0.65 : 0.9
         DialHaptics.shared.detent(strength: strength)
-        // in a fast spin the clicks blur; let every other one through
-        if gap > 0.03 { StartSounds.shared.tick(volume: strength) }
+        // the iPhone's own recorded keyboard tock; in a fast spin the
+        // clicks blur, so not every one sounds
+        if gap > 0.04 { AudioServicesPlaySystemSound(1104) }
     }
 
     private func close() {

@@ -15,6 +15,13 @@ struct ContentView: View {
     /// Which way the last race switch went, so the page follows the card.
     @State private var raceEdge: Edge = .trailing
 
+    /// One snappy animation for the switch itself; map and weather load
+    /// after it, outside the animation, so nothing heavy runs mid-slide.
+    private func switchRace(to race: Race) {
+        withAnimation(.snappy(duration: 0.35)) { model.show(race) }
+        Task { await model.refreshExtras() }
+    }
+
     /// The race's sections slide in from the side the card moved to (the
     /// old ones leave at once so nothing stacks).
     private var raceSwitch: AnyTransition {
@@ -124,7 +131,7 @@ struct ContentView: View {
                 if let race = model.displayRace {
 
                     RaceHeroCarousel(season: model.season, race: race, dockActive: $raceDock, edge: $raceEdge) { picked in
-                        Task { await model.select(picked) }
+                        switchRace(to: picked)
                     }
                     .id("hero")
 
@@ -150,6 +157,9 @@ struct ContentView: View {
                                  onLightsOut: { showLightsOut = true },
                                  onEmily: { showEmily = true })
                             .id("picks")
+                            // heavy (3D chart, animations): appears and
+                            // disappears without joining the race-switch animation
+                            .transaction { $0.animation = nil }
                     }
 
                     VStack {
@@ -168,9 +178,10 @@ struct ContentView: View {
 
                     VStack {
                         if let map = model.trackMap {
+                            // fades only: the 3D scene is too heavy to slide
                             TrackSectionView(map: map, circuit: race.circuit)
                                 .id(race.circuit.circuitId)
-                                .transition(raceSwitch)
+                                .transition(.opacity)
                         } else if model.extrasLoading {
                             TrackPlaceholder()
                         }
@@ -189,7 +200,7 @@ struct ContentView: View {
                                selectedId: model.displayRace?.id) { race in
                         let from = model.season.firstIndex { $0.id == model.displayRace?.id } ?? 0
                         raceEdge = (model.season.firstIndex { $0.id == race.id } ?? 0) >= from ? .trailing : .leading
-                        Task { await model.select(race) }
+                        switchRace(to: race)
                         withAnimation(.easeInOut(duration: 0.45)) { proxy.scrollTo("hero", anchor: .top) }
                     }
                 }
@@ -199,8 +210,6 @@ struct ContentView: View {
             .padding(.horizontal, 16)
             .padding(.top, 8)
             .padding(.bottom, 32)
-            .animation(.snappy(duration: 0.4), value: model.displayRace?.id)
-            .animation(.easeOut(duration: 0.3), value: model.extrasLoading)
         }
         .scrollDisabled(raceDock)
         .refreshable { await model.load() }
