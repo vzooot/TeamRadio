@@ -112,20 +112,24 @@ struct RaceHeroCarousel: View {
         tickIndex = index
         dockActive = true
         StartSounds.shared.prepare()
-        detent.prepare()
+        DialHaptics.shared.prepare()
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
 
-    /// A dial detent: a rigid tap and a short mechanical tick each time a
-    /// box crosses the middle.
-    private let detent = UIImpactFeedbackGenerator(style: .rigid)
+    /// A dial detent each time a box crosses the middle: firm and distinct
+    /// when turned slowly, lighter and quicker when spun.
     @State private var tickIndex: Int?
+    @State private var lastTick = Date.distantPast
 
     private func passed(_ i: Int) {
         guard i != tickIndex, season.indices.contains(i) else { return }
         tickIndex = i
-        detent.impactOccurred(intensity: 0.7)
-        StartSounds.shared.tick()
+        let gap = Date.now.timeIntervalSince(lastTick)
+        lastTick = .now
+        let strength: Float = gap < 0.05 ? 0.45 : gap < 0.12 ? 0.65 : 0.9
+        DialHaptics.shared.detent(strength: strength)
+        // in a fast spin the clicks blur; let every other one through
+        if gap > 0.03 { StartSounds.shared.tick(volume: strength) }
     }
 
     private func close() {
