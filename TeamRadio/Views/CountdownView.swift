@@ -169,7 +169,9 @@ struct CountdownView: View {
         return [
             session.date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute()),
             session.date.formatted(.dateTime.day().month(.abbreviated)).uppercased(),
-            days > 0 ? "\(days) DAYS" : "\(hours) HRS",
+            // fits the board with a margin up to "99 DAYS"; longer gets short
+            days > 99 ? "\(days) D" : days > 1 ? "\(days) DAYS" : days == 1 ? "1 DAY"
+                : hours == 1 ? "1 HR" : "\(hours) HRS",
             "RND \(race.round)",
         ]
     }

@@ -135,6 +135,8 @@ struct ContentView: View {
                     HeaderView(onInfo: { showAbout = true })
                 }
                 .padding(.bottom, -6)
+                // the helmet hangs over the race card, so the header draws on top
+                .zIndex(1)
                 .id("top")
 
                 if let race = model.displayRace {
@@ -154,6 +156,19 @@ struct ContentView: View {
                     }
                     .cascade(sectionsShown, delay: 0)
                     .id("schedule")
+
+                    // ...and the circuit right after the weekend's sessions.
+                    VStack {
+                        if let map = model.trackMap {
+                            // fades only: the 3D scene is too heavy to slide
+                            TrackSectionView(map: map, circuit: race.circuit)
+                                .id(race.circuit.circuitId)
+                        } else if model.extrasLoading {
+                            TrackPlaceholder()
+                        }
+                    }
+                    .cascade(sectionsShown, delay: 0.08)
+                    .id("trackSection")
 
                     #if DEBUG
                     if BlendDraft.gameZoneInApp {
@@ -178,25 +193,11 @@ struct ContentView: View {
                     if !Self.demoMode {
                         InviteBanner()
                     }
-
-                    VStack {
-                        if let map = model.trackMap {
-                            // fades only: the 3D scene is too heavy to slide
-                            TrackSectionView(map: map, circuit: race.circuit)
-                                .id(race.circuit.circuitId)
-                        } else if model.extrasLoading {
-                            TrackPlaceholder()
-                        }
-                    }
-                    .cascade(sectionsShown, delay: 0.08)
-                    .id("trackSection")
                 } else {
                     SeasonOverBanner()
                 }
 
-                if !model.standings.isEmpty {
-                    StandingsView(standings: model.standings)
-                }
+                // (The championship lives in the Standings tab, not here.)
 
                 if model.displayRace != nil {
                     // Settings for every session, just above the season's races.
