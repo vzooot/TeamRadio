@@ -276,6 +276,7 @@ struct GameZoneDraft: View {
         case "x": ZoneMixed(result: .hero, bold: .dotd)
         case "y": ZoneMixed(result: .sheet, bold: .lights)
         case "z": ZoneMixed(result: .cockpit, bold: .emily)
+        case "w": ZoneMixed(result: .hero, bold: .dotd, photoLights: true, waveEmily: true)
         default: BlendDraft(embedded: true, gameZone: true)
         }
     }
@@ -1167,6 +1168,8 @@ private struct ZoneMixed: View {
     enum Bold { case dotd, lights, emily }
     let result: Result
     let bold: Bold
+    var photoLights = false
+    var waveEmily = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -1175,9 +1178,58 @@ private struct ZoneMixed: View {
                 if bold == .dotd { boldDotd } else { darkDotd }
             }
             .id("zoneLower")
-            if bold == .lights { boldLights } else { darkLights }
-            if bold == .emily { boldEmily } else { darkEmily }
+            if photoLights { photoLightsCard } else if bold == .lights { boldLights } else { darkLights }
+            if waveEmily { waveEmilyBar } else if bold == .emily { boldEmily } else { darkEmily }
         }
+    }
+
+    /// Lights Out on the AI-made car under the five red lights.
+    private var photoLightsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("REACTION TEST").font(.f1(11, weight: .bold)).tracking(2).foregroundStyle(Theme.live)
+            Text("LIGHTS\nOUT").font(.f1(32).italic()).foregroundStyle(Theme.chromeText)
+            HStack(spacing: 12) {
+                LEDText(text: "0.198", pitch: 3.4)
+                Text("Best · P1\nthis week").font(.system(size: 12, weight: .semibold)).foregroundStyle(.white.opacity(0.85))
+            }
+            NeonChip(title: "HOLD TO START ▸", tint: Theme.live, selected: true).frame(width: 170)
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, minHeight: 250, alignment: .topLeading)
+        .background(
+            ZStack {
+                Color.clear.overlay(alignment: .trailing) {
+                    Image("LightsOutHero").resizable().scaledToFill()
+                }
+                .clipped()
+                // keep the left side dark enough for the text
+                LinearGradient(stops: [.init(color: Theme.background.opacity(0.95), location: 0),
+                                       .init(color: Theme.background.opacity(0.6), location: 0.45),
+                                       .init(color: .clear, location: 0.75)],
+                               startPoint: .leading, endPoint: .trailing)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 20))
+            .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Theme.glassStroke, lineWidth: 1))
+            .trioGlow(cornerRadius: 20)
+        )
+    }
+
+    /// The Emily bar from the built Game Zone: glass, waveform, mic.
+    private var waveEmilyBar: some View {
+        HStack(spacing: 12) {
+            Color.clear.overlay(Image("EmilyAvatar").resizable().scaledToFill())
+                .frame(width: 44, height: 44).clipShape(Circle())
+                .shadow(color: Theme.accent.opacity(0.7), radius: 6)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("ASK EMILY").font(.f1(16).italic()).foregroundStyle(Theme.chromeText)
+                Text("AI race engineer").font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.dimText)
+            }
+            RadioWave().frame(height: 26)
+            Image(systemName: "mic.fill").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.onAccent)
+                .frame(width: 42, height: 42).background(Circle().fill(Theme.accentGradient))
+        }
+        .padding(8).padding(.leading, 2)
+        .glassPanel(Capsule(), light: Theme.violet, lightOffset: CGSize(width: 0, height: 10))
     }
 
     /// Only the result card of each draft (the header and lower cards dropped).

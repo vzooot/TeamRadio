@@ -438,7 +438,7 @@ private struct EmilyBar: View {
 }
 
 /// A radio burst in the trio colours.
-private struct RadioWave: View {
+struct RadioWave: View {
     var body: some View {
         Canvas { ctx, size in
             var path = Path()
