@@ -10,6 +10,8 @@ struct ContentView: View {
     @State private var dotd = DotdModel()
     @State private var showDotd = false
     @State private var showLightsOut = false
+    /// The race dock is up: the page holds still while the finger scrubs.
+    @State private var raceDock = false
 
     var body: some View {
         ZStack {
@@ -115,8 +117,10 @@ struct ContentView: View {
                         browsingBar(race)
                     }
 
-                    RaceHeroView(race: race)
-                        .id("hero")
+                    RaceHeroCarousel(season: model.season, race: race, dockActive: $raceDock) { picked in
+                        Task { await model.select(picked) }
+                    }
+                    .id("hero")
 
                     CountdownView(race: race)
                         .id(race.id)
@@ -172,6 +176,7 @@ struct ContentView: View {
             .padding(.top, 8)
             .padding(.bottom, 32)
         }
+        .scrollDisabled(raceDock)
         .refreshable { await model.load() }
         #if DEBUG
         .task { await DemoDirector.shared.runIfNeeded() }
