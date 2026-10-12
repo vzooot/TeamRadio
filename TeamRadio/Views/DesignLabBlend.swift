@@ -125,8 +125,9 @@ struct BlendDraft: View {
     /// The lighter step: one "game zone" rule over all four cards.
     var gameZone = false
 
-    /// Debug hook: show the game-zone draft in the real Countdown tab.
-    static var gameZoneInApp: Bool { UserDefaults.standard.bool(forKey: "GameZoneDraft") }
+    /// Debug hook: show a game-zone draft in the real Countdown tab
+    /// (`-GameZoneDraft blend|a|b|c`).
+    static var gameZoneInApp: Bool { UserDefaults.standard.string(forKey: "GameZoneDraft") != nil }
 
     var body: some View {
         if embedded {
@@ -292,6 +293,337 @@ struct BlendDraft: View {
             Image(systemName: "mic.fill").font(.system(size: 17, weight: .bold)).foregroundStyle(Theme.onAccent)
                 .frame(width: 46, height: 46).background(Circle().fill(Theme.accentGradient))
                 .shadow(color: Theme.accent.opacity(0.6), radius: 10)
+        }
+        .padding(8).padding(.leading, 2)
+        .glassPanel(Capsule(), light: Theme.violet, lightOffset: CGSize(width: 0, height: 10))
+    }
+}
+
+// MARK: - Game zone variants in the app's colour code
+
+/// The four new-feature cards as one "Game Zone", in three variants that
+/// follow the app's own vocabulary: trio slashes before chrome titles, card
+/// panels with the trio glow, FP1-style chips, the violet countdown chip and
+/// the cyan "next" stripe.
+struct GameZoneDraft: View {
+    let variant: String
+
+    var body: some View {
+        switch variant {
+        case "a": ZoneSheet()
+        case "b": ZoneSectors()
+        case "c": ZoneGlass()
+        default: BlendDraft(embedded: true, gameZone: true)
+        }
+    }
+}
+
+/// The app's grey session chip ("FP1"), optionally filled with the accent.
+private func sessionChip(_ s: String, filled: Bool = false, width: CGFloat = 56) -> some View {
+    Text(s)
+        .font(.f1(12).italic())
+        .foregroundStyle(filled ? .white : Theme.dimText)
+        .frame(width: width, height: 26)
+        .background(RoundedRectangle(cornerRadius: 7)
+            .fill(filled ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Color.white.opacity(0.06))))
+}
+
+/// The violet outlined countdown chip from the race-weekend list.
+private func countdownChip(_ s: String) -> some View {
+    Text(s)
+        .font(.f1(10, weight: .heavy).monospacedDigit()).tracking(1)
+        .foregroundStyle(Theme.violet)
+        .padding(.horizontal, 6).padding(.vertical, 3)
+        .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(Theme.violet.opacity(0.65), lineWidth: 1))
+}
+
+/// Card panel exactly like the race-weekend list.
+private extension View {
+    func appCard(_ radius: CGFloat = 18) -> some View {
+        background(
+            RoundedRectangle(cornerRadius: radius)
+                .fill(Theme.card)
+                .overlay(RoundedRectangle(cornerRadius: radius).strokeBorder(Theme.glassStroke, lineWidth: 1))
+                .trioGlow(cornerRadius: radius, opacity: 0.4)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: radius))
+    }
+}
+
+private func smallCaps(_ s: String, _ c: Color = Theme.dimText) -> some View {
+    Text(s).font(.f1(10, weight: .heavy)).tracking(1.5).foregroundStyle(c)
+}
+
+// A: one list, like the race-weekend timetable. Each feature is a row.
+private struct ZoneSheet: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionTitle("GAME ZONE")
+            VStack(spacing: 0) {
+                row(chip: "PICK", title: "PREDICTIONS", next: true) {
+                    Text("Pole NOR · Winner PIA · 3 of 6").font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.dimText)
+                } trailing: {
+                    VStack(alignment: .trailing, spacing: 6) {
+                        countdownChip("LOCKS 12D 12H")
+                        segments
+                    }
+                }
+                divider
+                row(chip: "VOTE", title: "DRIVER OF THE DAY") {
+                    Text("Singapore · 412 votes").font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.dimText)
+                } trailing: {
+                    VStack(alignment: .trailing, spacing: 4) {
+                        LEDText(text: "ANT", pitch: 3.4, color: mercedes)
+                        smallCaps("52%", mercedes)
+                    }
+                }
+                divider
+                row(chip: "START", title: "LIGHTS OUT") {
+                    Text("Reaction test · P4 this week").font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.dimText)
+                } trailing: {
+                    VStack(alignment: .trailing, spacing: 4) {
+                        LEDText(text: "0.198", pitch: 3.4)
+                        smallCaps("BEST", Theme.dimText)
+                    }
+                }
+                divider
+                row(chip: "AI", title: "ASK EMILY", filled: true) {
+                    Text("Your race engineer · strategy, tyres, rules").font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.dimText)
+                } trailing: {
+                    Image(systemName: "mic.fill").font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.onAccent)
+                        .frame(width: 34, height: 34).background(Circle().fill(Theme.accentGradient))
+                }
+            }
+            .appCard()
+        }
+    }
+
+    private var divider: some View { Divider().overlay(Color.white.opacity(0.06)) }
+
+    private var segments: some View {
+        HStack(spacing: 2) {
+            ForEach(0..<6, id: \.self) { i in
+                Capsule().fill(i < 3 ? Theme.accent : Color.white.opacity(0.12)).frame(width: 10, height: 3)
+            }
+        }
+    }
+
+    private func row<Sub: View, Trailing: View>(chip: String, title: String, next: Bool = false, filled: Bool = false,
+                                                @ViewBuilder sub: () -> Sub, @ViewBuilder trailing: () -> Trailing) -> some View {
+        HStack(spacing: 12) {
+            sessionChip(chip, filled: filled)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.f1(15, weight: .bold)).foregroundStyle(.white)
+                sub()
+            }
+            Spacer(minLength: 6)
+            trailing()
+        }
+        .padding(.horizontal, 14).padding(.vertical, 13)
+        .background(next ? Theme.accent.opacity(0.08) : .clear)
+        .overlay(alignment: .leading) { if next { Rectangle().fill(Theme.accent).frame(width: 3) } }
+    }
+}
+
+// B: the trio colours as sectors. Picks lead; vote, rank and Lights Out
+// sit in three sector tiles (cyan / violet / red); Emily closes.
+private struct ZoneSectors: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionTitle("GAME ZONE")
+            picks
+            HStack(spacing: 8) {
+                sector("S1 · SEASON", Theme.accent) {
+                    Text("#12").font(.f1Digits(28)).foregroundStyle(Theme.chromeText)
+                } foot: { smallCaps("84 PTS", Theme.accent) }
+                sector("S2 · FAN VOTE", Theme.violet) {
+                    LEDText(text: "ANT", pitch: 4.2, color: mercedes)
+                } foot: { smallCaps("52% · VOTE →", Theme.violet) }
+                sector("S3 · LIGHTS", Theme.live) {
+                    LEDText(text: "0.198", pitch: 3.3)
+                } foot: { smallCaps("P4 · PLAY ▸", Theme.live) }
+            }
+            emily
+        }
+    }
+
+    private var picks: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("R18").font(.f1(12, weight: .bold)).tracking(1.5).foregroundStyle(Theme.onAccent)
+                    .padding(.horizontal, 10).padding(.vertical, 5).background(Capsule().fill(Theme.accentGradient))
+                Spacer()
+                countdownChip("LOCKS IN 12D 12H")
+            }
+            Text("MAKE YOUR PICKS").font(.f1(24).italic()).foregroundStyle(Theme.chromeText)
+            HStack(spacing: 8) {
+                slot("POLE", "NOR", Theme.accent, done: true)
+                slot("WIN", "PIA", Theme.accent, done: true)
+                slot("FL", "—", Theme.violet, done: false)
+            }
+            Button {} label: { Text("FINISH YOUR PICKS") }
+                .buttonStyle(GamePrimaryButtonStyle())
+        }
+        .padding(18)
+        .appCard(20)
+    }
+
+    /// Outlined like the session chips on the countdown card.
+    private func slot(_ label: String, _ code: String, _ color: Color, done: Bool) -> some View {
+        VStack(spacing: 2) {
+            smallCaps(label, Theme.dimText)
+            Text(code).font(.f1(20)).foregroundStyle(done ? .white : Theme.faintText)
+        }
+        .frame(maxWidth: .infinity).padding(.vertical, 9)
+        .background(RoundedRectangle(cornerRadius: 12).fill(color.opacity(done ? 0.1 : 0.03)))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(color.opacity(done ? 0.7 : 0.3), lineWidth: 1.2))
+        .shadow(color: done ? color.opacity(0.35) : .clear, radius: 6)
+    }
+
+    private func sector<Value: View, Foot: View>(_ label: String, _ color: Color,
+                                                 @ViewBuilder value: () -> Value, @ViewBuilder foot: () -> Foot) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Rectangle().fill(color).frame(height: 3).shadow(color: color, radius: 4)
+            smallCaps(label, Theme.dimText)
+            value().frame(height: 32, alignment: .leading)
+            foot()
+        }
+        .padding(.horizontal, 12).padding(.bottom, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .appCard(14)
+    }
+
+    private var emily: some View {
+        HStack(spacing: 12) {
+            Color.clear.overlay(Image("EmilyAvatar").resizable().scaledToFill())
+                .frame(width: 44, height: 44).clipShape(Circle())
+            VStack(alignment: .leading, spacing: 2) {
+                Text("ASK EMILY").font(.f1(16).italic()).foregroundStyle(Theme.chromeText)
+                Text("Your AI race engineer").font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.dimText)
+            }
+            Spacer()
+            Image(systemName: "mic.fill").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.onAccent)
+                .frame(width: 40, height: 40).background(Circle().fill(Theme.accentGradient))
+        }
+        .padding(10).padding(.trailing, 2)
+        .appCard(31)
+    }
+}
+
+// C: the glass + LED cards you liked, re-coded in the app's vocabulary.
+private struct ZoneGlass: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                SectionTitle("GAME ZONE")
+                Spacer()
+                countdownChip("LOCKS IN 12D 12H")
+            }
+            picks
+            HStack(spacing: 12) { dotd; lights }
+            emily
+        }
+    }
+
+    private var picks: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("MAKE YOUR PICKS").font(.f1(22).italic()).foregroundStyle(Theme.chromeText)
+                .padding(.horizontal, 16).padding(.top, 16)
+            VStack(spacing: 0) {
+                pick("POLE", "NOR", "NORRIS", ai: "NOR")
+                pick("WIN", "PIA", "PIASTRI", ai: "NOR")
+                pick("FL", "—", "TAP TO PICK", ai: "VER", next: true)
+            }
+            HStack {
+                HStack(spacing: 2) {
+                    ForEach(0..<6, id: \.self) { i in
+                        Capsule().fill(i < 3 ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Color.white.opacity(0.12))).frame(width: 14, height: 3)
+                    }
+                }
+                Spacer()
+                Text("FINISH →").font(.f1(13).italic()).tracking(1.5).foregroundStyle(Theme.onAccent)
+                    .padding(.horizontal, 16).padding(.vertical, 9).background(Capsule().fill(Theme.accentGradient))
+            }
+            .padding(.horizontal, 16).padding(.bottom, 16).padding(.top, 4)
+        }
+        .glassPanel(RoundedRectangle(cornerRadius: 22), light: Theme.accent, lightOffset: CGSize(width: -90, height: -20))
+        .background(Color.clear.trioGlow(cornerRadius: 22, opacity: 0.35))
+    }
+
+    private func pick(_ slot: String, _ code: String, _ name: String, ai: String, next: Bool = false) -> some View {
+        HStack(spacing: 12) {
+            sessionChip(slot, width: 46)
+            Text(code).font(.f1(18)).foregroundStyle(next ? Theme.faintText : .white).frame(width: 48, alignment: .leading)
+            Text(name).font(.system(size: 11, weight: .medium)).foregroundStyle(next ? Theme.accent : Theme.dimText)
+            Spacer()
+            Text("AI \(ai)").font(.f1(10, weight: .heavy)).tracking(1).foregroundStyle(Theme.faintText)
+        }
+        .padding(.horizontal, 16).padding(.vertical, 9)
+        .background(next ? Theme.accent.opacity(0.08) : .clear)
+        .overlay(alignment: .leading) { if next { Rectangle().fill(Theme.accent).frame(width: 3) } }
+        .overlay(alignment: .top) { Divider().overlay(Color.white.opacity(0.06)) }
+    }
+
+    private var dotd: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                TrioSlashes(height: 11)
+                smallCaps("DRIVER OF THE DAY")
+            }
+            LEDText(text: "ANT", pitch: 5.6, color: mercedes)
+            Text("52% · 412 votes").font(.system(size: 12, weight: .semibold)).foregroundStyle(.white)
+            HStack {
+                Text("VOTE →").font(.f1(12).italic()).tracking(1.5).foregroundStyle(Theme.accent)
+                Spacer()
+                countdownChip("4D LEFT")
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassPanel(RoundedRectangle(cornerRadius: 20), light: Theme.violet, lightOffset: CGSize(width: -20, height: 20))
+    }
+
+    private var lights: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                TrioSlashes(height: 11)
+                smallCaps("LIGHTS OUT")
+            }
+            LEDText(text: "0.198", pitch: 5)
+            Text("Best · P4 this week").font(.system(size: 12, weight: .semibold)).foregroundStyle(.white)
+            HStack(spacing: 5) {
+                ForEach(0..<5, id: \.self) { _ in Circle().fill(Theme.live).frame(width: 8, height: 8).shadow(color: Theme.live, radius: 3) }
+                Spacer()
+                Text("PLAY ▸").font(.f1(12).italic()).tracking(1.5).foregroundStyle(Theme.live)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassPanel(RoundedRectangle(cornerRadius: 20), light: Theme.live, lightOffset: CGSize(width: 20, height: 20))
+    }
+
+    private var emily: some View {
+        HStack(spacing: 12) {
+            Color.clear.overlay(Image("EmilyAvatar").resizable().scaledToFill())
+                .frame(width: 44, height: 44).clipShape(Circle())
+                .shadow(color: Theme.accent.opacity(0.7), radius: 6)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("ASK EMILY").font(.f1(16).italic()).foregroundStyle(Theme.chromeText)
+                Text("AI race engineer").font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.dimText)
+            }
+            Canvas { ctx, size in
+                var p = Path()
+                for x in stride(from: 0, through: size.width, by: 1) {
+                    let env = sin(Double(x / size.width) * .pi)
+                    let y = size.height / 2 + CGFloat((sin(Double(x) * 0.35) * 0.6 + sin(Double(x) * 0.11) * 0.4) * env) * size.height * 0.45
+                    x == 0 ? p.move(to: CGPoint(x: x, y: y)) : p.addLine(to: CGPoint(x: x, y: y))
+                }
+                ctx.stroke(p, with: .linearGradient(Gradient(colors: [Theme.accent, Theme.violet, Theme.live]),
+                                                    startPoint: .zero, endPoint: CGPoint(x: size.width, y: 0)), lineWidth: 1.3)
+            }
+            .frame(height: 26)
+            Image(systemName: "mic.fill").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.onAccent)
+                .frame(width: 42, height: 42).background(Circle().fill(Theme.accentGradient))
         }
         .padding(8).padding(.leading, 2)
         .glassPanel(Capsule(), light: Theme.violet, lightOffset: CGSize(width: 0, height: 10))

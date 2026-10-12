@@ -102,7 +102,7 @@ struct ContentView: View {
 
                     #if DEBUG
                     if BlendDraft.gameZoneInApp {
-                        BlendDraft(embedded: true, gameZone: true).id("gameZone")
+                        GameZoneDraft(variant: UserDefaults.standard.string(forKey: "GameZoneDraft") ?? "").id("gameZone")
                     }
                     #endif
                     if GameFeature.isEnabled, !model.isBrowsing, !Self.gameZoneDraft {
