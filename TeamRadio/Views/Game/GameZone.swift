@@ -31,10 +31,8 @@ struct GameZone: View {
                         ZoneChip(text: text)
                     }
                 }
-                PicksHero(game: game, state: state, now: now, onPicks: onPicks, onResult: onResult)
-                if game.race != nil {
-                    StrategistCard(game: game, state: state, seasonRounds: seasonRounds)
-                }
+                PicksHero(game: game, state: state, now: now, seasonRounds: seasonRounds,
+                          onPicks: onPicks, onResult: onResult)
                 if dotd.race != nil {
                     DotdBoldCard(model: dotd, now: now, onVote: onVote)
                         .id("dotdCard")
@@ -64,6 +62,7 @@ private struct PicksHero: View {
     @Bindable var game: GameViewModel
     let state: GameViewModel.CardState
     let now: Date
+    let seasonRounds: Int
     let onPicks: () -> Void
     let onResult: () -> Void
 
@@ -151,21 +150,16 @@ private struct PicksHero: View {
                 VStack(alignment: .leading, spacing: 2) {
                     if let me = game.lastBoard?.me, let total = game.lastBoard?.total {
                         Text("\(me.rank.ordinal) of \(total.formatted())")
-                    } else {
-                        Text("\(score.exactPicks) exact picks")
                     }
-                    if let ai = game.lastBoard?.strategist {
-                        Text(score.total > ai.points ? "You beat the \(ai.name) ✓"
-                             : score.total == ai.points ? "Level with the \(ai.name)"
-                             : "\(ai.name) scored \(ai.points)")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(score.total > ai.points ? PicksStrip.color(.exact) : Theme.dimText)
-                    }
+                    Text("\(score.exactPicks) exact \(score.exactPicks == 1 ? "pick" : "picks")")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Theme.dimText)
                 }
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(.white)
             }
             strip(prediction, score: score)
+            aiSection
             if let comment = game.lastBoard?.me?.comment {
                 RadioComment(text: comment)
             }
@@ -173,11 +167,13 @@ private struct PicksHero: View {
                 .buttonStyle(GameOutlineButtonStyle())
         case .locked:
             strip(current, score: nil)
+            aiSection
             Label("All picks locked · scored after the race", systemImage: "lock.fill")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(Theme.dimText)
         case .open, .picked:
             strip(current, score: nil)
+            aiSection
             Text(PicksCard.lockStatus(game, now: now))
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.faintText)
@@ -192,6 +188,15 @@ private struct PicksHero: View {
     }
 
     private var current: Prediction { game.saved?.prediction ?? game.draft }
+
+    /// The AI Strategist inside this card: its picks under yours, the
+    /// scoreline and the season duel.
+    private var aiSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Rectangle().fill(Theme.violet.opacity(0.3)).frame(height: 1).padding(.bottom, 12)
+            StrategistCard(game: game, state: state, seasonRounds: seasonRounds, embedded: true)
+        }
+    }
 
     private func note(_ text: String) -> some View {
         Text(text)
@@ -247,6 +252,8 @@ private struct StrategistCard: View {
     let game: GameViewModel
     let state: GameViewModel.CardState
     let seasonRounds: Int
+    /// Inside the picks card: no card chrome of its own.
+    var embedded = false
     @State private var history: [LeaderboardService.DuelRound]?
     @State private var revealed: LeaderboardService.PlayerPicks?
     /// The duel fills (rings sweep, bars grow) each time the card scrolls
@@ -285,17 +292,19 @@ private struct StrategistCard: View {
                     Image(systemName: "lock.fill").font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.violet)
                 }
             }
+            tiles
             if let rounds = history, !rounds.isEmpty {
                 duel(rounds)
             }
-            tiles
         }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(LinearGradient(colors: [Theme.card, Theme.violet.opacity(0.14)], startPoint: .leading, endPoint: .trailing))
-                .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Theme.violet.opacity(0.35), lineWidth: 1))
-        )
+        .padding(embedded ? 0 : 16)
+        .background {
+            if !embedded {
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(LinearGradient(colors: [Theme.card, Theme.violet.opacity(0.14)], startPoint: .leading, endPoint: .trailing))
+                    .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Theme.violet.opacity(0.35), lineWidth: 1))
+            }
+        }
         .onCardVisibility(show: {
             guard !shown else { return }
             withAnimation(.easeOut(duration: 1.1)) { shown = true }
@@ -731,7 +740,17 @@ private struct DotdBoldCard: View {
 
     /// Warm yellow flowing to amber, corner to corner (the user's pick,
     /// from the first card draft).
-    private static let yellow = [Color(red: 1, green: 0.84, blue: 0.35), Color(red: 1, green: 0.6, blue: 0.2)]
+    private static var yellow: [Color] {
+        #if DEBUG
+        // -DotdTone 1|2|3: compare yellows on the real card
+        switch UserDefaults.standard.integer(forKey: "DotdTone") {
+        case 2: return [Color(red: 1, green: 0.78, blue: 0.2), Color(red: 0.98, green: 0.55, blue: 0.1)]   // golden
+        case 3: return [Color(red: 1, green: 0.88, blue: 0.4), Color(red: 1, green: 0.72, blue: 0.24)]    // sunny
+        default: break
+        }
+        #endif
+        return [Color(red: 1, green: 0.84, blue: 0.35), Color(red: 1, green: 0.6, blue: 0.2)]              // original
+    }
     private static let ink = Theme.onAccent
 
     /// The entrance plays each time the card scrolls in: the suit strides in,
@@ -893,10 +912,6 @@ private struct DotdBoldCard: View {
     private var background: some View {
         RoundedRectangle(cornerRadius: 20)
             .fill(LinearGradient(colors: Self.yellow, startPoint: .topLeading, endPoint: .bottomTrailing))
-            // a soft spotlight behind the suit
-            .overlay(alignment: .topTrailing) {
-                Circle().fill(Color.white.opacity(0.35)).frame(width: 220).blur(radius: 40).offset(x: 50, y: -30)
-            }
             .overlay(alignment: .topTrailing) {
                 if let suit {
                     Image(suit)

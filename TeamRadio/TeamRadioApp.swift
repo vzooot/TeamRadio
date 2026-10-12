@@ -42,7 +42,12 @@ struct TeamRadioApp: App {
 
 struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
+    #if DEBUG
+    // -Tab N: open on a tab, for screenshots
+    @State private var selection = UserDefaults.standard.string(forKey: "Tab").flatMap(Int.init) ?? 0
+    #else
     @State private var selection = 0
+    #endif
     @State private var chatBadge = ChatBadge()
     @State private var showMessageToast = false
     @State private var toastDismissTask: Task<Void, Never>?
