@@ -275,6 +275,38 @@ struct ContentView: View {
 
 // MARK: - Header
 
+/// The header's About & settings button: a dark glass disc with a steering
+/// wheel, inside a slowly turning ring in the trio colours.
+struct CockpitButton: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion)) { context in
+            let angle = reduceMotion ? 0 : context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 8) / 8 * 360
+            ZStack {
+                Circle()
+                    .strokeBorder(
+                        AngularGradient(colors: [Theme.accent, Theme.violet, Theme.live, Theme.accent], center: .center),
+                        lineWidth: 2.5)
+                    .rotationEffect(.degrees(angle))
+                    .shadow(color: Theme.accent.opacity(0.6), radius: 5)
+                Circle()
+                    .fill(LinearGradient(colors: [Color(white: 0.16), Color(white: 0.04)], startPoint: .top, endPoint: .bottom))
+                    .padding(3.5)
+                    .overlay(
+                        Circle()
+                            .fill(LinearGradient(colors: [.white.opacity(0.16), .clear], startPoint: .top, endPoint: .center))
+                            .padding(3.5)
+                    )
+                Image(systemName: "steeringwheel")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Theme.chromeText)
+            }
+            .frame(width: 42, height: 42)
+        }
+    }
+}
+
 struct HeaderView: View {
     var onInfo: (() -> Void)? = nil
 
@@ -293,12 +325,9 @@ struct HeaderView: View {
                 Spacer()
 
                 if let onInfo {
-                    Button(action: onInfo) {
-                        Image(systemName: "info.circle")
-                            .font(.system(size: 20))
-                            .foregroundStyle(Theme.dimText)
-                    }
-                    .buttonStyle(.plain)
+                    Button(action: onInfo) { CockpitButton() }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("About and settings")
                 }
             }
 
