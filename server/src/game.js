@@ -627,6 +627,20 @@ export async function handleGame(request, env) {
     return json({ name: p.name, points: p.points, rank: p.rank, items: p.items ?? [] }, 300);
   }
 
+  // Season duel: one player's points and the AI Strategist's for every
+  // scored round of the season (null where someone didn't play).
+  if (url.pathname === "/game/history") {
+    const user = q.get("user") || "";
+    const rounds = [];
+    for (const r of await season()) {
+      const round = await env.TOKENS.get(`game:${ckEnv}:round:${r.season}-${r.round}`, "json");
+      if (!round) continue;
+      rounds.push({ round: Number(r.round), name: r.raceName,
+                    you: round.players?.[user]?.points ?? null, ai: round.strategist?.points ?? null });
+    }
+    return json({ rounds }, 120);
+  }
+
   // Lights Out reaction leaderboard, per week (Monday-based, UTC).
   if (url.pathname === "/game/reaction") {
     const week = reactionWeek();

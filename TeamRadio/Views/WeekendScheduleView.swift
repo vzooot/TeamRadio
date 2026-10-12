@@ -5,6 +5,8 @@ import SwiftUI
 struct WeekendScheduleView: View {
     let race: Race
     var weather: [Date: WeatherPoint] = [:]
+    /// The forecast is on its way: rows show a shimmer where it will go.
+    var weatherLoading = false
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
@@ -21,7 +23,8 @@ struct WeekendScheduleView: View {
                             session: session,
                             now: now,
                             isNext: session.id == nextId,
-                            weather: WeatherAPI.point(for: session.date, in: weather)
+                            weather: WeatherAPI.point(for: session.date, in: weather),
+                            weatherLoading: weatherLoading
                         )
                         if session.id != sessions.last?.id {
                             Divider().overlay(Color.white.opacity(0.06))
@@ -53,6 +56,7 @@ struct SessionRow: View {
     let now: Date
     let isNext: Bool
     var weather: WeatherPoint?
+    var weatherLoading = false
 
     private var isLive: Bool {
         session.date <= now && now < session.date.addingTimeInterval(session.kind.expectedDuration)
@@ -90,10 +94,31 @@ struct SessionRow: View {
                     .font(.f1(15, weight: .bold))
                     .foregroundStyle(isPast ? Theme.faintText : .white)
                     .strikethrough(isPast, color: Theme.faintText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 if let weather, !isPast {
-                    Text("\(weather.symbol) \(Int(weather.temperature.rounded()))° · \(weather.precipProbability)% rain")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(weather.precipProbability >= 40 ? Color(red: 0.4, green: 0.7, blue: 1.0) : Theme.dimText)
+                    // icon, temperature, chance of rain: readable at a glance,
+                    // on one line (it never wraps beside the countdown pill)
+                    let wet = weather.precipProbability >= 40
+                    HStack(spacing: 4) {
+                        Text(weather.symbol).font(.system(size: 13))
+                        Text("\(Int(weather.temperature.rounded()))°")
+                            .font(.system(size: 13, weight: .bold).monospacedDigit())
+                            .foregroundStyle(.white.opacity(0.9))
+                        HStack(spacing: 1) {
+                            Image(systemName: "drop.fill").font(.system(size: 8, weight: .bold))
+                            Text("\(weather.precipProbability)%")
+                                .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                        }
+                        .foregroundStyle(wet ? Color(red: 0.4, green: 0.7, blue: 1.0) : Theme.dimText)
+                    }
+                    .lineLimit(1)
+                    .fixedSize()
+                    .padding(.top, 2)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(Int(weather.temperature.rounded())) degrees, \(weather.precipProbability)% chance of rain")
+                } else if weatherLoading, !isPast {
+                    Shimmer(cornerRadius: 4).frame(width: 84, height: 11)
                 }
             }
 
@@ -112,6 +137,8 @@ struct SessionRow: View {
                 Text(countdown)
                     .font(.f1(10, weight: .heavy).monospacedDigit())
                     .tracking(1)
+                    .lineLimit(1)
+                    .fixedSize()
                     .foregroundStyle(Theme.violet)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 3)
@@ -123,6 +150,8 @@ struct SessionRow: View {
                 Text(countdown)
                     .font(.f1(10, weight: .heavy).monospacedDigit())
                     .tracking(1)
+                    .lineLimit(1)
+                    .fixedSize()
                     .foregroundStyle(Theme.dimText)
             }
 
@@ -132,6 +161,8 @@ struct SessionRow: View {
                 Text(session.date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)).uppercased())
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(isPast ? Theme.faintText : Theme.dimText)
+                    .lineLimit(1)
+                    .fixedSize()
                 Text(session.date.formatted(date: .omitted, time: .shortened))
                     .font(.system(size: 15, weight: .bold).monospacedDigit())
                     .foregroundStyle(isPast ? Theme.faintText : .white)

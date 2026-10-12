@@ -107,6 +107,25 @@ enum LeaderboardService {
         return try? JSONDecoder().decode(PlayerPicks.self, from: data)
     }
 
+    /// One scored round of the season duel: the player's and the AI's points.
+    struct DuelRound: Decodable, Equatable, Identifiable {
+        let round: Int
+        let name: String?
+        let you: Int?
+        let ai: Int?
+        var id: Int { round }
+    }
+
+    private struct History: Decodable { let rounds: [DuelRound] }
+
+    /// Points per scored round this season, for the player and the AI Strategist.
+    static func history(user: String) async -> [DuelRound]? {
+        var components = URLComponents(url: base.appending(path: "history"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "user", value: user), URLQueryItem(name: "env", value: environment)]
+        guard let (data, _) = try? await URLSession.shared.data(from: components.url!) else { return nil }
+        return (try? JSONDecoder().decode(History.self, from: data))?.rounds
+    }
+
     struct League: Decodable, Equatable, Identifiable {
         struct Member: Decodable, Equatable, Identifiable {
             let userId: String

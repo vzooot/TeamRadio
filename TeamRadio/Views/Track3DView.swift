@@ -3,14 +3,17 @@ import SceneKit
 
 /// Interactive 3D circuit map: the real track centerline extruded into a
 /// ribbon, with a glowing racing line, corner markers, and a start gate.
-/// Slowly auto-rotates; drag to orbit, pinch to zoom.
+/// Slowly auto-rotates; drag to orbit, pinch to zoom, tap a corner number to
+/// fly in on that turn.
 struct Track3DView: UIViewRepresentable {
     let map: TrackMap
     /// Incrementing this rebuilds the scene, snapping camera and rotation
     /// back to the initial framing.
     var resetToken: Int = 0
-    /// Corner to highlight (circuit guide); nil shows all markers alike.
+    /// Corner to highlight and zoom in on; nil shows the whole circuit.
     var selectedCorner: Int? = nil
+    /// A corner number was tapped on the map (nil when tapped again).
+    var onSelectCorner: ((Int?) -> Void)? = nil
 
     func makeUIView(context: Context) -> SCNView {
         let view = SCNView()
@@ -20,9 +23,68 @@ struct Track3DView: UIViewRepresentable {
         view.scene = TrackSceneBuilder.build(map: map)
         context.coordinator.circuitName = map.circuitName
         context.coordinator.resetToken = resetToken
+        context.coordinator.onSelectCorner = onSelectCorner
+        view.addGestureRecognizer(UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.tapped(_:))))
         Self.highlight(selectedCorner, in: view)
+        Self.focus(selectedCorner, in: view, animated: false)
         context.coordinator.selectedCorner = selectedCorner
         return view
+    }
+
+    /// Flies the camera in on a corner (and pauses the slow spin so it stays
+    /// put), or back out to the whole circuit for nil. Pinch and drag then
+    /// work around the turn.
+    static func focus(_ number: Int?, in view: SCNView, animated: Bool = true) {
+        guard let root = view.scene?.rootNode,
+              let cameraNode = root.childNode(withName: "camera", recursively: false),
+              let target = root.childNode(withName: "focus", recursively: false),
+              let spinner = root.childNode(withName: "spinner", recursively: false) else { return }
+        // Back to the scene camera if the user's gestures made a free one.
+        view.pointOfView = cameraNode
+        let corner = number.flatMap { root.childNode(withName: "corner-\($0)", recursively: true) }
+
+        let look: SCNVector3
+        let position: SCNVector3
+        if let corner {
+            spinner.removeAction(forKey: TrackSceneBuilder.spinKey)
+            // The marker floats above the track; aim a little below it, and
+            // come in from the side the camera is already on.
+            // Where the marker is drawn (its stored transform can differ
+            // under the billboard constraint and pivot).
+            let c = corner.presentation.worldPosition
+            var dx = cameraNode.position.x - c.x, dz = cameraNode.position.z - c.z
+            let length = max(sqrt(dx * dx + dz * dz), 0.001)
+            dx /= length
+            dz /= length
+            look = SCNVector3(c.x, c.y - 0.3, c.z)
+            position = SCNVector3(c.x + dx * 2.8, c.y + 2.2, c.z + dz * 2.8)
+        } else {
+            if spinner.action(forKey: TrackSceneBuilder.spinKey) == nil {
+                spinner.runAction(TrackSceneBuilder.spin, forKey: TrackSceneBuilder.spinKey)
+            }
+            look = SCNVector3(0, 0, 0)
+            position = TrackSceneBuilder.homeCamera
+        }
+
+        // Fly by transform: bake the current (constrained) view in, drop the
+        // look-at constraint, then animate to an exact pose facing the turn.
+        let pose = SCNNode()
+        pose.position = position
+        pose.look(at: look)
+        cameraNode.transform = cameraNode.presentation.transform
+        cameraNode.constraints = nil
+        target.position = look
+
+        SCNTransaction.begin()
+        SCNTransaction.animationDuration = animated ? 0.9 : 0
+        SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        SCNTransaction.completionBlock = {
+            // Back home: hand the camera to the centre constraint again.
+            if corner == nil { cameraNode.constraints = [SCNLookAtConstraint(target: target)] }
+        }
+        cameraNode.transform = pose.transform
+        SCNTransaction.commit()
+        view.defaultCameraController.target = look
     }
 
     /// Selected corner: bigger and cyan; the others dim back.
@@ -42,30 +104,55 @@ struct Track3DView: UIViewRepresentable {
     }
 
     func updateUIView(_ view: SCNView, context: Context) {
-        if context.coordinator.selectedCorner != selectedCorner {
+        context.coordinator.onSelectCorner = onSelectCorner
+        if context.coordinator.circuitName != map.circuitName || context.coordinator.resetToken != resetToken {
+            context.coordinator.circuitName = map.circuitName
+            context.coordinator.resetToken = resetToken
+            view.scene = TrackSceneBuilder.build(map: map)
+            // Drop any free camera the user's gestures created.
+            view.pointOfView = view.scene?.rootNode.childNodes.first { $0.camera != nil }
             context.coordinator.selectedCorner = selectedCorner
             Self.highlight(selectedCorner, in: view)
+            Self.focus(selectedCorner, in: view, animated: false)
+        } else if context.coordinator.selectedCorner != selectedCorner {
+            context.coordinator.selectedCorner = selectedCorner
+            Self.highlight(selectedCorner, in: view)
+            Self.focus(selectedCorner, in: view)
         }
-        guard context.coordinator.circuitName != map.circuitName
-                || context.coordinator.resetToken != resetToken else { return }
-        context.coordinator.circuitName = map.circuitName
-        context.coordinator.resetToken = resetToken
-        view.scene = TrackSceneBuilder.build(map: map)
-        // Drop any free camera the user's gestures created.
-        view.pointOfView = view.scene?.rootNode.childNodes.first { $0.camera != nil }
-        Self.highlight(selectedCorner, in: view)
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
-    final class Coordinator {
+    final class Coordinator: NSObject {
         var circuitName: String?
         var resetToken = 0
         var selectedCorner: Int?
+        var onSelectCorner: ((Int?) -> Void)?
+
+        /// The corner number nearest the tap on screen (generous radius, the
+        /// digits are small); tapping the selected one again zooms back out.
+        @objc func tapped(_ gesture: UITapGestureRecognizer) {
+            guard let view = gesture.view as? SCNView, let root = view.scene?.rootNode else { return }
+            let point = gesture.location(in: view)
+            var best: (number: Int, distance: CGFloat)?
+            root.enumerateChildNodes { node, _ in
+                guard let name = node.name, name.hasPrefix("corner-"), let n = Int(name.dropFirst(7)) else { return }
+                let p = view.projectPoint(node.worldPosition)
+                guard p.z > 0, p.z < 1 else { return }
+                let d = hypot(CGFloat(p.x) - point.x, CGFloat(p.y) - point.y)
+                if d < 36, d < (best?.distance ?? .infinity) { best = (n, d) }
+            }
+            guard let best else { return }
+            onSelectCorner?(best.number == selectedCorner ? nil : best.number)
+        }
     }
 }
 
 enum TrackSceneBuilder {
+    static let spinKey = "spin"
+    static var spin: SCNAction { .repeatForever(.rotateBy(x: 0, y: 2 * .pi, z: 0, duration: 45)) }
+    static let homeCamera = SCNVector3(0, 7.5, 10.5)
+
     static func build(map: TrackMap) -> SCNScene {
         let scene = SCNScene()
         scene.background.contents = UIColor.clear
@@ -76,6 +163,7 @@ enum TrackSceneBuilder {
         // Spinner carries the slow auto-rotation; the flat track node inside it
         // holds everything positioned in the 2D map plane.
         let spinner = SCNNode()
+        spinner.name = "spinner"
         let flat = SCNNode()
         flat.eulerAngles.x = -.pi / 2
         spinner.addChildNode(flat)
@@ -184,7 +272,7 @@ enum TrackSceneBuilder {
         flat.addChildNode(car)
 
         // Slow orbit; user gestures move the camera independently.
-        spinner.runAction(.repeatForever(.rotateBy(x: 0, y: 2 * .pi, z: 0, duration: 45)))
+        spinner.runAction(spin, forKey: spinKey)
 
         // Lights.
         let ambient = SCNNode()
@@ -209,10 +297,16 @@ enum TrackSceneBuilder {
         camera.bloomIntensity = 0.5
         camera.bloomThreshold = 0.55
         camera.zFar = 200
+        // The camera looks at a focus point: the circuit's centre, or the
+        // tapped corner (Track3DView.focus moves both).
+        let focus = SCNNode()
+        focus.name = "focus"
+        scene.rootNode.addChildNode(focus)
         let cameraNode = SCNNode()
+        cameraNode.name = "camera"
         cameraNode.camera = camera
-        cameraNode.position = SCNVector3(0, 7.5, 10.5)
-        cameraNode.constraints = [SCNLookAtConstraint(target: spinner)]
+        cameraNode.position = homeCamera
+        cameraNode.constraints = [SCNLookAtConstraint(target: focus)]
         scene.rootNode.addChildNode(cameraNode)
 
         return scene
@@ -230,8 +324,13 @@ enum TrackSceneBuilder {
     }
 
     private static func normalize(_ x: Double, _ y: Double, map: TrackMap) -> (x: Float, y: Float) {
-        let b = bounds(map: map)
-        return (Float((x - b.cx) * b.scale), Float((y - b.cy) * b.scale))
+        normalize(x, y, bounds: bounds(map: map))
+    }
+
+    /// With the bounds worked out once: per point, measuring the whole map
+    /// again made building a circuit quadratic (a 300 ms freeze per switch).
+    private static func normalize(_ x: Double, _ y: Double, bounds b: (cx: Double, cy: Double, scale: Double)) -> (x: Float, y: Float) {
+        (Float((x - b.cx) * b.scale), Float((y - b.cy) * b.scale))
     }
 
     /// Elevation is exaggerated so 20–30 m of real grade reads clearly at
@@ -246,7 +345,7 @@ enum TrackSceneBuilder {
             heights = [Float](repeating: 0, count: map.x.count)
         }
         let raw = zip(zip(map.x, map.y), heights).map { pair, h in
-            let p = normalize(pair.0, pair.1, map: map)
+            let p = normalize(pair.0, pair.1, bounds: b)
             return (x: p.x, y: p.y, h: h)
         }
         // Two Chaikin passes: corner-cutting subdivision that keeps the ribbon

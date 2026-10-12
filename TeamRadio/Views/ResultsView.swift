@@ -314,6 +314,8 @@ struct ResultsView: View {
 
 struct PodiumView: View {
     let results: [RaceResult]
+    /// The steps rise when the podium appears (third, second, then the winner).
+    @State private var raised = false
 
     private func result(_ position: String) -> RaceResult? {
         results.first { $0.position == position }
@@ -321,9 +323,15 @@ struct PodiumView: View {
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 8) {
-            if let p2 = result("2") { step(p2, height: 74) }
-            if let p1 = result("1") { step(p1, height: 104) }
-            if let p3 = result("3") { step(p3, height: 56) }
+            if let p2 = result("2") { step(p2, height: 74, delay: 0.15) }
+            if let p1 = result("1") { step(p1, height: 104, delay: 0.3) }
+            if let p3 = result("3") { step(p3, height: 56, delay: 0) }
+        }
+        .frame(height: 220, alignment: .bottom)
+        .task(id: results.first?.id) {
+            raised = false
+            try? await Task.sleep(for: .milliseconds(60))
+            raised = true
         }
         .frame(maxWidth: .infinity)
         .padding(18)
@@ -342,7 +350,7 @@ struct PodiumView: View {
         )
     }
 
-    private func step(_ result: RaceResult, height: CGFloat) -> some View {
+    private func step(_ result: RaceResult, height: CGFloat, delay: Double) -> some View {
         VStack(spacing: 6) {
             if result.position == "1" {
                 Text("🏆")
@@ -373,10 +381,14 @@ struct PodiumView: View {
                     .font(.f1Digits(34))
                     .foregroundStyle(result.position == "1" ? Theme.accent : .white)
                     .padding(.top, 14)
+                    .opacity(raised ? 1 : 0)
             }
-            .frame(height: height)
+            .frame(height: raised ? height : 10)
+            .clipped()
         }
         .frame(maxWidth: .infinity)
+        .opacity(raised ? 1 : 0.3)
+        .animation(.spring(response: 0.6, dampingFraction: result.position == "1" ? 0.6 : 0.75).delay(delay), value: raised)
     }
 }
 
@@ -580,13 +592,19 @@ struct QualifyingResultRow: View {
 
 struct ConstructorStandingsView: View {
     let standings: [ConstructorStanding]
+    /// Each team's points bar fills in turn when the table appears.
+    @State private var filled = false
+
+    private var leaderPoints: Double {
+        standings.compactMap { Double($0.points) }.max() ?? 1
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionTitle("CONSTRUCTORS' CHAMPIONSHIP")
 
             VStack(spacing: 0) {
-                ForEach(standings) { entry in
+                ForEach(Array(standings.enumerated()), id: \.element.id) { index, entry in
                     HStack(spacing: 12) {
                         Text(entry.position)
                             .font(.f1Digits(18))
@@ -616,6 +634,16 @@ struct ConstructorStandingsView: View {
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 9)
+                    .background(alignment: .leading) {
+                        // the team's share of the leader's points
+                        GeometryReader { geo in
+                            let share = (Double(entry.points) ?? 0) / max(leaderPoints, 1)
+                            LinearGradient(colors: [Theme.teamColor(entry.constructor.constructorId).opacity(0.28), .clear],
+                                           startPoint: .leading, endPoint: .trailing)
+                                .frame(width: geo.size.width * (filled ? share : 0))
+                                .animation(.easeOut(duration: 0.8).delay(Double(index) * 0.06), value: filled)
+                        }
+                    }
                     .opensProfile(.team(entry.id))
 
                     if entry.id != standings.last?.id {
@@ -632,6 +660,11 @@ struct ConstructorStandingsView: View {
                     )
             )
             .clipShape(RoundedRectangle(cornerRadius: 18))
+        }
+        .task(id: standings.first?.points) {
+            filled = false
+            try? await Task.sleep(for: .milliseconds(80))
+            filled = true
         }
     }
 }

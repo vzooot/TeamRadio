@@ -6,6 +6,7 @@
                                keywords, subtitle; replace both screenshot sets
   submit VERSION BUILD         wait for BUILD to process, attach it, submit for review
   release VERSION              release an approved version (Pending Developer Release)
+  promo VERSION                set promotional text (no review needed, works on the live version)
   next-build                   print the highest build number on App Store Connect + 1
 
 Options for prepare:
@@ -104,6 +105,9 @@ def cmd_prepare(a):
     notes_path = a.notes or os.path.join(ROOT, "fastlane", "metadata", "en-US", "release_notes.txt")
     if os.path.exists(notes_path):
         attrs["whatsNew"] = open(notes_path).read().strip()
+    promo_path = os.path.join(ROOT, "fastlane", "metadata", "en-US", "promotional_text.txt")
+    if os.path.exists(promo_path):
+        attrs["promotionalText"] = open(promo_path).read().strip()
     if a.keywords:
         assert len(a.keywords) <= 100, "keywords over 100 characters"
         attrs["keywords"] = a.keywords
@@ -193,6 +197,22 @@ def cmd_submit(a):
     log("SUBMITTED", a.version, "->", version_id(a.version)[1])
 
 
+def cmd_promo(a):
+    """Promotional text needs no review, so it is set on the live version too."""
+    vid, state = version_id(a.version)
+    if not vid:
+        sys.exit(f"version {a.version} not found")
+    meta = os.path.join(ROOT, "fastlane", "metadata")
+    for l in call("GET", f"/v1/appStoreVersions/{vid}/appStoreVersionLocalizations?fields[appStoreVersionLocalizations]=locale")["data"]:
+        path = os.path.join(meta, l["attributes"]["locale"], "promotional_text.txt")
+        if not os.path.exists(path):
+            continue
+        text = open(path).read().strip()
+        assert len(text) <= 170, f"{path} over 170 characters"
+        call("PATCH", f"/v1/appStoreVersionLocalizations/{l['id']}", {"data": {"type": "appStoreVersionLocalizations", "id": l["id"], "attributes": {"promotionalText": text}}})
+        log("promo", l["attributes"]["locale"], f"({len(text)} chars) on", a.version, state)
+
+
 def cmd_next_build(_):
     builds = call("GET", f"/v1/builds?filter[app]={APP}&sort=-uploadedDate&limit=50&fields[builds]=version")["data"]
     print(max((int(b["attributes"]["version"]) for b in builds if b["attributes"]["version"].isdigit()), default=0) + 1)
@@ -214,5 +234,6 @@ pp = sub.add_parser("prepare"); pp.add_argument("version"); pp.add_argument("--n
 pp.add_argument("--subtitle"); pp.add_argument("--no-screenshots", action="store_true"); pp.set_defaults(fn=cmd_prepare)
 ps = sub.add_parser("submit"); ps.add_argument("version"); ps.add_argument("build"); ps.set_defaults(fn=cmd_submit)
 pr = sub.add_parser("release"); pr.add_argument("version"); pr.set_defaults(fn=cmd_release)
+po = sub.add_parser("promo"); po.add_argument("version"); po.set_defaults(fn=cmd_promo)
 sub.add_parser("next-build").set_defaults(fn=cmd_next_build)
 args = p.parse_args(); args.fn(args)

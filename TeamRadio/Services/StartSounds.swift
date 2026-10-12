@@ -1,7 +1,7 @@
 import AVFoundation
 
-/// Short synthesized tones for Lights Out: a beep for each light, a low
-/// buzz for a jump start, and the app's radio key click on a good start.
+/// Short synthesized tones for Lights Out: a beep for each light, a soft
+/// two-note "uh-oh" for a jump start, and the app's radio key click on a good start.
 /// Ambient session, so the silent switch mutes them like any game sound.
 @MainActor
 final class StartSounds {
@@ -33,8 +33,31 @@ final class StartSounds {
     /// One light coming on.
     func beep() { tone(frequency: 880, duration: 0.11, volume: 0.35) }
 
-    /// Jump start.
-    func buzz() { tone(frequency: 140, duration: 0.35, volume: 0.5, square: true) }
+    /// Jump start: two gentle falling notes, a friendly "uh-oh".
+    func buzz() {
+        start()
+        let notes: [(frequency: Double, duration: Double)] = [(659.3, 0.13), (493.9, 0.28)]
+        let total = notes.reduce(0) { $0 + Int(format.sampleRate * $1.duration) }
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(total)),
+              let data = buffer.floatChannelData?[0] else { return }
+        buffer.frameLength = AVAudioFrameCount(total)
+        var offset = 0
+        for note in notes {
+            let frames = Int(format.sampleRate * note.duration)
+            for i in 0..<frames {
+                let t = Double(i) / format.sampleRate
+                // soft attack, exponential decay, a touch of the octave for warmth
+                let envelope = min(1, t / 0.012) * exp(-t * 7)
+                let phase = 2 * Double.pi * note.frequency * t
+                data[offset + i] = Float((sin(phase) + 0.25 * sin(2 * phase)) * envelope * 0.3)
+            }
+            offset += frames
+        }
+        let fade = Int(format.sampleRate * 0.008)
+        for i in 0..<fade { data[total - 1 - i] *= Float(i) / Float(fade) }
+        player.scheduleBuffer(buffer, completionHandler: nil)
+        if !player.isPlaying { player.play() }
+    }
 
     /// Reaction recorded.
     func radioClick() {
@@ -43,7 +66,7 @@ final class StartSounds {
         click?.play()
     }
 
-    private func tone(frequency: Double, duration: Double, volume: Float, square: Bool = false) {
+    private func tone(frequency: Double, duration: Double, volume: Float) {
         start()
         let frames = AVAudioFrameCount(format.sampleRate * duration)
         guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames),
@@ -52,7 +75,7 @@ final class StartSounds {
         let fade = Int(format.sampleRate * 0.01)
         for i in 0..<Int(frames) {
             let phase = 2 * Double.pi * frequency * Double(i) / format.sampleRate
-            var v = Float(square ? (sin(phase) >= 0 ? 0.6 : -0.6) : sin(phase))
+            var v = Float(sin(phase))
             // short fade in/out so the beep doesn't click
             let edge = min(i, Int(frames) - 1 - i)
             if edge < fade { v *= Float(edge) / Float(fade) }

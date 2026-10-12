@@ -108,7 +108,9 @@ struct DotMatrixBoard: View {
     @State private var transitionStart: Date?
     @State private var settle: Task<Void, Never>?
 
-    private static let cols = 26, rows = 6      // a quiet ring of sockets around the 24×4 content
+    // a quiet ring of sockets around the content: the lights (24 wide) sit
+    // two in from each side, text up to 26 wide (e.g. "11 DAYS") one in
+    private static let cols = 28, rows = 6
     private static let inset = 1
     private static let holeRatio: CGFloat = 0.28  // socket radius as a fraction of the pitch
     private static let scramble: TimeInterval = 0.9
@@ -134,7 +136,7 @@ struct DotMatrixBoard: View {
         if page == 0 {
             // five round 4×4 blocks (corners dark), one dark column between
             for c in 0..<5 {
-                let c0 = Self.inset + c * 5
+                let c0 = (Self.cols - 24) / 2 + c * 5
                 for dc in 0..<4 {
                     for dr in 0..<4 {
                         let corner = (dc == 0 || dc == 3) && (dr == 0 || dr == 3)
@@ -144,17 +146,29 @@ struct DotMatrixBoard: View {
                 }
             }
         } else {
-            let text = Array(pages[page - 1].uppercased().prefix(6))
-            let width = text.count * 4 - 1
-            var col = max(Self.inset, (Self.cols - width) / 2)
-            for ch in text {
+            // The whole text, centred with the same margin on both sides:
+            // letters 3 wide, a space 2, a colon or dot 1, one dark column
+            // between. The board is an even width, so an odd text gets one
+            // gap a column wider (the middle one).
+            let text = Array(pages[page - 1].uppercased())
+            func width(_ ch: Character) -> Int { ch == " " ? 2 : ch == ":" || ch == "." ? 1 : 3 }
+            var gaps = Array(repeating: 1, count: max(text.count - 1, 0))
+            var total = text.map(width).reduce(0, +) + gaps.reduce(0, +)
+            if total % 2 == 1, !gaps.isEmpty {
+                gaps[gaps.count / 2] += 1
+                total += 1
+            }
+            var col = max(0, (Self.cols - total) / 2)
+            for (i, ch) in text.enumerated() {
                 let bits = Array(Self.glyphs[ch] ?? Self.glyphs[" "]!)
+                // a 1-wide glyph is the middle column of its 3-wide pattern
+                let source = width(ch) == 3 ? [0, 1, 2] : width(ch) == 1 ? [1] : []
                 for row in 0..<4 {
-                    for k in 0..<3 where bits[row * 3 + k] == "#" && col + k < Self.cols {
+                    for (k, s) in source.enumerated() where bits[row * 3 + s] == "#" && col + k < Self.cols {
                         cells[(Self.inset + row) * 1000 + col + k] = 1
                     }
                 }
-                col += 4
+                col += width(ch) + (i < gaps.count ? gaps[i] : 0)
             }
         }
         return cells

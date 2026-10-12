@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import UserNotifications
 
 /// Shows private-message pushes as banners even while the app is open, and
@@ -41,11 +42,22 @@ struct TeamRadioApp: App {
 
 struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
+    #if DEBUG
+    // -Tab N: open on a tab, for screenshots
+    @State private var selection = UserDefaults.standard.string(forKey: "Tab").flatMap(Int.init) ?? 0
+    #else
     @State private var selection = 0
+    #endif
     @State private var chatBadge = ChatBadge()
     @State private var showMessageToast = false
     @State private var toastDismissTask: Task<Void, Never>?
     @State private var profile: ProfileTarget?
+    @State private var showIntro = false   // the lights intro is out; a designed clip replaces it
+    #if DEBUG
+    private static let designLabOpen = UserDefaults.standard.string(forKey: "DesignLab") != nil
+    #else
+    private static let designLabOpen = false
+    #endif
 
     var body: some View {
         TabView(selection: $selection) {
@@ -67,6 +79,16 @@ struct RootView: View {
                 .tag(4)
         }
         .tint(Theme.accent)
+        #if DEBUG
+        .overlay { if let id = UserDefaults.standard.string(forKey: "DesignLab") { DesignLab(id: id) } }
+        #endif
+        .overlay {
+            if showIntro {
+                IntroView { showIntro = false }
+                    .transition(.opacity)
+                    .zIndex(1)
+            }
+        }
         .environment(\.openProfile, OpenProfileAction { profile = $0 })
         .sheet(item: $profile) { target in
             ProfileSheet(target: target)
@@ -112,7 +134,7 @@ struct RootView: View {
         .onChange(of: chatBadge.unread) { _, _ in TabBarBadge.tint(private: chatBadge.unreadDMs > 0) }
         .onChange(of: chatBadge.unreadDMs) { _, _ in TabBarBadge.tint(private: chatBadge.unreadDMs > 0) }
         .overlay(alignment: .bottom) {
-            if showMessageToast {
+            if showMessageToast && !showIntro && !Self.designLabOpen {
                 MessageToast(sender: chatBadge.latestSender, text: chatBadge.latestText, isPrivate: chatBadge.latestIsPrivate) {
                     selection = 3
                     if chatBadge.latestIsPrivate {

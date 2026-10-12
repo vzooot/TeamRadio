@@ -2,10 +2,11 @@ import QuartzCore
 import SwiftUI
 import UIKit
 
-/// "Lights Out": the F1 start procedure as a reaction test. Five red lights
-/// come on a second apart, hold for a random 0.2–3 s, go out, and the player
-/// taps. Tapping before lights out is a jump start. Best time stays on the
-/// device; the result can be shared with the App Store link.
+/// "Lights Out": the F1 start procedure as a reaction test. The player holds
+/// a finger down like the clutch; five red lights come on a second apart,
+/// hold for a random 0.2–3 s and go out, and the player lets go. Letting go
+/// before lights out is a jump start. Best time stays on the device; the
+/// result can be shared with the App Store link.
 struct LightsOutView: View {
     enum Phase: Equatable {
         case ready
@@ -19,7 +20,9 @@ struct LightsOutView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var phase: Phase = .ready
     @State private var sequence: Task<Void, Never>?
+    @State private var fingerDown = false
     @AppStorage("lightsOutBest") private var best: Double = 0
+    @AppStorage("lightsOutHistory") private var history = ""
     @AppStorage("chatNickname") private var nickname = ""
     @State private var board: LeaderboardService.ReactionBoard?
     @State private var userId: String?
@@ -34,22 +37,25 @@ struct LightsOutView: View {
                 .ignoresSafeArea()
                 .animation(.easeOut(duration: 0.15), value: litCount)
 
-            VStack(spacing: 28) {
+            VStack(spacing: 22) {
                 header
                 Spacer(minLength: 0)
                 gantry
                 status
                 Spacer(minLength: 0)
-                footer
+                controls
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
         }
-        .contentShape(Rectangle())
-        .onTapGesture { tap() }
         .onDisappear { sequence?.cancel() }
         .task {
             StartSounds.shared.prepare()
+            // Clear a best saved before anticipated starts were caught.
+            if best > 0, best < Self.minReaction { best = 0 }
+            #if DEBUG
+            if UserDefaults.standard.bool(forKey: "LightsOutAutoStart") { start() }
+            #endif
             userId = await ChatService.currentUserId()
             board = await LeaderboardService.reaction(user: userId, name: nil, ms: nil)
         }
@@ -88,61 +94,25 @@ struct LightsOutView: View {
         }
     }
 
-    /// The gantry as it hangs over the grid: five black housings on a
-    /// crossbar, two large lamps each under a hood. Both lamps of a column
-    /// light together.
+    /// The main screen's LED board, its five start lights driven by the
+    /// sequence, on the same carbon panel as the countdown card, with the
+    /// running timer underneath.
     private var gantry: some View {
-        ZStack(alignment: .top) {
-            // the crossbar the housings hang from
-            RoundedRectangle(cornerRadius: 4)
-                .fill(LinearGradient(colors: [Color(white: 0.55), Color(white: 0.3)], startPoint: .top, endPoint: .bottom))
-                .frame(height: 10)
-                .padding(.top, 34)
-            HStack(spacing: 10) {
-                ForEach(0..<5, id: \.self) { column in
-                    let on = column < litCount
-                    VStack(spacing: 8) {
-                        ForEach(0..<2, id: \.self) { _ in lamp(on: on) }
-                    }
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(LinearGradient(colors: [Color(white: 0.13), Color(white: 0.04)], startPoint: .top, endPoint: .bottom))
-                    )
-                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.white.opacity(0.1)))
-                }
-            }
+        VStack(spacing: 16) {
+            DotMatrixBoard(litLights: litCount, standby: phase == .ready)
+                .alignedToContent()
+                .allowsHitTesting(false)
+                .accessibilityElement()
+                .accessibilityLabel("\(litCount) of 5 start lights on")
+            ReactionTimer(phase: phase)
         }
-        .animation(.easeOut(duration: 0.05), value: litCount)
-        .accessibilityElement()
-        .accessibilityLabel("\(litCount) of 5 start lights on")
-    }
-
-    /// A round lamp under a hood: dark lens with a fine LED grid when off,
-    /// glowing red when on.
-    private func lamp(on: Bool) -> some View {
-        ZStack {
-            Circle().fill(on ? Theme.live : Color(white: 0.09))
-            if on {
-                Circle().fill(RadialGradient(colors: [Color.white.opacity(0.55), .clear],
-                                             center: .init(x: 0.4, y: 0.35), startRadius: 0, endRadius: 22))
-            }
-            // LED dot texture
-            Circle()
-                .fill(ImagePaint(image: Image(systemName: "circle.grid.3x3.fill"), scale: 0.18))
-                .opacity(on ? 0.12 : 0.18)
-            Circle().strokeBorder(Color.black.opacity(0.8), lineWidth: 3)
-        }
-        .frame(width: 46, height: 46)
-        .overlay(alignment: .top) {
-            // the hood above each lamp
-            UnevenRoundedRectangle(topLeadingRadius: 6, topTrailingRadius: 6)
-                .fill(Color(white: 0.06))
-                .frame(width: 52, height: 8)
-                .offset(y: -6)
-        }
-        .shadow(color: on ? Theme.live.opacity(0.95) : .clear, radius: 16)
+        .padding(18)
+        .background(
+            CarbonFiber()
+                .clipShape(RoundedRectangle(cornerRadius: 22))
+                .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(Theme.glassStroke, lineWidth: 1))
+                .trioGlow(cornerRadius: 22)
+        )
     }
 
     @ViewBuilder
@@ -150,21 +120,17 @@ struct LightsOutView: View {
         switch phase {
         case .ready:
             VStack(spacing: 18) {
-                prompt("TAP ANYWHERE TO START", sub: "Wait for the lights to go out, then tap as fast as you can.")
+                prompt("HOLD THE BRAKE", sub: "The lights come on while you hold. Let go the moment they go out.")
                 weeklyBoard
             }
         case .lighting, .holding:
-            prompt("WAIT FOR IT…", sub: "Don't jump the start.")
+            prompt("HOLD IT…", sub: "Don't let go before lights out.")
         case .go:
-            prompt("GO!", sub: " ")
+            prompt("LET GO!", sub: " ", color: Theme.accent)
         case .jumpStart:
-            prompt("JUMP START", sub: "Drive-through penalty. Tap to try again.", color: Theme.live)
+            prompt("JUMP START", sub: "You let go too early. Drive-through penalty.", color: Theme.live)
         case .result(let seconds):
             VStack(spacing: 8) {
-                Text(String(format: "%.3f", seconds))
-                    .font(.f1Digits(72))
-                    .foregroundStyle(Theme.accent)
-                    .shadow(color: Theme.accent.opacity(0.6), radius: 14)
                 Text(Self.verdict(seconds))
                     .font(.f1(18).italic())
                     .foregroundStyle(.white)
@@ -178,10 +144,6 @@ struct LightsOutView: View {
                         .tracking(1.5)
                         .foregroundStyle(Theme.accent)
                 }
-                Text("Tap to go again")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Theme.faintText)
-                    .padding(.top, 4)
             }
         }
     }
@@ -196,44 +158,107 @@ struct LightsOutView: View {
                 .foregroundStyle(Theme.dimText)
                 .multilineTextAlignment(.center)
         }
-        .frame(minHeight: 150)
+        .frame(minHeight: 90)
     }
 
+    /// The brake pedal while a start is possible; after a run, START AGAIN
+    /// (and sharing a good time). Only the pedal reacts to holding, so a
+    /// stray touch elsewhere can't launch or end a run.
     @ViewBuilder
-    private var footer: some View {
-        if case .result(let seconds) = phase {
-            ShareLink(item: Self.appStore,
-                      message: Text(String(format: "Lights out in %.3f s 🏁 Beat my reaction time on Team Radio:", seconds))) {
-                Text("SHARE YOUR TIME")
+    private var controls: some View {
+        switch phase {
+        case .ready, .lighting, .holding, .go:
+            BrakePedal(pressed: fingerDown)
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { _ in
+                            guard !fingerDown else { return }
+                            fingerDown = true
+                            press()
+                        }
+                        .onEnded { _ in
+                            fingerDown = false
+                            release()
+                        }
+                )
+                .accessibilityElement()
+                .accessibilityLabel("Brake pedal")
+                .accessibilityHint("Hold to start the lights, release when they go out")
+                .accessibilityAction(named: "Hold") { press() }
+                .accessibilityAction(named: "Release") { release() }
+        case .result(let seconds):
+            HStack(spacing: 10) {
+                Button { restart() } label: { Text("START AGAIN") }
+                    .buttonStyle(GamePrimaryButtonStyle())
+                ShareLink(item: Self.appStore,
+                          message: Text(String(format: "Lights out in %.3f s 🏁 Beat my reaction time on Team Radio:", seconds))) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Theme.accent)
+                        .frame(width: 50, height: 46)
+                        .background(RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.accent.opacity(0.5)))
+                }
+                .accessibilityLabel("Share your time")
             }
-            .buttonStyle(GamePrimaryButtonStyle())
-        } else if best > 0 {
-            Text(String(format: "PERSONAL BEST  %.3f s", best))
-                .font(.f1(13, weight: .bold))
-                .tracking(1.5)
-                .foregroundStyle(Theme.dimText)
+        case .jumpStart:
+            Button { restart() } label: { Text("START AGAIN") }
+                .buttonStyle(GamePrimaryButtonStyle())
         }
     }
 
     // MARK: - Logic
 
-    private func tap() {
+    /// Back to the grid: lights off, waiting for the pedal.
+    private func restart() {
+        sequence?.cancel()
+        fingerDown = false
+        phase = .ready
+    }
+
+    /// Pedal down: the brake is on and the start sequence begins.
+    private func press() {
+        guard phase == .ready else { return }
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+        start()
+    }
+
+    /// Finger up: a jump start before lights out, the reaction after.
+    private func release() {
         switch phase {
         case .ready, .result, .jumpStart:
-            start()
+            break
         case .lighting, .holding:
-            sequence?.cancel()
-            UINotificationFeedbackGenerator().notificationOccurred(.error)
-            StartSounds.shared.buzz()
-            phase = .jumpStart
+            jumpStart()
         case .go(let out):
             let seconds = CACurrentMediaTime() - out
+            // Nobody reacts in under 0.1 s: that's anticipation, a jump
+            // start (the server ignores such times too).
+            guard seconds >= Self.minReaction else { return jumpStart() }
             if best == 0 || seconds < best { best = seconds }
+            history = Self.appending(seconds, to: history)
             submit(seconds)
             UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
             StartSounds.shared.radioClick()
             phase = .result(seconds)
         }
+    }
+
+    static let minReaction = 0.1
+
+    /// The last ten reaction times, oldest first, stored as "0.231,0.208,…".
+    static func times(_ stored: String) -> [Double] {
+        stored.split(separator: ",").compactMap { Double($0) }
+    }
+
+    static func appending(_ seconds: Double, to stored: String) -> String {
+        (times(stored) + [seconds]).suffix(10).map { String(format: "%.3f", $0) }.joined(separator: ",")
+    }
+
+    private func jumpStart() {
+        sequence?.cancel()
+        UINotificationFeedbackGenerator().notificationOccurred(.error)
+        StartSounds.shared.buzz()
+        phase = .jumpStart
     }
 
     private func start() {
@@ -272,7 +297,7 @@ struct LightsOutView: View {
                     .font(.f1(11, weight: .bold))
                     .tracking(2)
                     .foregroundStyle(Color(red: 1, green: 0.75, blue: 0.2))
-                ForEach(top.prefix(5)) { e in
+                ForEach(top.prefix(3)) { e in
                     HStack {
                         Text("\(e.rank)").font(.f1(14)).foregroundStyle(Theme.dimText).frame(width: 24, alignment: .leading)
                         Text(e.name).font(.system(size: 14, weight: .semibold))
@@ -285,7 +310,6 @@ struct LightsOutView: View {
             .padding(14)
             .frame(maxWidth: 320)
             .background(RoundedRectangle(cornerRadius: 14).fill(Theme.card))
-            .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.white.opacity(0.08)))
         } else if nickname.isEmpty {
             Text("Pick a Paddock name to get on the weekly leaderboard.")
                 .font(.system(size: 12))
@@ -302,6 +326,45 @@ struct LightsOutView: View {
         case ..<0.40: "Bogged down a bit"
         default: "Stalled on the grid"
         }
+    }
+}
+
+/// A brake pedal: ridged aluminium on a dark mount, tilting down and
+/// glowing red while it's held.
+private struct BrakePedal: View {
+    let pressed: Bool
+
+    var body: some View {
+        VStack(spacing: 10) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(LinearGradient(colors: [Color(white: pressed ? 0.30 : 0.42), Color(white: 0.16)],
+                                         startPoint: .top, endPoint: .bottom))
+                // grip ridges
+                VStack(spacing: 8) {
+                    ForEach(0..<6, id: \.self) { _ in
+                        Capsule()
+                            .fill(Color.black.opacity(0.55))
+                            .frame(height: 6)
+                            .overlay(alignment: .top) { Capsule().fill(Color.white.opacity(0.18)).frame(height: 1) }
+                    }
+                }
+                .padding(.horizontal, 18)
+                RoundedRectangle(cornerRadius: 20)
+                    .strokeBorder(pressed ? Theme.live : Color.white.opacity(0.18), lineWidth: pressed ? 2.5 : 1)
+            }
+            .frame(width: 112, height: 132)
+            .rotation3DEffect(.degrees(pressed ? 22 : 0), axis: (x: 1, y: 0, z: 0), anchor: .bottom, perspective: 0.5)
+            .scaleEffect(pressed ? 0.96 : 1)
+            .shadow(color: pressed ? Theme.live.opacity(0.7) : .black.opacity(0.6), radius: pressed ? 18 : 10, y: pressed ? 2 : 10)
+            .animation(.spring(response: 0.18, dampingFraction: 0.7), value: pressed)
+            Text(pressed ? "HOLDING…" : "HOLD THE BRAKE")
+                .font(.f1(11, weight: .heavy))
+                .tracking(2)
+                .foregroundStyle(pressed ? Theme.live : Theme.dimText)
+        }
+        .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
     }
 }
 
@@ -345,5 +408,76 @@ struct LightsOutCard: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Play Lights Out, the reaction test")
+    }
+}
+
+/// The reaction clock: idle at 0.000, racing from lights out, frozen on
+/// the tap, red on a jump start. Neon-tile frame like the countdown.
+private struct ReactionTimer: View {
+    let phase: LightsOutView.Phase
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1 / 60, paused: !isRunning)) { context in
+            let (text, tint) = display(at: context.date)
+            Text(text)
+                .font(.f1Digits(64))
+                .foregroundStyle(tint == Theme.live ? AnyShapeStyle(Theme.liveGradient) : AnyShapeStyle(Theme.chromeText))
+                .shadow(color: tint.opacity(0.6), radius: 10)
+                .contentTransition(.numericText())
+                .animation(isRunning ? nil : .snappy(duration: 0.25), value: text)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 18)
+                            .fill(LinearGradient(colors: [Color(white: 0.03), Color(white: 0.09)], startPoint: .top, endPoint: .bottom))
+                        RoundedRectangle(cornerRadius: 18)
+                            .fill(LinearGradient(colors: [Color.white.opacity(0.10), .clear], startPoint: .top, endPoint: .center))
+                        RoundedRectangle(cornerRadius: 18).strokeBorder(tint.opacity(0.9), lineWidth: 3).blur(radius: 5)
+                        RoundedRectangle(cornerRadius: 18)
+                            .strokeBorder(LinearGradient(colors: [Color.white.opacity(0.95), tint, tint.opacity(0.8)],
+                                                         startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 2.2)
+                    }
+                )
+                .shadow(color: tint.opacity(0.45), radius: 12)
+                .overlay(alignment: .bottom) {
+                    Text(caption)
+                        .font(.f1(10, weight: .bold))
+                        .tracking(2)
+                        .foregroundStyle(tint.opacity(0.85))
+                        .offset(y: 18)
+                }
+                .padding(.bottom, 14)
+        }
+    }
+
+    private var isRunning: Bool {
+        if case .go = phase { return true }
+        return false
+    }
+
+    private var caption: String {
+        switch phase {
+        case .ready: "REACTION TIME"
+        case .lighting, .holding: "WAIT FOR LIGHTS OUT"
+        case .go: "LET GO!"
+        case .result: "SECONDS"
+        case .jumpStart: "JUMP START"
+        }
+    }
+
+    private func display(at now: Date) -> (String, Color) {
+        switch phase {
+        case .go(let out):
+            return (String(format: "%.3f", max(0, CACurrentMediaTime() - out)), Theme.accent)
+        case .result(let s):
+            return (String(format: "%.3f", s), Theme.accent)
+        case .jumpStart:
+            return ("JUMP", Theme.live)
+        case .lighting, .holding:
+            return ("0.000", Theme.live)
+        case .ready:
+            return ("0.000", Theme.accent)
+        }
     }
 }

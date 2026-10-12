@@ -88,6 +88,12 @@ struct CountdownView: View {
                 }
             }
             .onAppear { pinned = LiveActivityManager.hasPinIntent }
+            // Updated in place when the race changes (the digits roll over):
+            // start again from that race's next session.
+            .onChange(of: race.id) { _, _ in
+                selectedId = nil
+                pinned = LiveActivityManager.hasPinIntent
+            }
             #if DEBUG
             .onChange(of: DemoDirector.shared.sessionIndex) { _, i in
                 if let i, sessions.indices.contains(i) { selectedId = sessions[i].id }
@@ -163,7 +169,9 @@ struct CountdownView: View {
         return [
             session.date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute()),
             session.date.formatted(.dateTime.day().month(.abbreviated)).uppercased(),
-            days > 0 ? "\(days) DAYS" : "\(hours) HRS",
+            // fits the board with a margin up to "99 DAYS"; longer gets short
+            days > 99 ? "\(days) D" : days > 1 ? "\(days) DAYS" : days == 1 ? "1 DAY"
+                : hours == 1 ? "1 HR" : "\(hours) HRS",
             "RND \(race.round)",
         ]
     }

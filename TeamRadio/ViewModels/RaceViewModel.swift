@@ -21,6 +21,9 @@ final class RaceViewModel {
     /// Hourly forecast at the displayed race's circuit, keyed by UTC hour
     /// (Open-Meteo only reaches ~16 days ahead, so far rounds have none).
     var weather: [Date: WeatherPoint] = [:]
+    /// Weather and the track map are on their way for the displayed race
+    /// (the screen shows shimmering placeholders meanwhile).
+    var extrasLoading = false
 
     /// What the countdown tab shows: the browsed round, else the next one.
     var displayRace: Race? { selectedRace ?? nextRace }
@@ -60,7 +63,24 @@ final class RaceViewModel {
 
     /// Browse another round (nil returns to the next race).
     func select(_ race: Race?) async {
+        show(race)
+        await loadExtras(for: displayRace)
+    }
+
+    /// Switch the displayed race at once (call inside an animation); the
+    /// map and weather follow with `refreshExtras()`.
+    func show(_ race: Race?) {
         selectedRace = race?.id == nextRace?.id ? nil : race
+        // Never draw the last race's circuit under this one (building a 3D
+        // scene for it only to throw it away): its own cached map, or the
+        // placeholder until it loads.
+        let cached = displayRace.flatMap { mapCache[$0.circuit.circuitId] }
+        trackMap = cached
+        weather = [:]
+        extrasLoading = displayRace != nil
+    }
+
+    func refreshExtras() async {
         await loadExtras(for: displayRace)
     }
 
@@ -75,6 +95,7 @@ final class RaceViewModel {
         }
         trackMap = mapCache[race.circuit.circuitId]
         weather = [:]
+        extrasLoading = true
         let task = Task { [weak self] in
             async let map: TrackMap? = self?.mapCache[race.circuit.circuitId] != nil ? nil
                 : try? await TrackAPI.trackMap(circuitId: race.circuit.circuitId, season: race.season)
@@ -90,6 +111,7 @@ final class RaceViewModel {
                 self.trackMap = loadedMap
             }
             self.weather = loadedWeather ?? [:]
+            self.extrasLoading = false
         }
         extrasTask = task
         await task.value

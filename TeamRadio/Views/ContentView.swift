@@ -10,6 +10,29 @@ struct ContentView: View {
     @State private var dotd = DotdModel()
     @State private var showDotd = false
     @State private var showLightsOut = false
+    /// The race strip is open: the page holds still meanwhile.
+    @State private var raceDock = false
+    /// Which way the last race switch went, so the page follows the card.
+    @State private var raceEdge: Edge = .trailing
+
+    /// The schedule and circuit are on screen (false while a switch swaps them).
+    @State private var sectionsShown = true
+
+    /// Switching race: the countdown stays and updates in place, its digits
+    /// rolling to the new race; the schedule and circuit slip out, are
+    /// swapped while hidden (so no rebuild ever shows as a stutter), then
+    /// rise back in one after the other. Map and weather load after that.
+    /// nil goes back to the next race.
+    private func switchRace(to race: Race?) {
+        sectionsShown = false
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(110))
+            model.show(race)
+            try? await Task.sleep(for: .milliseconds(40))
+            sectionsShown = true
+            await model.refreshExtras()
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -43,7 +66,28 @@ struct ContentView: View {
         .task(id: model.nextRace?.id) {
             guard GameFeature.isEnabled else { return }
             await game.load(race: model.nextRace, season: model.season)
+            #if DEBUG
+            // -FakePicks YES: a signed-in player with three picks, for screenshots
+            if UserDefaults.standard.bool(forKey: "FakePicks"), game.drivers.count > 2 {
+                game.access = .ready
+                game.draft.pole = game.drivers[1].id
+                game.draft.p1 = game.drivers[0].id
+                game.draft.p2 = game.drivers[2].id
+            }
+            #endif
             await dotd.load(season: model.season, fallbackDrivers: game.drivers)
+            #if DEBUG
+            // -FakeVote YES: a cast vote and a three-way tally, for screenshots
+            if UserDefaults.standard.bool(forKey: "FakeVote"), dotd.drivers.count > 2 {
+                let d = dotd.drivers
+                dotd.myVote = d[1].id
+                dotd.tally = DotdService.Tally(total: 412, votes: [
+                    .init(driverId: d[1].id, count: 214, pct: 52),
+                    .init(driverId: d[0].id, count: 124, pct: 30),
+                    .init(driverId: d[2].id, count: 74, pct: 18),
+                ])
+            }
+            #endif
         }
         .fullScreenCover(isPresented: $showLightsOut) {
             LightsOutView()
@@ -79,63 +123,94 @@ struct ContentView: View {
         ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                if let race = model.nextRace {
-                    // Broadcast-style LIVE bar sits above everything, so the
-                    // helmet below still hangs over the race card.
-                    LiveSessionBanner(race: race)
-                }
+                // The very top of the page (the LIVE bar included), where a
+                // pick from the season list glides back to.
+                VStack(alignment: .leading, spacing: 22) {
+                    if let race = model.nextRace {
+                        // Broadcast-style LIVE bar sits above everything, so the
+                        // helmet below still hangs over the race card.
+                        LiveSessionBanner(race: race)
+                    }
 
-                HeaderView(onInfo: { showAbout = true })
-                    .padding(.bottom, -6)
-                    .id("top")
+                    HeaderView(onInfo: { showAbout = true })
+                }
+                .padding(.bottom, -6)
+                // the helmet hangs over the race card, so the header draws on top
+                .zIndex(1)
+                .id("top")
 
                 if let race = model.displayRace {
-                    if model.isBrowsing {
-                        browsingBar(race)
-                    }
 
-                    RaceHeroView(race: race)
-                        .id("hero")
+                    RaceHeroCarousel(season: model.season, race: race, dockActive: $raceDock, edge: $raceEdge,
+                                     nextId: model.nextRace?.id, onBack: backToNextRace) { picked in
+                        switchRace(to: picked)
+                    }
+                    .id("hero")
 
                     CountdownView(race: race)
-                        .id(race.id)
 
-                    if GameFeature.isEnabled, !model.isBrowsing {
-                        DotdCard(model: dotd) { showDotd = true }
-                        PicksCard(game: game, onOpen: { showPicks = true }, onShowResult: { showResult = true })
-                            .id("picks")
-                        AskEmilyCard { showEmily = true }
-                        LightsOutCard { showLightsOut = true }
+                    // The weekend's sessions always right under the countdown.
+                    VStack {
+                        WeekendScheduleView(race: race, weather: model.weather, weatherLoading: model.extrasLoading)
+                            .id(race.id)
                     }
+                    .cascade(sectionsShown, delay: 0)
+                    .id("schedule")
 
-                    WeekendScheduleView(race: race, weather: model.weather)
-                        .id("schedule")
+                    // ...and the circuit right after the weekend's sessions.
+                    VStack {
+                        if let map = model.trackMap {
+                            // fades only: the 3D scene is too heavy to slide
+                            TrackSectionView(map: map, circuit: race.circuit)
+                                .id(race.circuit.circuitId)
+                        } else if model.extrasLoading {
+                            TrackPlaceholder()
+                        }
+                    }
+                    .cascade(sectionsShown, delay: 0.08)
+                    .id("trackSection")
 
-                    SessionAlertsCard(season: model.season)
-                        .id("alerts")
+                    #if DEBUG
+                    if BlendDraft.gameZoneInApp {
+                        GameZoneDraft(variant: UserDefaults.standard.string(forKey: "GameZoneDraft") ?? "").id("gameZone")
+                    }
+                    #endif
+                    if GameFeature.isEnabled, !model.isBrowsing, !Self.gameZoneDraft {
+                        GameZone(game: game, dotd: dotd, seasonRounds: model.season.count,
+                                 onPicks: { showPicks = true },
+                                 onResult: { showResult = true },
+                                 onVote: { showDotd = true },
+                                 onLightsOut: { showLightsOut = true },
+                                 onEmily: { showEmily = true })
+                            .id("picks")
+                            // heavy (3D chart, animations): appears and
+                            // disappears without joining the race-switch
+                            // animation — only then, so its own animations
+                            // (rings filling, cards rising) still play
+                            .transaction(value: model.isBrowsing) { $0.animation = nil }
+                    }
 
                     if !Self.demoMode {
                         InviteBanner()
-                    }
-
-                    if let map = model.trackMap {
-                        TrackSectionView(map: map, circuit: race.circuit)
-                            .id("trackSection")
                     }
                 } else {
                     SeasonOverBanner()
                 }
 
-                if !model.standings.isEmpty {
-                    StandingsView(standings: model.standings)
+                // (The championship lives in the Standings tab, not here.)
+
+                if model.displayRace != nil {
+                    // Settings for every session, just above the season's races.
+                    SessionAlertsCard(season: model.season)
+                        .id("alerts")
                 }
 
                 if !model.season.isEmpty {
                     SeasonView(season: model.season, nextRaceId: model.nextRace?.id,
                                selectedId: model.displayRace?.id) { race in
-                        Task { await model.select(race) }
-                        withAnimation(.easeInOut(duration: 0.45)) { proxy.scrollTo("hero", anchor: .top) }
+                        pickFromSeason(race, proxy: proxy)
                     }
+                    .id("season")
                 }
 
                 FooterView()
@@ -144,9 +219,41 @@ struct ContentView: View {
             .padding(.top, 8)
             .padding(.bottom, 32)
         }
+        .scrollDisabled(raceDock)
         .refreshable { await model.load() }
         #if DEBUG
         .task { await DemoDirector.shared.runIfNeeded() }
+        .task {
+            // -ScrollTo <id>: jump to a section for screenshots
+            guard let id = UserDefaults.standard.string(forKey: "ScrollTo") else { return }
+            try? await Task.sleep(for: .seconds(4))
+            proxy.scrollTo(id, anchor: .top)
+        }
+        .task {
+            // -SeasonTap N: scroll to the season list and pick round N there
+            let n = UserDefaults.standard.integer(forKey: "SeasonTap")
+            guard n > 0 else { return }
+            try? await Task.sleep(for: .seconds(4))
+            guard model.season.indices.contains(n - 1) else { return }
+            proxy.scrollTo("season", anchor: .bottom)
+            try? await Task.sleep(for: .seconds(1.5))
+            pickFromSeason(model.season[n - 1], proxy: proxy)
+        }
+        .task {
+            // -RaceCycle N: switch race N times (ahead, ahead, back to the
+            // next race …) for profiling the switch
+            let n = UserDefaults.standard.integer(forKey: "RaceCycle")
+            guard n > 0 else { return }
+            try? await Task.sleep(for: .seconds(5))
+            for i in 0..<n {
+                let base = model.season.firstIndex { $0.id == model.nextRace?.id } ?? 0
+                let step = i % 3
+                let j = base + step + 1
+                let target = step == 2 || !model.season.indices.contains(j) ? nil : model.season[j]
+                switchRace(to: target)
+                try? await Task.sleep(for: .seconds(2))
+            }
+        }
         .onChange(of: DemoDirector.shared.scroll) { _, step in
             guard let step else { return }
             let id: String = step.target == "countdown" ? (model.displayRace?.id ?? "") : step.target
@@ -154,6 +261,15 @@ struct ContentView: View {
         }
         #endif
         }
+    }
+
+    /// Debug-only: the four game cards replaced by the game-zone design draft.
+    private static var gameZoneDraft: Bool {
+        #if DEBUG
+        BlendDraft.gameZoneInApp
+        #else
+        false
+        #endif
     }
 
     /// Debug-only demo recordings hide anything not yet released.
@@ -166,40 +282,73 @@ struct ContentView: View {
     }
 
     /// Shown while looking at a round other than the next one.
-    private func browsingBar(_ race: Race) -> some View {
-        HStack(spacing: 10) {
-            Text(race.isPast ? "PAST ROUND" : "UPCOMING ROUND")
-                .font(.f1(11, weight: .bold))
-                .tracking(2)
-                .foregroundStyle(Theme.dimText)
-            Spacer()
-            Button {
-                Task { await model.select(nil) }
-            } label: {
-                HStack(spacing: 5) {
-                    Image(systemName: "arrow.uturn.backward")
-                        .font(.system(size: 10, weight: .bold))
-                    Text("BACK TO NEXT RACE")
-                        .font(.f1(11, weight: .bold))
-                        .tracking(1)
-                }
-                .foregroundStyle(Theme.accent)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(
-                    Capsule()
-                        .fill(Theme.accent.opacity(0.1))
-                        .overlay(Capsule().strokeBorder(Theme.accent.opacity(0.5), lineWidth: 1))
-                )
-            }
-            .buttonStyle(.plain)
+    /// A race tapped in the season list at the bottom of the page.
+    private func pickFromSeason(_ race: Race, proxy: ScrollViewProxy) {
+        let from = model.season.firstIndex { $0.id == model.displayRace?.id } ?? 0
+        raceEdge = (model.season.firstIndex { $0.id == race.id } ?? 0) >= from ? .trailing : .leading
+        // Glide all the way up first, then switch: switching changes the
+        // page's height, which stopped the glide short when both ran at once.
+        withAnimation(.easeInOut(duration: 0.45)) { proxy.scrollTo("top", anchor: .top) }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(380))
+            switchRace(to: race)
         }
-        .padding(.horizontal, 4)
-        .padding(.bottom, -10)
+    }
+
+    /// The card's "next race" button: back from browsing.
+    private func backToNextRace() {
+        let from = model.season.firstIndex { $0.id == model.displayRace?.id } ?? 0
+        let to = model.season.firstIndex { $0.id == model.nextRace?.id } ?? 0
+        raceEdge = to >= from ? .trailing : .leading
+        switchRace(to: nil)
+    }
+}
+
+private extension View {
+    /// Slips out fast when hidden, rises back in with a soft spring after
+    /// `delay` when shown (opacity and offset only, so it stays cheap).
+    func cascade(_ shown: Bool, delay: Double) -> some View {
+        self
+            .opacity(shown ? 1 : 0)
+            .offset(y: shown ? 0 : 22)
+            .animation(shown ? .spring(response: 0.45, dampingFraction: 0.8).delay(delay) : .easeIn(duration: 0.1),
+                       value: shown)
     }
 }
 
 // MARK: - Header
+
+/// The header's About & settings button: a dark glass disc with a steering
+/// wheel, inside a slowly turning ring in the trio colours.
+struct CockpitButton: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion)) { context in
+            let angle = reduceMotion ? 0 : context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 8) / 8 * 360
+            ZStack {
+                Circle()
+                    .strokeBorder(
+                        AngularGradient(colors: [Theme.accent, Theme.violet, Theme.live, Theme.accent], center: .center),
+                        lineWidth: 2.5)
+                    .rotationEffect(.degrees(angle))
+                    .shadow(color: Theme.accent.opacity(0.6), radius: 5)
+                Circle()
+                    .fill(LinearGradient(colors: [Color(white: 0.16), Color(white: 0.04)], startPoint: .top, endPoint: .bottom))
+                    .padding(3.5)
+                    .overlay(
+                        Circle()
+                            .fill(LinearGradient(colors: [.white.opacity(0.16), .clear], startPoint: .top, endPoint: .center))
+                            .padding(3.5)
+                    )
+                Image(systemName: "steeringwheel")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Theme.chromeText)
+            }
+            .frame(width: 42, height: 42)
+        }
+    }
+}
 
 struct HeaderView: View {
     var onInfo: (() -> Void)? = nil
@@ -219,12 +368,9 @@ struct HeaderView: View {
                 Spacer()
 
                 if let onInfo {
-                    Button(action: onInfo) {
-                        Image(systemName: "info.circle")
-                            .font(.system(size: 20))
-                            .foregroundStyle(Theme.dimText)
-                    }
-                    .buttonStyle(.plain)
+                    Button(action: onInfo) { CockpitButton() }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("About and settings")
                 }
             }
 

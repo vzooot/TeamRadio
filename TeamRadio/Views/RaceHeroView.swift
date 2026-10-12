@@ -3,6 +3,9 @@ import SwiftUI
 /// Hero card for the upcoming grand prix.
 struct RaceHeroView: View {
     let race: Race
+    /// Set on any race but the next one: the year's corner becomes a way
+    /// back to the next race.
+    var onBack: (() -> Void)? = nil
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -39,23 +42,34 @@ struct RaceHeroView: View {
                         .padding(.vertical, 5)
                         .background(Theme.accentGradient, in: RoundedRectangle(cornerRadius: 7))
 
+                    // Nothing in the middle: the header helmet hangs over it.
                     Spacer()
 
-                    // Right of centre: the header helmet hangs over the
-                    // middle of this row.
-                    if race.isSprintWeekend {
-                        Text("SPRINT")
-                            .font(.f1(13).italic())
-                            .tracking(1)
-                            .foregroundStyle(.black)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(.yellow, in: RoundedRectangle(cornerRadius: 7))
+                    if let onBack {
+                        Button(action: onBack) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.uturn.backward")
+                                    .font(.system(size: 9, weight: .bold))
+                                Text("NEXT RACE")
+                                    .font(.f1(10, weight: .bold))
+                                    .tracking(1)
+                            }
+                            .foregroundStyle(Theme.accent)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 6)
+                            .background(
+                                Capsule()
+                                    .fill(Theme.accent.opacity(0.1))
+                                    .overlay(Capsule().strokeBorder(Theme.accent.opacity(0.5), lineWidth: 1))
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Back to next race")
+                    } else {
+                        Text(race.season)
+                            .font(.f1(15).italic())
+                            .foregroundStyle(Theme.dimText)
                     }
-
-                    Text(race.season)
-                        .font(.f1(15).italic())
-                        .foregroundStyle(Theme.dimText)
                 }
 
                 Text(race.raceName.uppercased())
@@ -65,12 +79,29 @@ struct RaceHeroView: View {
                     .minimumScaleFactor(0.6)
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(race.circuit.circuitName)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.85))
+                    HStack(spacing: 8) {
+                        Text(race.circuit.circuitName)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.85))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                        if race.isSprintWeekend {
+                            Text("SPRINT")
+                                .font(.f1(10).italic())
+                                .tracking(1)
+                                .foregroundStyle(.black)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(.yellow, in: RoundedRectangle(cornerRadius: 5))
+                        }
+                    }
                     Text("\(Flags.emoji(for: race.circuit.location.country)) \(race.circuit.location.locality), \(race.circuit.location.country) · \(weekendRange)")
                         .font(.system(size: 13))
                         .foregroundStyle(Theme.dimText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        // clear of the hold hint in the corner
+                        .padding(.trailing, 58)
                 }
             }
             .padding(18)
