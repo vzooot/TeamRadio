@@ -23,6 +23,8 @@ struct DesignLab: View {
             case "news1": NewsDraftFrontPage()
             case "news2": NewsDraftTimeline()
             case "news3": NewsDraftMagazine()
+            case "news4": NewsDraftBroadcast()
+            case "news5": NewsDraftFrontPageType()
             case "full": FullDraft(page: UserDefaults.standard.integer(forKey: "DesignPage"))
             case "styleGlass": StyleGlass()
             case "styleHUD": StyleTelemetry()
