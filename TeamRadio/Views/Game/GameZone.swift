@@ -1,11 +1,13 @@
+import SceneKit
 import SwiftUI
+import UIKit
 
-/// The 1.2 features grouped under one heading on the Countdown tab: picks,
-/// driver of the day, Lights Out and Ask Emily. First step of the
-/// "telemetry glass" style (Docs/redesign-telemetry-glass.md): glass panels
-/// with coloured light behind them and LED numbers like the countdown board,
-/// in the app's own colour code (trio slashes, grey chips, violet countdown
-/// chip, cyan "next" stripe).
+/// The game features on the Countdown tab, each its own card in its own
+/// size: picks (the result after scoring) as a race-hero card, the AI
+/// Strategist with the season duel in rings and 3D bars, driver of the day
+/// as a bold yellow card with the team's suit, Lights Out as a photo strip,
+/// and the Ask Emily bar. Approved draft:
+/// Marketing/drafts/2026-10-12/game-zone-final-before-after-race.jpg
 struct GameZone: View {
     @Bindable var game: GameViewModel
     let dotd: DotdModel
@@ -19,7 +21,7 @@ struct GameZone: View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
             let now = context.date
             let state = game.cardState(at: now)
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 14) {
                 HStack {
                     SectionTitle("GAME ZONE")
                     Spacer()
@@ -27,12 +29,14 @@ struct GameZone: View {
                         ZoneChip(text: text)
                     }
                 }
-                PicksPanel(game: game, state: state, now: now,
-                           onOpen: { if case .scored = state { onResult() } else { onPicks() } })
-                if dotd.race != nil {
-                    DotdTile(model: dotd, now: now, onVote: onVote)
+                PicksHero(game: game, state: state, now: now, onPicks: onPicks, onResult: onResult)
+                if game.race != nil {
+                    StrategistCard(game: game, state: state)
                 }
-                LightsOutTile(onPlay: onLightsOut)
+                if dotd.race != nil {
+                    DotdBoldCard(model: dotd, now: now, onVote: onVote)
+                }
+                LightsStrip(onPlay: onLightsOut)
                 EmilyBar(onTap: onEmily)
             }
         }
@@ -51,59 +55,81 @@ struct GameZone: View {
     }
 }
 
-// MARK: - Picks
+// MARK: - Picks / result: the race-hero card
 
-private struct PicksPanel: View {
+private struct PicksHero: View {
     @Bindable var game: GameViewModel
     let state: GameViewModel.CardState
     let now: Date
-    let onOpen: () -> Void
+    let onPicks: () -> Void
+    let onResult: () -> Void
+
+    /// The race this card is about: the scored one, else the next.
+    private var race: Race? {
+        if case let .scored(race, _, _) = state { return race }
+        return game.race
+    }
 
     var body: some View {
-        // Not .disabled: that would dim the whole panel; it just does nothing.
-        Button {
-            if game.access == .ready, state != .missed { onOpen() }
-        } label: {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(title)
-                    .font(.f1(22).italic())
-                    .foregroundStyle(Theme.chromeText)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
-                switch game.access {
-                case .checking:
-                    ProgressView().tint(Theme.accent).frame(maxWidth: .infinity).padding(.vertical, 24)
-                case .needsICloud:
-                    note("Sign in to iCloud in Settings to play. Your iCloud account is your player identity.")
-                case .needsName:
-                    note("Pick a Paddock name in the Paddock tab first. It's how you appear on the leaderboard.")
-                case .ready:
-                    content
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                if let race {
+                    Text("ROUND \(race.roundNumber)")
+                        .font(.f1(13).italic())
+                        .tracking(1)
+                        .foregroundStyle(Theme.onAccent)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Theme.accentGradient, in: RoundedRectangle(cornerRadius: 7))
                 }
+                Spacer()
+                Text(isScored ? "YOUR RESULT" : "YOUR PICKS")
+                    .font(.f1(15).italic())
+                    .foregroundStyle(Theme.dimText)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .zoneGlass(RoundedRectangle(cornerRadius: 22), light: Theme.accent, offset: CGSize(width: -90, height: -20))
-            .background(Color.clear.trioGlow(cornerRadius: 22, opacity: 0.35))
+            if let race {
+                Text(PicksCard.shortName(race))
+                    .font(.f1(30).italic())
+                    .foregroundStyle(Theme.chromeText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+            }
+            switch game.access {
+            case .checking:
+                ProgressView().tint(Theme.accent).frame(maxWidth: .infinity).padding(.vertical, 12)
+            case .needsICloud:
+                note("Sign in to iCloud in Settings to play. Your iCloud account is your player identity.")
+            case .needsName:
+                note("Pick a Paddock name in the Paddock tab first. It's how you appear on the leaderboard.")
+            case .ready:
+                content
+            }
         }
-        .buttonStyle(.plain)
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(LinearGradient(colors: [Theme.card, Theme.violet.opacity(0.16), Theme.accent.opacity(0.24)],
+                                     startPoint: .topLeading, endPoint: .bottomTrailing))
+                .overlay(alignment: .topTrailing) {
+                    if let race {
+                        Text(Flags.emoji(for: race.circuit.location.country))
+                            .font(.system(size: 100))
+                            .opacity(0.14)
+                            .rotationEffect(.degrees(-12))
+                            .offset(x: 14, y: -6)
+                            .accessibilityHidden(true)
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Theme.glassStroke, lineWidth: 1))
+                .trioGlow(cornerRadius: 20)
+        )
     }
 
-    private var title: String {
-        switch state {
-        case .scored: "YOUR RESULT"
-        case .open: "MAKE YOUR PICKS"
-        default: "YOUR PICKS"
-        }
-    }
-
-    private var prediction: Prediction {
-        if case let .scored(_, _, prediction) = state { return prediction }
-        return game.saved?.prediction ?? game.draft
-    }
-
-    private var score: ScoreBreakdown? {
-        if case let .scored(_, score, _) = state { return score }
-        return nil
+    private var isScored: Bool {
+        if case .scored = state { return true }
+        return false
     }
 
     @ViewBuilder
@@ -111,283 +137,481 @@ private struct PicksPanel: View {
         switch state {
         case .missed:
             note("Picks for this round closed when the race started. The next round opens after the race.")
-        case let .scored(_, score, _):
-            scoreHeader(score)
-            rows
-            if let comment = game.lastBoard?.me?.comment {
-                RadioComment(text: comment).padding(.horizontal, 16)
+        case let .scored(_, score, prediction):
+            HStack(alignment: .firstTextBaseline, spacing: 14) {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text("+\(score.total)").font(.f1Digits(52))
+                    Text("PTS").font(.f1(16))
+                }
+                .foregroundStyle(Theme.accent)
+                .shadow(color: Theme.accent.opacity(0.5), radius: 10)
+                VStack(alignment: .leading, spacing: 2) {
+                    if let me = game.lastBoard?.me, let total = game.lastBoard?.total {
+                        Text("\(me.rank.ordinal) of \(total.formatted())")
+                    } else {
+                        Text("\(score.exactPicks) exact picks")
+                    }
+                    if let ai = game.lastBoard?.strategist {
+                        Text(score.total > ai.points ? "You beat the \(ai.name) ✓"
+                             : score.total == ai.points ? "Level with the \(ai.name)"
+                             : "\(ai.name) scored \(ai.points)")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(score.total > ai.points ? PicksStrip.color(.exact) : Theme.dimText)
+                    }
+                }
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
             }
-            footer(cta: "BREAKDOWN →")
+            strip(prediction, score: score)
+            if let comment = game.lastBoard?.me?.comment {
+                RadioComment(text: comment)
+            }
+            Button(action: onResult) { Text("SEE BREAKDOWN") }
+                .buttonStyle(GameOutlineButtonStyle())
         case .locked:
-            rows
+            strip(current, score: nil)
             Label("All picks locked · scored after the race", systemImage: "lock.fill")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(Theme.dimText)
-                .padding(.horizontal, 16).padding(.bottom, 16).padding(.top, 4)
         case .open, .picked:
-            rows
-            footer(cta: state == .open ? "MAKE PICKS →" : prediction.isComplete ? "EDIT →" : "FINISH →")
+            strip(current, score: nil)
+            Text(PicksCard.lockStatus(game, now: now))
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.faintText)
+            if state == .picked, current.isComplete {
+                Button(action: onPicks) { Text("EDIT PICKS") }
+                    .buttonStyle(GameOutlineButtonStyle())
+            } else {
+                Button(action: onPicks) { Text(state == .open ? "MAKE YOUR PICKS" : "FINISH YOUR PICKS") }
+                    .buttonStyle(GamePrimaryButtonStyle())
+            }
         }
     }
+
+    private var current: Prediction { game.saved?.prediction ?? game.draft }
 
     private func note(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 13))
             .foregroundStyle(Theme.dimText)
             .fixedSize(horizontal: false, vertical: true)
-            .padding(.horizontal, 16).padding(.bottom, 16)
     }
 
-    private func scoreHeader(_ score: ScoreBreakdown) -> some View {
-        HStack(alignment: .center, spacing: 14) {
-            LEDText(text: "+\(score.total)", pitch: 6, color: Theme.accent)
-            VStack(alignment: .leading, spacing: 3) {
-                if let me = game.lastBoard?.me, let total = game.lastBoard?.total {
-                    Text("\(me.rank.ordinal) of \(total.formatted()) · \(score.total) pts")
-                } else {
-                    Text("\(score.total) pts · \(score.exactPicks) exact")
-                }
-                if let ai = game.lastBoard?.strategist {
-                    Text(score.total > ai.points ? "You beat the \(ai.name) ✓"
-                         : score.total == ai.points ? "Level with the \(ai.name)"
-                         : "\(ai.name) scored \(ai.points)")
-                        .font(.system(size: 12))
-                        .foregroundStyle(score.total > ai.points ? PicksStrip.color(.exact) : Theme.dimText)
-                }
-            }
-            .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(.white)
-        }
-        .padding(.horizontal, 16)
-    }
-
-    // MARK: Rows
-
-    private struct Slot: Identifiable {
-        let label: String
-        let picks: [String?]
-        let group: PickGroup
-        let kinds: [ScoreBreakdown.Kind]
-        var id: String { label }
-    }
-
-    private var slots: [Slot] {
-        let p = prediction
-        return (p.hasSprint ? [Slot(label: "SPR", picks: [p.sprintWinner], group: .sprint, kinds: [.sprint])] : []) + [
-            Slot(label: "POLE", picks: [p.pole], group: .quali, kinds: [.pole]),
-            Slot(label: "WIN", picks: [p.p1], group: .race, kinds: [.p1]),
-            Slot(label: "P2·P3", picks: [p.p2, p.p3], group: .race, kinds: [.p2, .p3]),
-            Slot(label: "FL", picks: [p.fastestLap], group: .race, kinds: [.fastestLap]),
-        ]
-    }
-
-    /// The first open slot still missing a pick gets the cyan "next" stripe.
-    private var nextSlot: String? {
-        guard state == .open || state == .picked else { return nil }
-        return slots.first { slot in
-            slot.picks.contains(nil) && !game.isLocked(slot.group, at: now)
-        }?.label
-    }
-
-    private var rows: some View {
-        VStack(spacing: 0) {
-            ForEach(slots) { slot in
-                row(slot, isNext: slot.label == nextSlot)
-            }
-        }
-    }
-
-    private func row(_ slot: Slot, isNext: Bool) -> some View {
-        HStack(spacing: 12) {
-            ZoneSessionChip(text: slot.label)
-            if slot.picks.allSatisfy({ $0 == nil }) {
-                Text(isNext ? "TAP TO PICK" : "—")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(isNext ? Theme.accent : Theme.faintText)
-            } else {
-                HStack(spacing: 10) {
-                    ForEach(Array(slot.picks.enumerated()), id: \.offset) { _, id in
-                        pickCode(id)
+    /// One tile per pick: code and team colour, a cyan "+" where a pick is
+    /// still open, a padlock where it locked empty, the points once scored.
+    private func strip(_ p: Prediction, score: ScoreBreakdown?) -> some View {
+        let picks: [(String, String?, ScoreBreakdown.Kind, PickGroup)] =
+            (p.hasSprint ? [("SPR", p.sprintWinner, .sprint, .sprint)] : []) + [
+                ("POLE", p.pole, .pole, .quali), ("P1", p.p1, .p1, .race), ("P2", p.p2, .p2, .race),
+                ("P3", p.p3, .p3, .race), ("FL", p.fastestLap, .fastestLap, .race),
+            ]
+        return HStack(spacing: 6) {
+            ForEach(picks, id: \.0) { label, id, kind, group in
+                let driver = game.driver(id)
+                let open = id == nil && score == nil && !game.isLocked(group, at: now)
+                VStack(spacing: 3) {
+                    Text(label).font(.f1(10, weight: .bold)).tracking(1).foregroundStyle(Theme.faintText)
+                    if let driver {
+                        Text(driver.code).font(.f1(15)).foregroundStyle(.white)
+                    } else if open {
+                        Text("+").font(.f1(15)).foregroundStyle(Theme.accent)
+                    } else {
+                        Text("—").font(.f1(15)).foregroundStyle(Theme.faintText)
+                    }
+                    Capsule()
+                        .fill(driver.map { Theme.teamColor($0.teamId) } ?? (open ? Theme.accent.opacity(0.4) : .clear))
+                        .frame(width: 18, height: 3)
+                    if let item = score?.items.first(where: { $0.kind == kind }) {
+                        Text(PicksStrip.mark(item))
+                            .font(.f1(10, weight: .bold))
+                            .foregroundStyle(PicksStrip.color(item.outcome))
                     }
                 }
-                if slot.picks.count == 1, let name = game.driver(slot.picks[0])?.familyName {
-                    Text(name.uppercased())
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Theme.dimText)
-                        .lineLimit(1)
-                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.25)))
+                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(open ? Theme.accent.opacity(0.4) : .clear))
             }
-            Spacer(minLength: 6)
-            trailing(slot)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(isNext ? Theme.accent.opacity(0.08) : .clear)
-        .overlay(alignment: .leading) { if isNext { Rectangle().fill(Theme.accent).frame(width: 3) } }
-        .overlay(alignment: .top) { Divider().overlay(Color.white.opacity(0.06)) }
-    }
-
-    private func pickCode(_ id: String?) -> some View {
-        let driver = game.driver(id)
-        return HStack(spacing: 6) {
-            Capsule().fill(Theme.teamColor(driver?.teamId)).frame(width: 3, height: 16)
-            Text(driver?.code ?? "—").font(.f1(17)).foregroundStyle(.white)
-        }
-    }
-
-    /// Points once scored, otherwise when this pick locks.
-    @ViewBuilder
-    private func trailing(_ slot: Slot) -> some View {
-        if let score {
-            let items = score.items.filter { slot.kinds.contains($0.kind) }
-            HStack(spacing: 6) {
-                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
-                    Text(PicksStrip.mark(item))
-                        .font(.f1(11, weight: .bold))
-                        .foregroundStyle(PicksStrip.color(item.outcome))
-                }
-            }
-        } else if game.isLocked(slot.group, at: now) {
-            Image(systemName: "lock.fill").font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.faintText)
-        } else if let lock = game.lockDate(slot.group) {
-            Text(lock.formatted(.dateTime.weekday(.abbreviated).hour().minute()).uppercased())
-                .font(.f1(10, weight: .heavy))
-                .tracking(1)
-                .foregroundStyle(Theme.faintText)
-        }
-    }
-
-    // MARK: Footer
-
-    private var pickCount: (made: Int, total: Int) {
-        let p = prediction
-        let all: [String?] = (p.hasSprint ? [p.sprintWinner] : []) + [p.pole, p.p1, p.p2, p.p3, p.fastestLap, p.wildcard]
-        return (all.compactMap { $0 }.count, all.count)
-    }
-
-    private func footer(cta: String) -> some View {
-        let count = pickCount
-        return HStack(spacing: 10) {
-            HStack(spacing: 2) {
-                ForEach(0..<count.total, id: \.self) { i in
-                    Capsule()
-                        .fill(i < count.made ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Color.white.opacity(0.12)))
-                        .frame(width: 14, height: 3)
-                }
-            }
-            Text("\(count.made) OF \(count.total)")
-                .font(.f1(10, weight: .heavy))
-                .tracking(1.2)
-                .foregroundStyle(Theme.dimText)
-            Spacer()
-            Text(cta)
-                .font(.f1(13).italic())
-                .tracking(1.5)
-                .foregroundStyle(Theme.onAccent)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 9)
-                .background(Capsule().fill(Theme.accentGradient))
-                .shadow(color: Theme.accent.opacity(0.45), radius: 8)
-        }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 16)
-        .padding(.top, 4)
     }
 }
 
-// MARK: - Driver of the day
+// MARK: - AI Strategist
 
-private struct DotdTile: View {
+/// The AI's picks (sealed until the round is scored, then revealed with
+/// their points) and the season duel: totals in rings, every round in 3D.
+private struct StrategistCard: View {
+    let game: GameViewModel
+    let state: GameViewModel.CardState
+    @State private var history: [LeaderboardService.DuelRound]?
+    @State private var revealed: LeaderboardService.PlayerPicks?
+
+    private var scored: (race: Race, score: ScoreBreakdown)? {
+        if case let .scored(race, score, _) = state { return (race, score) }
+        return nil
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: "cpu")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(Theme.violet)
+                    .frame(width: 36, height: 36)
+                    .background(Circle().fill(Theme.violet.opacity(0.15)))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("AI STRATEGIST").font(.f1(16).italic()).foregroundStyle(Theme.chromeText)
+                    Text(subtitle).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.dimText)
+                }
+                Spacer(minLength: 4)
+                if let scored, let ai = revealed?.points {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("YOU \(scored.score.total) · AI \(ai)").font(.f1(12, weight: .heavy)).foregroundStyle(.white)
+                        Text(scored.score.total > ai ? "YOU WIN ✓" : scored.score.total == ai ? "DRAW" : "AI WINS")
+                            .font(.f1(10, weight: .bold))
+                            .tracking(1)
+                            .foregroundStyle(scored.score.total > ai ? PicksStrip.color(.exact) : Theme.dimText)
+                    }
+                } else if scored == nil {
+                    Image(systemName: "lock.fill").font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.violet)
+                }
+            }
+            if let rounds = history, !rounds.isEmpty {
+                duel(rounds)
+            }
+            tiles
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(LinearGradient(colors: [Theme.card, Theme.violet.opacity(0.14)], startPoint: .leading, endPoint: .trailing))
+                .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Theme.violet.opacity(0.35), lineWidth: 1))
+        )
+        .task(id: scored?.race.id) {
+            if let user = await ChatService.currentUserId() {
+                history = await LeaderboardService.history(user: user)
+            }
+            if let race = scored?.race {
+                revealed = await LeaderboardService.playerPicks(round: race.id, user: "ai-strategist")
+            }
+        }
+    }
+
+    private var subtitle: String {
+        if let race = scored?.race { return "Its \(race.raceName.replacingOccurrences(of: " Grand Prix", with: "")) picks, revealed" }
+        if let race = game.race { return "Has picked R\(race.round) · revealed after the race" }
+        return "Beat the AI every round"
+    }
+
+    private func duel(_ rounds: [LeaderboardService.DuelRound]) -> some View {
+        let you = rounds.map { Double($0.you ?? 0) }
+        let ai = rounds.map { Double($0.ai ?? 0) }
+        return HStack(spacing: 14) {
+            SeasonDuelRings(you: you.reduce(0, +), ai: ai.reduce(0, +))
+                .frame(width: 92, height: 92)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 10) {
+                    legend("YOU", Theme.accent)
+                    legend("AI", Theme.violet)
+                    Spacer()
+                    Text("SEASON · \(rounds.count) \(rounds.count == 1 ? "ROUND" : "ROUNDS")")
+                        .font(.f1(9, weight: .bold))
+                        .tracking(1)
+                        .foregroundStyle(Theme.faintText)
+                }
+                SeasonDuelBars(you: you, ai: ai)
+                    .frame(height: 96)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Season: you \(Int(you.reduce(0, +))) points, AI \(Int(ai.reduce(0, +))) points")
+    }
+
+    private func legend(_ s: String, _ c: Color) -> some View {
+        HStack(spacing: 4) {
+            Circle().fill(c).frame(width: 6, height: 6).shadow(color: c, radius: 3)
+            Text(s).font(.f1(9, weight: .heavy)).tracking(1).foregroundStyle(.white.opacity(0.8))
+        }
+    }
+
+    /// Sealed "?" tiles, or the revealed picks with their points.
+    private var tiles: some View {
+        let order: [(String, String)] = (game.draft.hasSprint || revealed?.items?.contains { $0.kind == "sprint" } == true
+                                        ? [("SPR", "sprint")] : []) +
+            [("POLE", "pole"), ("P1", "p1"), ("P2", "p2"), ("P3", "p3"), ("FL", "fastestLap")]
+        return HStack(spacing: 6) {
+            ForEach(order, id: \.1) { label, kind in
+                let item = scored == nil ? nil : revealed?.items?.first { $0.kind == kind }
+                VStack(spacing: 3) {
+                    Text(label).font(.f1(9, weight: .bold)).tracking(1).foregroundStyle(Theme.faintText)
+                    if let item {
+                        Text(game.driver(item.picked)?.code ?? "—").font(.f1(14)).foregroundStyle(.white)
+                        Text(item.outcome == "miss" ? "✗ 0" : item.outcome == "exact" ? "✓ \(item.points)" : "~ \(item.points)")
+                            .font(.f1(9, weight: .bold))
+                            .foregroundStyle(item.outcome == "miss" ? PicksStrip.color(.miss)
+                                             : item.outcome == "exact" ? PicksStrip.color(.exact) : PicksStrip.color(.partial))
+                    } else {
+                        Text("?").font(.f1(14)).foregroundStyle(Theme.violet)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 7)
+                .background(RoundedRectangle(cornerRadius: 9).fill(Theme.violet.opacity(item == nil ? 0.12 : 0.08)))
+            }
+        }
+    }
+}
+
+/// Season totals as two concentric rings: you (cyan) outside, the AI
+/// (violet) inside, each against the larger total.
+private struct SeasonDuelRings: View {
+    let you: Double
+    let ai: Double
+
+    var body: some View {
+        let top = max(you, ai, 1) * 1.08
+        ZStack {
+            ring(you / top, Theme.accent, inset: 0)
+            ring(ai / top, Theme.violet, inset: 13)
+            VStack(spacing: 0) {
+                Text("\(Int(you))").font(.f1Digits(18)).foregroundStyle(.white)
+                Text("VS \(Int(ai))").font(.f1(9, weight: .heavy)).tracking(1).foregroundStyle(Theme.violet)
+            }
+        }
+    }
+
+    private func ring(_ value: Double, _ color: Color, inset: CGFloat) -> some View {
+        ZStack {
+            Circle().stroke(color.opacity(0.15), lineWidth: 9)
+            Circle().trim(from: 0, to: value)
+                .stroke(color, style: StrokeStyle(lineWidth: 9, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .shadow(color: color.opacity(0.8), radius: 4)
+        }
+        .padding(inset)
+    }
+}
+
+/// Points per round as glowing 3D bars, you in front and the AI behind,
+/// gently swaying (SceneKit, like the circuit map).
+private struct SeasonDuelBars: UIViewRepresentable {
+    let you: [Double]
+    let ai: [Double]
+
+    func makeUIView(context: Context) -> SCNView {
+        let view = SCNView()
+        view.backgroundColor = .clear
+        view.antialiasingMode = .multisampling4X
+        view.isUserInteractionEnabled = false
+        view.scene = Self.scene(you: you, ai: ai)
+        context.coordinator.key = you + ai
+        return view
+    }
+
+    func updateUIView(_ view: SCNView, context: Context) {
+        guard context.coordinator.key != you + ai else { return }
+        context.coordinator.key = you + ai
+        view.scene = Self.scene(you: you, ai: ai)
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+    final class Coordinator { var key: [Double] = [] }
+
+    private static func scene(you: [Double], ai: [Double]) -> SCNScene {
+        let scene = SCNScene()
+        scene.background.contents = UIColor.clear
+        let chart = SCNNode()
+        scene.rootNode.addChildNode(chart)
+        let n = max(you.count, ai.count, 1)
+        let pitch: Float = min(0.42, 7.2 / Float(n))
+        let x0 = -Float(n - 1) * pitch / 2
+        let top = max(you.max() ?? 0, ai.max() ?? 0, 1)
+        let cyan = UIColor(red: 0.15, green: 0.82, blue: 1, alpha: 1)
+        let violet = UIColor(red: 0.52, green: 0.42, blue: 1, alpha: 1)
+        for (row, values, color) in [(0, you, cyan), (1, ai, violet)] {
+            for (i, v) in values.enumerated() {
+                let h = CGFloat(max(v, 0.3) / top * 1.6)
+                let box = SCNBox(width: CGFloat(pitch * 0.62), height: h, length: CGFloat(pitch * 0.62), chamferRadius: 0.04)
+                let material = SCNMaterial()
+                material.lightingModel = .lambert
+                material.diffuse.contents = color.withAlphaComponent(row == 0 ? 1 : 0.85)
+                material.emission.contents = color.withAlphaComponent(0.35)
+                box.materials = [material]
+                let node = SCNNode(geometry: box)
+                node.position = SCNVector3(x0 + Float(i) * pitch, Float(h) / 2, row == 0 ? 0.22 : -0.22)
+                chart.addChildNode(node)
+            }
+        }
+        let floor = SCNNode(geometry: SCNBox(width: CGFloat(Float(n) * pitch + 0.3), height: 0.01, length: 0.9, chamferRadius: 0))
+        floor.geometry?.firstMaterial?.diffuse.contents = UIColor(white: 1, alpha: 0.06)
+        floor.geometry?.firstMaterial?.lightingModel = .constant
+        chart.addChildNode(floor)
+
+        chart.eulerAngles.y = -0.45
+        chart.runAction(.repeatForever(.sequence([
+            .rotateBy(x: 0, y: 0.35, z: 0, duration: 4),
+            .rotateBy(x: 0, y: -0.35, z: 0, duration: 4),
+        ])))
+
+        let ambient = SCNNode()
+        ambient.light = SCNLight()
+        ambient.light?.type = .ambient
+        ambient.light?.intensity = 500
+        scene.rootNode.addChildNode(ambient)
+        let sun = SCNNode()
+        sun.light = SCNLight()
+        sun.light?.type = .directional
+        sun.light?.intensity = 900
+        sun.eulerAngles = SCNVector3(-Float.pi / 3, 0.6, 0)
+        scene.rootNode.addChildNode(sun)
+
+        let camera = SCNNode()
+        camera.camera = SCNCamera()
+        camera.camera?.fieldOfView = 30
+        camera.position = SCNVector3(0, 3.6, 6.2)
+        camera.look(at: SCNVector3(0, 0.35, 0))
+        scene.rootNode.addChildNode(camera)
+        return scene
+    }
+}
+
+// MARK: - Driver of the day: bold yellow card
+
+private struct DotdBoldCard: View {
     let model: DotdModel
     let now: Date
     let onVote: () -> Void
 
+    private static let yellow = [Color(red: 1, green: 0.84, blue: 0.35), Color(red: 1, green: 0.55, blue: 0.2)]
+
     var body: some View {
         Button(action: onVote) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    TileHeading(text: "DRIVER OF THE DAY")
-                    Spacer(minLength: 4)
-                    if let left = timeLeft { ZoneChip(text: left) }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Self.yellow[0])
+                        .frame(width: 30, height: 30)
+                        .background(Circle().fill(Theme.onAccent)
+                            .overlay(Circle().strokeBorder(LinearGradient(colors: Self.yellow, startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1.5)))
+                    Text(kicker)
+                        .font(.f1(10, weight: .bold))
+                        .tracking(1.5)
+                        .foregroundStyle(Theme.onAccent.opacity(0.6))
+                        .lineLimit(1)
                 }
-                HStack(spacing: 16) {
-                    if model.myVote != nil, let lead = model.tally?.votes.first {
-                        let driver = model.driver(lead.driverId)
-                        LEDText(text: driver?.code ?? String(lead.driverId.prefix(3)).uppercased(), pitch: 5.6,
-                                color: Theme.teamColor(driver?.teamId))
-                        detail("\(lead.pct)% of \(model.tally?.total ?? 0) votes", action: "CHANGE →")
-                    } else {
-                        LEDText(text: "???", pitch: 5.6, color: Theme.violet)
-                        detail("Who impressed you most?", action: "VOTE →")
+                Text("DRIVER OF THE DAY").font(.f1(22)).foregroundStyle(Theme.onAccent)
+                if model.myVote != nil, let votes = model.tally?.votes, !votes.isEmpty {
+                    VStack(spacing: 5) {
+                        ForEach(votes.prefix(3)) { v in
+                            bar(model.driver(v.driverId)?.code ?? String(v.driverId.prefix(3)).uppercased(), Double(v.pct) / 100)
+                        }
                     }
-                    Spacer(minLength: 0)
+                    .frame(width: 190)
+                    .padding(.top, 2)
+                } else {
+                    Text("Who impressed you most?\nTap to vote.")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Theme.onAccent.opacity(0.8))
                 }
             }
-            .padding(14)
+            .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .zoneGlass(RoundedRectangle(cornerRadius: 20), light: Theme.violet, offset: CGSize(width: -20, height: 20))
+            .frame(minHeight: 168, alignment: .topLeading)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(LinearGradient(colors: Self.yellow, startPoint: .leading, endPoint: .trailing))
+                    .overlay(alignment: .topTrailing) {
+                        if let suit {
+                            Image(suit)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(height: 250)
+                                .shadow(color: .black.opacity(0.3), radius: 8, x: -3, y: 6)
+                                .offset(x: -6, y: 14)
+                                .accessibilityHidden(true)
+                        }
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
+            )
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Driver of the day vote")
     }
 
-    private func detail(_ text: String, action: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(text)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.white)
-            Text(action)
-                .font(.f1(12).italic())
-                .tracking(1.5)
-                .foregroundStyle(Theme.accent)
+    /// "FAN VOTE · R17 · 3D LEFT" (short: the suit stands to the right)
+    private var kicker: String {
+        guard let race = model.race else { return "FAN VOTE" }
+        var parts = ["FAN VOTE", "R\(race.round)"]
+        if let closes = DotdService.window(for: race)?.closes {
+            let left = Int(closes.timeIntervalSince(now))
+            if left > 0 { parts.append(left >= 86400 ? "\(left / 86400)D LEFT" : "\(max(1, left / 3600))H LEFT") }
         }
+        return parts.joined(separator: " · ")
     }
 
-    /// "4D LEFT", "9H LEFT" until the vote closes.
-    private var timeLeft: String? {
-        guard let race = model.race, let closes = DotdService.window(for: race)?.closes else { return nil }
-        let left = Int(closes.timeIntervalSince(now))
-        guard left > 0 else { return nil }
-        return left >= 86400 ? "\(left / 86400)D LEFT" : "\(max(1, left / 3600))H LEFT"
+    /// The suit of the leader's team once you've voted; before that the
+    /// winner's (the ballot is in finishing order).
+    private var suit: String? {
+        let id = model.myVote != nil ? model.tally?.votes.first?.driverId : model.drivers.first?.id
+        guard let team = model.driver(id)?.teamId, UIImage(named: "Suits/\(team)") != nil else { return nil }
+        return "Suits/\(team)"
+    }
+
+    private func bar(_ code: String, _ pct: Double) -> some View {
+        HStack(spacing: 8) {
+            Text(code).font(.f1(12)).foregroundStyle(Theme.onAccent).frame(width: 34, alignment: .leading)
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Theme.onAccent.opacity(0.12))
+                    Capsule().fill(Theme.onAccent).frame(width: max(4, geo.size.width * pct))
+                }
+            }
+            .frame(height: 7)
+            Text("\(Int((pct * 100).rounded()))%").font(.f1Digits(11)).foregroundStyle(Theme.onAccent).frame(width: 34, alignment: .trailing)
+        }
     }
 }
 
-// MARK: - Lights Out
+// MARK: - Lights Out: photo strip
 
-private struct LightsOutTile: View {
+private struct LightsStrip: View {
     let onPlay: () -> Void
     @AppStorage("lightsOutBest") private var best: Double = 0
+    @AppStorage("lightsOutHistory") private var history = ""
     @State private var board: LeaderboardService.ReactionBoard?
 
     var body: some View {
         Button(action: onPlay) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    TileHeading(text: "LIGHTS OUT")
-                    Spacer(minLength: 4)
-                    HStack(spacing: 5) {
-                        ForEach(0..<5, id: \.self) { _ in
-                            Circle().fill(Theme.live).frame(width: 8, height: 8).shadow(color: Theme.live, radius: 3)
-                        }
-                    }
-                }
-                HStack(spacing: 16) {
-                    LEDText(text: best > 0 ? String(format: "%.3f", best) : "-.---", pitch: 5)
-                    VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .bottom) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("REACTION TEST").font(.f1(10, weight: .bold)).tracking(2).foregroundStyle(Theme.live)
+                    Text("LIGHTS OUT").font(.f1(22).italic()).foregroundStyle(Theme.chromeText)
+                    HStack(spacing: 10) {
+                        LEDText(text: best > 0 ? String(format: "%.3f", best) : "-.---", pitch: 2.8)
                         Text(subtitle)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.white)
-                        Text("PLAY ▸")
-                            .font(.f1(12).italic())
-                            .tracking(1.5)
-                            .foregroundStyle(Theme.live)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.85))
+                            .lineLimit(1)
                     }
-                    Spacer(minLength: 0)
                 }
+                Spacer(minLength: 6)
+                starts
+                NeonChip(title: "PLAY ▸", tint: Theme.live, selected: true).frame(width: 84)
             }
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .zoneGlass(RoundedRectangle(cornerRadius: 20), light: Theme.live, offset: CGSize(width: 20, height: 20))
+            .padding(16)
+            .frame(height: 118)
+            .background(
+                Color.clear
+                    .overlay(alignment: .trailing) { Image("LightsOutHero").resizable().scaledToFill() }
+                    .overlay(LinearGradient(stops: [.init(color: Theme.background.opacity(0.95), location: 0),
+                                                    .init(color: Theme.background.opacity(0.55), location: 0.5),
+                                                    .init(color: .clear, location: 0.85)],
+                                            startPoint: .leading, endPoint: .trailing))
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Theme.glassStroke, lineWidth: 1))
+            )
         }
         .buttonStyle(.plain)
         .accessibilityLabel(best > 0 ? String(format: "Lights Out, your best %.3f seconds", best) : "Play Lights Out")
@@ -398,8 +622,27 @@ private struct LightsOutTile: View {
     }
 
     private var subtitle: String {
-        if let me = board?.me { return "Best · P\(me.rank) this week" }
-        return best > 0 ? "Your best start" : "Can you beat 0.200?"
+        if let me = board?.me { return "P\(me.rank) this week" }
+        return best > 0 ? "Your best" : "Beat 0.200"
+    }
+
+    /// The last ten starts: shorter is faster, the best one lit.
+    @ViewBuilder
+    private var starts: some View {
+        let times = LightsOutView.times(history)
+        if times.count > 1, let fastest = times.min() {
+            HStack(alignment: .bottom, spacing: 3) {
+                ForEach(Array(times.enumerated()), id: \.offset) { _, t in
+                    let lit = t == fastest
+                    Capsule()
+                        .fill(lit ? Theme.live : Color.white.opacity(0.35))
+                        .frame(width: 4, height: CGFloat(min(max((t - 0.1) * 120, 6), 46)))
+                        .shadow(color: lit ? Theme.live : .clear, radius: 3)
+                }
+            }
+            .padding(.trailing, 6)
+            .accessibilityHidden(true)
+        }
     }
 }
 
@@ -457,32 +700,6 @@ struct RadioWave: View {
 }
 
 // MARK: - Shared pieces
-
-/// Trio slashes and a small-caps label, heading a tile.
-private struct TileHeading: View {
-    let text: String
-    var body: some View {
-        HStack(spacing: 6) {
-            TrioSlashes(height: 11)
-            Text(text).font(.f1(10, weight: .heavy)).tracking(1.5).foregroundStyle(Theme.dimText)
-                .lineLimit(1).minimumScaleFactor(0.8)
-        }
-    }
-}
-
-/// The grey session chip of the race-weekend list ("FP1").
-private struct ZoneSessionChip: View {
-    let text: String
-    var body: some View {
-        Text(text)
-            .font(.f1(12).italic())
-            .foregroundStyle(Theme.dimText)
-            .lineLimit(1)
-            .minimumScaleFactor(0.8)
-            .frame(width: 50, height: 26)
-            .background(RoundedRectangle(cornerRadius: 7).fill(Color.white.opacity(0.06)))
-    }
-}
 
 /// The violet outlined countdown chip of the race-weekend list.
 private struct ZoneChip: View {

@@ -22,6 +22,7 @@ struct LightsOutView: View {
     @State private var sequence: Task<Void, Never>?
     @State private var fingerDown = false
     @AppStorage("lightsOutBest") private var best: Double = 0
+    @AppStorage("lightsOutHistory") private var history = ""
     @AppStorage("chatNickname") private var nickname = ""
     @State private var board: LeaderboardService.ReactionBoard?
     @State private var userId: String?
@@ -225,6 +226,7 @@ struct LightsOutView: View {
             // start (the server ignores such times too).
             guard seconds >= Self.minReaction else { return jumpStart() }
             if best == 0 || seconds < best { best = seconds }
+            history = Self.appending(seconds, to: history)
             submit(seconds)
             UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
             StartSounds.shared.radioClick()
@@ -233,6 +235,15 @@ struct LightsOutView: View {
     }
 
     static let minReaction = 0.1
+
+    /// The last ten reaction times, oldest first, stored as "0.231,0.208,…".
+    static func times(_ stored: String) -> [Double] {
+        stored.split(separator: ",").compactMap { Double($0) }
+    }
+
+    static func appending(_ seconds: Double, to stored: String) -> String {
+        (times(stored) + [seconds]).suffix(10).map { String(format: "%.3f", $0) }.joined(separator: ",")
+    }
 
     private func jumpStart() {
         sequence?.cancel()
