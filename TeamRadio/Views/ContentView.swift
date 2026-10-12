@@ -115,7 +115,7 @@ struct ContentView: View {
                     }
                     #endif
                     if GameFeature.isEnabled, !model.isBrowsing, !Self.gameZoneDraft {
-                        GameZone(game: game, dotd: dotd,
+                        GameZone(game: game, dotd: dotd, seasonRounds: model.season.count,
                                  onPicks: { showPicks = true },
                                  onResult: { showResult = true },
                                  onVote: { showDotd = true },

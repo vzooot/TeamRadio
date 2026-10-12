@@ -11,6 +11,8 @@ import UIKit
 struct GameZone: View {
     @Bindable var game: GameViewModel
     let dotd: DotdModel
+    /// Rounds in the season, for the duel chart's empty columns.
+    var seasonRounds = 0
     let onPicks: () -> Void
     let onResult: () -> Void
     let onVote: () -> Void
@@ -31,7 +33,7 @@ struct GameZone: View {
                 }
                 PicksHero(game: game, state: state, now: now, onPicks: onPicks, onResult: onResult)
                 if game.race != nil {
-                    StrategistCard(game: game, state: state)
+                    StrategistCard(game: game, state: state, seasonRounds: seasonRounds)
                 }
                 if dotd.race != nil {
                     DotdBoldCard(model: dotd, now: now, onVote: onVote)
@@ -243,8 +245,11 @@ private struct PicksHero: View {
 private struct StrategistCard: View {
     let game: GameViewModel
     let state: GameViewModel.CardState
+    let seasonRounds: Int
     @State private var history: [LeaderboardService.DuelRound]?
     @State private var revealed: LeaderboardService.PlayerPicks?
+    /// The duel fills (rings sweep, bars grow) each time it scrolls into view.
+    @State private var shown = false
 
     private var scored: (race: Race, score: ScoreBreakdown)? {
         if case let .scored(race, score, _) = state { return (race, score) }
@@ -292,7 +297,11 @@ private struct StrategistCard: View {
                 revealed = await LeaderboardService.playerPicks(round: race.id, user: "ai-strategist")
             }
             // Keep asking until the history arrives (offline, server busy).
-            guard let user = await ChatService.currentUserId() else { return }
+            var player = await ChatService.currentUserId()
+            #if DEBUG
+            if player == nil, UserDefaults.standard.bool(forKey: "FakePicks") { player = "debug-player" }
+            #endif
+            guard let user = player else { return }
             while !Task.isCancelled {
                 if let rounds = await LeaderboardService.history(user: user) {
                     history = rounds
@@ -310,23 +319,35 @@ private struct StrategistCard: View {
     }
 
     private func duel(_ rounds: [LeaderboardService.DuelRound]) -> some View {
-        let you = rounds.map { Double($0.you ?? 0) }
-        let ai = rounds.map { Double($0.ai ?? 0) }
+        // One column per round of the season; unscored rounds stay empty.
+        let count = max(seasonRounds, rounds.map(\.round).max() ?? 0)
+        let byRound = Dictionary(rounds.map { ($0.round, $0) }, uniquingKeysWith: { a, _ in a })
+        let youCols = (1...max(count, 1)).map { byRound[$0]?.you.map(Double.init) }
+        let aiCols = (1...max(count, 1)).map { byRound[$0]?.ai.map(Double.init) }
+        let you = youCols.compactMap { $0 }
+        let ai = aiCols.compactMap { $0 }
         return HStack(spacing: 14) {
-            SeasonDuelRings(you: you.reduce(0, +), ai: ai.reduce(0, +))
+            SeasonDuelRings(you: you.reduce(0, +), ai: ai.reduce(0, +), progress: shown ? 1 : 0)
                 .frame(width: 92, height: 92)
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 10) {
                     legend("YOU", Theme.accent)
                     legend("AI", Theme.violet)
                     Spacer()
-                    Text("SEASON · \(rounds.count) \(rounds.count == 1 ? "ROUND" : "ROUNDS")")
+                    Text("SEASON · \(rounds.count) OF \(count)")
                         .font(.f1(9, weight: .bold))
                         .tracking(1)
                         .foregroundStyle(Theme.faintText)
                 }
-                SeasonDuelBars(you: you, ai: ai)
+                SeasonDuelBars(you: youCols, ai: aiCols, grown: shown)
                     .frame(height: 96)
+            }
+        }
+        .onScrolledIntoView { visible in
+            if visible {
+                withAnimation(.easeOut(duration: 1.3)) { shown = true }
+            } else {
+                shown = false
             }
         }
         .accessibilityElement(children: .ignore)
@@ -373,15 +394,22 @@ private struct StrategistCard: View {
 private struct SeasonDuelRings: View {
     let you: Double
     let ai: Double
+    /// 0 empty, 1 full; animating it sweeps the rings and counts the totals up.
+    var progress: Double = 1
 
     var body: some View {
         let top = max(you, ai, 1) * 1.08
         ZStack {
-            ring(you / top, Theme.accent, inset: 0)
-            ring(ai / top, Theme.violet, inset: 13)
+            ring(you / top * progress, Theme.accent, inset: 0)
+            ring(ai / top * progress, Theme.violet, inset: 13)
             VStack(spacing: 0) {
-                Text("\(Int(you))").font(.f1Digits(18)).foregroundStyle(.white)
-                Text("VS \(Int(ai))").font(.f1(9, weight: .heavy)).tracking(1).foregroundStyle(Theme.violet)
+                CountingText(value: you * progress, prefix: "")
+                    .font(.f1Digits(18))
+                    .foregroundStyle(.white)
+                CountingText(value: ai * progress, prefix: "VS ")
+                    .font(.f1(9, weight: .heavy))
+                    .tracking(1)
+                    .foregroundStyle(Theme.violet)
             }
         }
     }
@@ -398,11 +426,45 @@ private struct SeasonDuelRings: View {
     }
 }
 
+/// A number that counts while it animates (whole numbers, optional prefix).
+private struct CountingText: View, Animatable {
+    var value: Double
+    let prefix: String
+
+    var animatableData: Double {
+        get { value }
+        set { value = newValue }
+    }
+
+    var body: some View {
+        Text("\(prefix)\(Int(value.rounded()))").monospacedDigit()
+    }
+}
+
+private extension View {
+    /// Reports when the view scrolls into and out of view (iOS 18+; on
+    /// iOS 17 it simply counts as visible when it appears).
+    @ViewBuilder
+    func onScrolledIntoView(_ action: @escaping (Bool) -> Void) -> some View {
+        if #available(iOS 18, *) {
+            onScrollVisibilityChange(threshold: 0.6, action)
+        } else {
+            onAppear { action(true) }
+        }
+    }
+}
+
 /// Points per round as glowing 3D bars, you in front and the AI behind,
-/// gently swaying (SceneKit, like the circuit map).
+/// swinging side to side so the depth shows (SceneKit, like the circuit
+/// map). The bars grow up from the floor, one after another, when `grown`
+/// turns true and drop back flat when it turns false.
 private struct SeasonDuelBars: UIViewRepresentable {
-    let you: [Double]
-    let ai: [Double]
+    /// One entry per round of the season; nil where the round isn't scored.
+    let you: [Double?]
+    let ai: [Double?]
+    var grown = true
+
+    private var key: [Double] { (you + ai).map { $0 ?? -1 } }
 
     func makeUIView(context: Context) -> SCNView {
         let view = SCNView()
@@ -410,20 +472,51 @@ private struct SeasonDuelBars: UIViewRepresentable {
         view.antialiasingMode = .multisampling4X
         view.isUserInteractionEnabled = false
         view.scene = Self.scene(you: you, ai: ai)
-        context.coordinator.key = you + ai
+        context.coordinator.key = key
+        Self.setGrown(grown, in: view, animated: false)
+        context.coordinator.grown = grown
         return view
     }
 
     func updateUIView(_ view: SCNView, context: Context) {
-        guard context.coordinator.key != you + ai else { return }
-        context.coordinator.key = you + ai
-        view.scene = Self.scene(you: you, ai: ai)
+        if context.coordinator.key != key {
+            context.coordinator.key = key
+            view.scene = Self.scene(you: you, ai: ai)
+            Self.setGrown(grown, in: view, animated: grown)
+            context.coordinator.grown = grown
+        } else if context.coordinator.grown != grown {
+            context.coordinator.grown = grown
+            Self.setGrown(grown, in: view, animated: grown)
+        }
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
-    final class Coordinator { var key: [Double] = [] }
+    final class Coordinator {
+        var key: [Double] = []
+        var grown = true
+    }
 
-    private static func scene(you: [Double], ai: [Double]) -> SCNScene {
+    /// Grows each bar from the floor with a short stagger along the
+    /// season, or flattens them all at once.
+    private static func setGrown(_ grown: Bool, in view: SCNView, animated: Bool) {
+        view.scene?.rootNode.enumerateChildNodes { node, _ in
+            guard let name = node.name, name.hasPrefix("bar-"), let column = Int(name.split(separator: "-").last ?? "") else { return }
+            node.removeAction(forKey: "grow")
+            guard grown, animated else {
+                node.scale = SCNVector3(1, grown ? 1 : 0.01, 1)
+                return
+            }
+            node.scale = SCNVector3(1, 0.01, 1)
+            let rise = SCNAction.customAction(duration: 0.7) { node, elapsed in
+                let t = Float(elapsed / 0.7)
+                let eased = 1 - pow(1 - t, 3)   // ease out
+                node.scale = SCNVector3(1, max(0.01, eased), 1)
+            }
+            node.runAction(.sequence([.wait(duration: Double(column) * 0.045), rise]), forKey: "grow")
+        }
+    }
+
+    private static func scene(you: [Double?], ai: [Double?]) -> SCNScene {
         let scene = SCNScene()
         scene.background.contents = UIColor.clear
         let chart = SCNNode()
@@ -431,12 +524,33 @@ private struct SeasonDuelBars: UIViewRepresentable {
         let n = max(you.count, ai.count, 1)
         let pitch: Float = min(0.42, 7.2 / Float(n))
         let x0 = -Float(n - 1) * pitch / 2
-        let top = max(you.max() ?? 0, ai.max() ?? 0, 1)
+        let top = max(you.compactMap { $0 }.max() ?? 0, ai.compactMap { $0 }.max() ?? 0, 1)
+        let full: CGFloat = 1.6
         let cyan = UIColor(red: 0.15, green: 0.82, blue: 1, alpha: 1)
         let violet = UIColor(red: 0.52, green: 0.42, blue: 1, alpha: 1)
+
+        // Every round gets a grey glass column, the season still to fill.
+        let glass = SCNMaterial()
+        glass.lightingModel = .constant
+        glass.diffuse.contents = UIColor(white: 1, alpha: 0.07)
+        glass.writesToDepthBuffer = false
+        glass.isDoubleSided = true
+        for row in 0..<2 {
+            for i in 0..<n {
+                let track = SCNBox(width: CGFloat(pitch * 0.7), height: full, length: CGFloat(pitch * 0.7), chamferRadius: 0.04)
+                track.materials = [glass]
+                let node = SCNNode(geometry: track)
+                node.name = "track"
+                node.position = SCNVector3(x0 + Float(i) * pitch, Float(full) / 2, row == 0 ? 0.22 : -0.22)
+                node.renderingOrder = 10
+                chart.addChildNode(node)
+            }
+        }
+
         for (row, values, color) in [(0, you, cyan), (1, ai, violet)] {
-            for (i, v) in values.enumerated() {
-                let h = CGFloat(max(v, 0.3) / top * 1.6)
+            for (i, value) in values.enumerated() {
+                guard let v = value else { continue }
+                let h = CGFloat(max(v, 0.3) / top) * full
                 let box = SCNBox(width: CGFloat(pitch * 0.62), height: h, length: CGFloat(pitch * 0.62), chamferRadius: 0.04)
                 let material = SCNMaterial()
                 material.lightingModel = .lambert
@@ -444,7 +558,10 @@ private struct SeasonDuelBars: UIViewRepresentable {
                 material.emission.contents = color.withAlphaComponent(0.35)
                 box.materials = [material]
                 let node = SCNNode(geometry: box)
-                node.position = SCNVector3(x0 + Float(i) * pitch, Float(h) / 2, row == 0 ? 0.22 : -0.22)
+                node.name = "bar-\(row)-\(i)"
+                // Pivot at the bottom face so the bar grows up from the floor.
+                node.pivot = SCNMatrix4MakeTranslation(0, -Float(h) / 2, 0)
+                node.position = SCNVector3(x0 + Float(i) * pitch, 0, row == 0 ? 0.22 : -0.22)
                 chart.addChildNode(node)
             }
         }
@@ -453,11 +570,13 @@ private struct SeasonDuelBars: UIViewRepresentable {
         floor.geometry?.firstMaterial?.lightingModel = .constant
         chart.addChildNode(floor)
 
-        chart.eulerAngles.y = -0.45
-        chart.runAction(.repeatForever(.sequence([
-            .rotateBy(x: 0, y: 0.35, z: 0, duration: 4),
-            .rotateBy(x: 0, y: -0.35, z: 0, duration: 4),
-        ])))
+        // A wide, eased swing so the depth is obvious.
+        chart.eulerAngles.y = -0.75
+        let swingRight = SCNAction.rotateBy(x: 0, y: 1.5, z: 0, duration: 3.2)
+        swingRight.timingMode = .easeInEaseOut
+        let swingLeft = SCNAction.rotateBy(x: 0, y: -1.5, z: 0, duration: 3.2)
+        swingLeft.timingMode = .easeInEaseOut
+        chart.runAction(.repeatForever(.sequence([swingRight, swingLeft])))
 
         let ambient = SCNNode()
         ambient.light = SCNLight()
