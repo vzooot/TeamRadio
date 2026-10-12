@@ -19,11 +19,12 @@ private extension View {
     }
 }
 
-/// The race hero card with two ways to travel through the season:
-/// swipe left or right for the next or previous grand prix, or press and
-/// hold to open a strip of the season's race boxes over the card. The strip
-/// stays open: scroll it freely (the box in the middle is zoomed), then tap
-/// the race to go to. Tapping around the boxes closes it.
+/// The race hero card as a line of every grand prix in the season: drag
+/// sideways and the neighbouring cards slide along with your finger, then
+/// the line snaps to a card and that race shows. Press and hold to open a
+/// strip of the season's race boxes over the card: scroll it freely (the
+/// box in the middle is zoomed), then tap the race to go to. Tapping around
+/// the boxes closes it.
 struct RaceHeroCarousel: View {
     let season: [Race]
     let race: Race
@@ -36,21 +37,41 @@ struct RaceHeroCarousel: View {
     @State private var height: CGFloat = 0
     /// The race box in the middle of the strip.
     @State private var centeredId: String?
-    @GestureState private var pull: CGFloat = 0
+    /// The card the line has settled on.
+    @State private var pagedId: String?
 
     private var index: Int? { season.firstIndex { $0.id == race.id } }
     private var nextRaceId: String? { season.first { ($0.startDate ?? .distantPast) > .now }?.id }
 
     var body: some View {
-        ZStack {
-            RaceHeroView(race: race)
-                .id(race.id)
-                .transition(.asymmetric(
-                    insertion: .move(edge: edge).combined(with: .opacity),
-                    removal: .move(edge: edge == .trailing ? .leading : .trailing).combined(with: .opacity)))
+        ScrollView(.horizontal, showsIndicators: false) {
+            LazyHStack(alignment: .top, spacing: 14) {
+                ForEach(season) { r in
+                    RaceHeroView(race: r)
+                        .containerRelativeFrame(.horizontal)
+                        .id(r.id)
+                }
+            }
+            .scrollTargetLayout()
         }
-        .animation(.snappy(duration: 0.4), value: race.id)
-        .offset(x: dockActive ? 0 : pull * 0.35)
+        .scrollTargetBehavior(.viewAligned)
+        .scrollPosition(id: $pagedId)
+        // let the neighbours show at the page edges, like one long line
+        .scrollClipDisabled()
+        .scrollDisabled(dockActive)
+        .onAppear { if pagedId == nil { pagedId = race.id } }
+        // settled on a new card: show that race
+        .onChange(of: pagedId) { _, id in
+            guard let id, id != race.id, let picked = season.first(where: { $0.id == id }) else { return }
+            edge = (season.firstIndex { $0.id == id } ?? 0) > (index ?? 0) ? .trailing : .leading
+            UISelectionFeedbackGenerator().selectionChanged()
+            onSelect(picked)
+        }
+        // switched elsewhere (strip, season list, back button): follow it
+        .onChange(of: race.id) { _, id in
+            guard pagedId != id else { return }
+            withAnimation(.snappy(duration: 0.4)) { pagedId = id }
+        }
         .overlay {
             if dockActive {
                 strip.transition(.opacity.combined(with: .scale(scale: 0.96)))
@@ -62,8 +83,6 @@ struct RaceHeroCarousel: View {
                 .onAppear { width = geo.size.width; height = geo.size.height }
                 .onChange(of: geo.size) { _, size in width = size.width; height = size.height }
         })
-        .contentShape(Rectangle())
-        .simultaneousGesture(swipe)
         .simultaneousGesture(
             LongPressGesture(minimumDuration: 0.35).onEnded { _ in open() }
         )
@@ -82,27 +101,9 @@ struct RaceHeroCarousel: View {
         #endif
     }
 
-    // MARK: Swipe
-
-    private var swipe: some Gesture {
-        DragGesture(minimumDistance: 24)
-            .updating($pull) { value, state, _ in
-                guard !dockActive, abs(value.translation.width) > abs(value.translation.height) else { return }
-                state = value.translation.width
-            }
-            .onEnded { value in
-                guard !dockActive,
-                      abs(value.translation.width) > abs(value.translation.height) * 1.5,
-                      abs(value.translation.width) > 50 else { return }
-                step(value.translation.width < 0 ? 1 : -1)
-            }
-    }
-
     private func step(_ delta: Int) {
         guard let i = index, season.indices.contains(i + delta) else { return }
-        edge = delta > 0 ? .trailing : .leading
-        UISelectionFeedbackGenerator().selectionChanged()
-        onSelect(season[i + delta])
+        withAnimation(.snappy(duration: 0.4)) { pagedId = season[i + delta].id }
     }
 
     // MARK: The strip
