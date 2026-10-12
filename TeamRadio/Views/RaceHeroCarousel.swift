@@ -17,6 +17,19 @@ private extension View {
             self
         }
     }
+
+    /// Calls `action` when scrolling comes to rest (iOS 18+); on iOS 17
+    /// whenever `value` changes.
+    @ViewBuilder
+    func onScrollSettled<V: Equatable>(_ value: V, _ action: @escaping () -> Void) -> some View {
+        if #available(iOS 18, *) {
+            onScrollPhaseChange { _, phase in
+                if phase == .idle { action() }
+            }
+        } else {
+            onChange(of: value) { _, _ in action() }
+        }
+    }
 }
 
 /// The race hero card as a line of every grand prix in the season: drag
@@ -39,6 +52,10 @@ struct RaceHeroCarousel: View {
     @State private var centeredId: String?
     /// The card the line has settled on.
     @State private var pagedId: String?
+    /// A card the line is gliding to by itself (not the user's scroll).
+    @State private var gliding: String?
+    /// The box in the middle of the open strip (highlighted; tap to go).
+    @State private var middle: Int?
     /// How often the strip has been opened (the hold hint retires at 3).
     @AppStorage("raceStripOpens") private var stripOpens = 0
 
@@ -63,17 +80,28 @@ struct RaceHeroCarousel: View {
         .scrollClipDisabled()
         .scrollDisabled(dockActive)
         .onAppear { if pagedId == nil { pagedId = race.id } }
-        // settled on a new card: show that race
-        .onChange(of: pagedId) { _, id in
-            guard let id, id != race.id, let picked = season.first(where: { $0.id == id }) else { return }
+        // Come to rest on a card the user scrolled to: show that race. Cards
+        // passed on the way (or during a programmatic glide) don't count.
+        .onScrollSettled(pagedId) {
+            if let target = gliding {
+                if pagedId == target { gliding = nil }
+                return
+            }
+            guard let id = pagedId, id != race.id, let picked = season.first(where: { $0.id == id }) else { return }
             edge = (season.firstIndex { $0.id == id } ?? 0) > (index ?? 0) ? .trailing : .leading
             UISelectionFeedbackGenerator().selectionChanged()
             onSelect(picked)
         }
-        // switched elsewhere (strip, season list, back button): follow it
+        // switched elsewhere (strip, season list, back button): glide there
         .onChange(of: race.id) { _, id in
             guard pagedId != id else { return }
+            gliding = id
             withAnimation(.snappy(duration: 0.4)) { pagedId = id }
+            // never leave the line deaf if the glide's end goes unreported
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1))
+                if gliding == id { gliding = nil }
+            }
         }
         .overlay(alignment: .bottomTrailing) {
             // until people have found it, say the card can be held
@@ -105,6 +133,8 @@ struct RaceHeroCarousel: View {
             guard n > 0, season.indices.contains(n - 1) else { return }
             try? await Task.sleep(for: .seconds(2))
             centeredId = season[n - 1].id
+            middle = n - 1
+            tickIndex = n - 1
             dockActive = true
         }
         #endif
@@ -121,6 +151,7 @@ struct RaceHeroCarousel: View {
         guard !dockActive else { return }
         centeredId = race.id
         tickIndex = index
+        middle = index
         dockActive = true
         stripOpens += 1
         DialHaptics.shared.prepare()
@@ -135,6 +166,7 @@ struct RaceHeroCarousel: View {
     private func passed(_ i: Int) {
         guard i != tickIndex, season.indices.contains(i) else { return }
         tickIndex = i
+        middle = i
         let gap = Date.now.timeIntervalSince(lastTick)
         lastTick = .now
         let strength: Float = gap < 0.05 ? 0.45 : gap < 0.12 ? 0.65 : 0.9
@@ -176,9 +208,17 @@ struct RaceHeroCarousel: View {
             ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: spacing) {
-                    ForEach(season) { r in
-                        Button { pick(r) } label: {
-                            RoundCard(race: r, isNext: r.id == nextRaceId, isSelected: r.id == race.id)
+                    ForEach(Array(season.enumerated()), id: \.element.id) { i, r in
+                        // the middle box is lit and goes there; a side box
+                        // only rolls into the middle
+                        Button {
+                            if i == middle {
+                                pick(r)
+                            } else {
+                                withAnimation(.snappy(duration: 0.3)) { proxy.scrollTo(r.id, anchor: .center) }
+                            }
+                        } label: {
+                            RoundCard(race: r, isNext: r.id == nextRaceId, isSelected: i == middle)
                         }
                         .buttonStyle(.plain)
                         .id(r.id)

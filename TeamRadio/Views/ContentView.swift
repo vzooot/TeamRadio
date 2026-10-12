@@ -257,7 +257,11 @@ struct ContentView: View {
                 .foregroundStyle(Theme.dimText)
             Spacer()
             Button {
-                Task { await model.select(nil) }
+                let from = model.season.firstIndex { $0.id == model.displayRace?.id } ?? 0
+                let to = model.season.firstIndex { $0.id == model.nextRace?.id } ?? 0
+                raceEdge = to >= from ? .trailing : .leading
+                withAnimation(.snappy(duration: 0.35)) { model.show(nil) }
+                Task { await model.refreshExtras() }
             } label: {
                 HStack(spacing: 5) {
                     Image(systemName: "arrow.uturn.backward")
