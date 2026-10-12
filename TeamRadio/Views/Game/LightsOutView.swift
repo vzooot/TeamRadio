@@ -50,6 +50,9 @@ struct LightsOutView: View {
         .onDisappear { sequence?.cancel() }
         .task {
             StartSounds.shared.prepare()
+            #if DEBUG
+            if UserDefaults.standard.bool(forKey: "LightsOutAutoStart") { start() }
+            #endif
             userId = await ChatService.currentUserId()
             board = await LeaderboardService.reaction(user: userId, name: nil, ms: nil)
         }
@@ -88,61 +91,25 @@ struct LightsOutView: View {
         }
     }
 
-    /// The gantry as it hangs over the grid: five black housings on a
-    /// crossbar, two large lamps each under a hood. Both lamps of a column
-    /// light together.
+    /// The main screen's LED board, its five start lights driven by the
+    /// sequence, on the same carbon panel as the countdown card, with the
+    /// running timer underneath.
     private var gantry: some View {
-        ZStack(alignment: .top) {
-            // the crossbar the housings hang from
-            RoundedRectangle(cornerRadius: 4)
-                .fill(LinearGradient(colors: [Color(white: 0.55), Color(white: 0.3)], startPoint: .top, endPoint: .bottom))
-                .frame(height: 10)
-                .padding(.top, 34)
-            HStack(spacing: 10) {
-                ForEach(0..<5, id: \.self) { column in
-                    let on = column < litCount
-                    VStack(spacing: 8) {
-                        ForEach(0..<2, id: \.self) { _ in lamp(on: on) }
-                    }
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(LinearGradient(colors: [Color(white: 0.13), Color(white: 0.04)], startPoint: .top, endPoint: .bottom))
-                    )
-                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.white.opacity(0.1)))
-                }
-            }
+        VStack(spacing: 16) {
+            DotMatrixBoard(litLights: litCount, standby: phase == .ready)
+                .alignedToContent()
+                .allowsHitTesting(false)
+                .accessibilityElement()
+                .accessibilityLabel("\(litCount) of 5 start lights on")
+            ReactionTimer(phase: phase)
         }
-        .animation(.easeOut(duration: 0.05), value: litCount)
-        .accessibilityElement()
-        .accessibilityLabel("\(litCount) of 5 start lights on")
-    }
-
-    /// A round lamp under a hood: dark lens with a fine LED grid when off,
-    /// glowing red when on.
-    private func lamp(on: Bool) -> some View {
-        ZStack {
-            Circle().fill(on ? Theme.live : Color(white: 0.09))
-            if on {
-                Circle().fill(RadialGradient(colors: [Color.white.opacity(0.55), .clear],
-                                             center: .init(x: 0.4, y: 0.35), startRadius: 0, endRadius: 22))
-            }
-            // LED dot texture
-            Circle()
-                .fill(ImagePaint(image: Image(systemName: "circle.grid.3x3.fill"), scale: 0.18))
-                .opacity(on ? 0.12 : 0.18)
-            Circle().strokeBorder(Color.black.opacity(0.8), lineWidth: 3)
-        }
-        .frame(width: 46, height: 46)
-        .overlay(alignment: .top) {
-            // the hood above each lamp
-            UnevenRoundedRectangle(topLeadingRadius: 6, topTrailingRadius: 6)
-                .fill(Color(white: 0.06))
-                .frame(width: 52, height: 8)
-                .offset(y: -6)
-        }
-        .shadow(color: on ? Theme.live.opacity(0.95) : .clear, radius: 16)
+        .padding(18)
+        .background(
+            CarbonFiber()
+                .clipShape(RoundedRectangle(cornerRadius: 22))
+                .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(Theme.glassStroke, lineWidth: 1))
+                .trioGlow(cornerRadius: 22)
+        )
     }
 
     @ViewBuilder
@@ -156,15 +123,11 @@ struct LightsOutView: View {
         case .lighting, .holding:
             prompt("WAIT FOR IT…", sub: "Don't jump the start.")
         case .go:
-            prompt("GO!", sub: " ")
+            prompt("GO GO GO!", sub: " ", color: Theme.accent)
         case .jumpStart:
             prompt("JUMP START", sub: "Drive-through penalty. Tap to try again.", color: Theme.live)
         case .result(let seconds):
             VStack(spacing: 8) {
-                Text(String(format: "%.3f", seconds))
-                    .font(.f1Digits(72))
-                    .foregroundStyle(Theme.accent)
-                    .shadow(color: Theme.accent.opacity(0.6), radius: 14)
                 Text(Self.verdict(seconds))
                     .font(.f1(18).italic())
                     .foregroundStyle(.white)
@@ -196,7 +159,7 @@ struct LightsOutView: View {
                 .foregroundStyle(Theme.dimText)
                 .multilineTextAlignment(.center)
         }
-        .frame(minHeight: 150)
+        .frame(minHeight: 90)
     }
 
     @ViewBuilder
@@ -285,7 +248,6 @@ struct LightsOutView: View {
             .padding(14)
             .frame(maxWidth: 320)
             .background(RoundedRectangle(cornerRadius: 14).fill(Theme.card))
-            .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.white.opacity(0.08)))
         } else if nickname.isEmpty {
             Text("Pick a Paddock name to get on the weekly leaderboard.")
                 .font(.system(size: 12))
@@ -345,5 +307,76 @@ struct LightsOutCard: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Play Lights Out, the reaction test")
+    }
+}
+
+/// The reaction clock: idle at 0.000, racing from lights out, frozen on
+/// the tap, red on a jump start. Neon-tile frame like the countdown.
+private struct ReactionTimer: View {
+    let phase: LightsOutView.Phase
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1 / 60, paused: !isRunning)) { context in
+            let (text, tint) = display(at: context.date)
+            Text(text)
+                .font(.f1Digits(64))
+                .foregroundStyle(tint == Theme.live ? AnyShapeStyle(Theme.liveGradient) : AnyShapeStyle(Theme.chromeText))
+                .shadow(color: tint.opacity(0.6), radius: 10)
+                .contentTransition(.numericText())
+                .animation(isRunning ? nil : .snappy(duration: 0.25), value: text)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 18)
+                            .fill(LinearGradient(colors: [Color(white: 0.03), Color(white: 0.09)], startPoint: .top, endPoint: .bottom))
+                        RoundedRectangle(cornerRadius: 18)
+                            .fill(LinearGradient(colors: [Color.white.opacity(0.10), .clear], startPoint: .top, endPoint: .center))
+                        RoundedRectangle(cornerRadius: 18).strokeBorder(tint.opacity(0.9), lineWidth: 3).blur(radius: 5)
+                        RoundedRectangle(cornerRadius: 18)
+                            .strokeBorder(LinearGradient(colors: [Color.white.opacity(0.95), tint, tint.opacity(0.8)],
+                                                         startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 2.2)
+                    }
+                )
+                .shadow(color: tint.opacity(0.45), radius: 12)
+                .overlay(alignment: .bottom) {
+                    Text(caption)
+                        .font(.f1(10, weight: .bold))
+                        .tracking(2)
+                        .foregroundStyle(tint.opacity(0.85))
+                        .offset(y: 18)
+                }
+                .padding(.bottom, 14)
+        }
+    }
+
+    private var isRunning: Bool {
+        if case .go = phase { return true }
+        return false
+    }
+
+    private var caption: String {
+        switch phase {
+        case .ready: "REACTION TIME"
+        case .lighting, .holding: "WAIT FOR LIGHTS OUT"
+        case .go: "TAP!"
+        case .result: "SECONDS"
+        case .jumpStart: "JUMP START"
+        }
+    }
+
+    private func display(at now: Date) -> (String, Color) {
+        switch phase {
+        case .go(let out):
+            return (String(format: "%.3f", max(0, CACurrentMediaTime() - out)), Theme.accent)
+        case .result(let s):
+            return (String(format: "%.3f", s), Theme.accent)
+        case .jumpStart:
+            return ("JUMP", Theme.live)
+        case .lighting, .holding:
+            return ("0.000", Theme.live)
+        case .ready:
+            return ("0.000", Theme.accent)
+        }
     }
 }
