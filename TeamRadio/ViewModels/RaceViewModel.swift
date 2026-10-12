@@ -71,6 +71,13 @@ final class RaceViewModel {
     /// map and weather follow with `refreshExtras()`.
     func show(_ race: Race?) {
         selectedRace = race?.id == nextRace?.id ? nil : race
+        // Never draw the last race's circuit under this one (building a 3D
+        // scene for it only to throw it away): its own cached map, or the
+        // placeholder until it loads.
+        let cached = displayRace.flatMap { mapCache[$0.circuit.circuitId] }
+        trackMap = cached
+        weather = [:]
+        extrasLoading = displayRace != nil
     }
 
     func refreshExtras() async {

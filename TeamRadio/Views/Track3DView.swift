@@ -324,8 +324,13 @@ enum TrackSceneBuilder {
     }
 
     private static func normalize(_ x: Double, _ y: Double, map: TrackMap) -> (x: Float, y: Float) {
-        let b = bounds(map: map)
-        return (Float((x - b.cx) * b.scale), Float((y - b.cy) * b.scale))
+        normalize(x, y, bounds: bounds(map: map))
+    }
+
+    /// With the bounds worked out once: per point, measuring the whole map
+    /// again made building a circuit quadratic (a 300 ms freeze per switch).
+    private static func normalize(_ x: Double, _ y: Double, bounds b: (cx: Double, cy: Double, scale: Double)) -> (x: Float, y: Float) {
+        (Float((x - b.cx) * b.scale), Float((y - b.cy) * b.scale))
     }
 
     /// Elevation is exaggerated so 20–30 m of real grade reads clearly at
@@ -340,7 +345,7 @@ enum TrackSceneBuilder {
             heights = [Float](repeating: 0, count: map.x.count)
         }
         let raw = zip(zip(map.x, map.y), heights).map { pair, h in
-            let p = normalize(pair.0, pair.1, map: map)
+            let p = normalize(pair.0, pair.1, bounds: b)
             return (x: p.x, y: p.y, h: h)
         }
         // Two Chaikin passes: corner-cutting subdivision that keeps the ribbon

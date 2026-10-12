@@ -224,6 +224,21 @@ struct ContentView: View {
             try? await Task.sleep(for: .seconds(4))
             proxy.scrollTo(id, anchor: .top)
         }
+        .task {
+            // -RaceCycle N: switch race N times (ahead, ahead, back to the
+            // next race …) for profiling the switch
+            let n = UserDefaults.standard.integer(forKey: "RaceCycle")
+            guard n > 0 else { return }
+            try? await Task.sleep(for: .seconds(5))
+            for i in 0..<n {
+                let base = model.season.firstIndex { $0.id == model.nextRace?.id } ?? 0
+                let step = i % 3
+                let j = base + step + 1
+                let target = step == 2 || !model.season.indices.contains(j) ? nil : model.season[j]
+                switchRace(to: target)
+                try? await Task.sleep(for: .seconds(2))
+            }
+        }
         .onChange(of: DemoDirector.shared.scroll) { _, step in
             guard let step else { return }
             let id: String = step.target == "countdown" ? (model.displayRace?.id ?? "") : step.target
