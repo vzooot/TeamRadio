@@ -100,6 +100,14 @@ final class GameViewModel {
             }
         }
 
+        #if DEBUG
+        // -DemoGame YES: store screenshots without an iCloud account
+        if UserDefaults.standard.string(forKey: "DemoGame") != nil {
+            await loadDemo(before: race, season: season)
+            return
+        }
+        #endif
+
         guard await ChatService.accountAvailable(), let id = await ChatService.currentUserId() else {
             access = .needsICloud
             return
@@ -144,6 +152,29 @@ final class GameViewModel {
         lastBoard = try? await LeaderboardService.board(scope: .round, round: previous.id,
                                                         year: previous.season, user: userId)
     }
+
+    #if DEBUG
+    /// Sample picks for the last round, scored against its real result:
+    /// winner and pole right, P2/P3 swapped.
+    private func loadDemo(before race: Race, season: [Race]) async {
+        access = .ready
+        guard let previous = season.last(where: { $0.roundNumber == race.roundNumber - 1 }),
+              let result = try? await F1API.raceResults(round: previous.round),
+              let classification = result.results,
+              classification.count > 4 else { return }
+        let quali = (try? await F1API.qualifying(round: previous.round))?.qualifyingResults ?? []
+        var picks = Prediction(round: previous.id, hasSprint: false)
+        picks.p1 = classification[0].driver.driverId
+        picks.p2 = classification[2].driver.driverId
+        picks.p3 = classification[1].driver.driverId
+        picks.pole = quali.first?.driver.driverId ?? classification[0].driver.driverId
+        picks.fastestLap = classification[3].driver.driverId
+        let score = GameRules.score(picks, wildcard: Wildcard.forRound(previous.roundNumber),
+                                    qualifying: quali, race: classification, sprint: [])
+        lastScored = (previous, score, picks)
+        lastBoard = try? await LeaderboardService.board(scope: .round, round: previous.id, year: previous.season, user: nil)
+    }
+    #endif
 
     func driver(_ id: String?) -> GameDriver? {
         drivers.first { $0.id == id }

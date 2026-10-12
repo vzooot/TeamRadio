@@ -19,6 +19,7 @@ TX, TY = track["x"], track["y"]
 
 PANELS = [
     ("countdown", "NEVER MISS", "LIGHTS OUT", "Alerts & Lock Screen countdowns, automatic"),
+    ("game", "BEAT THE", "AI STRATEGIST", "Call the podium. Can you out-predict the AI?"),
     ("track", "THE CIRCUIT,", "ALIVE IN 3D", "Ghost car, sector colors & real elevation"),
     ("chat", "THE PADDOCK,", "LIVE", "Fan chat with GIFs, photos & videos"),
     ("results", "RESULTS,", "SPOILER-SAFE", "Hidden until you say so"),
@@ -127,7 +128,7 @@ for name, l1, l2, sub in PANELS:
     c.convert("RGB").save(f"{PROJ}/fastlane/screenshots/ipad/0{PANELS.index((name, l1, l2, sub)) + 1}-{name}.png", quality=95)
     print("v3", name)
 
-sheet = Image.new("RGB", (6 * 440 + 60, 1000), (8, 10, 16))
+sheet = Image.new("RGB", (len(PANELS) * 440 + 60, 1000), (8, 10, 16))
 for i, (name, *_r) in enumerate(PANELS):
     p = Image.open(f"{PROJ}/fastlane/screenshots/ipad/0{i + 1}-{name}.png").resize((440, 956), Image.LANCZOS)
     sheet.paste(p, (10 + i * 440, 22))
