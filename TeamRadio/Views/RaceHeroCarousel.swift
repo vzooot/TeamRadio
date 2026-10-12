@@ -56,8 +56,6 @@ struct RaceHeroCarousel: View {
     @State private var gliding: String?
     /// The box in the middle of the open strip (highlighted; tap to go).
     @State private var middle: Int?
-    /// How often the strip has been opened (the hold hint retires at 3).
-    @AppStorage("raceStripOpens") private var stripOpens = 0
 
     private var index: Int? { season.firstIndex { $0.id == race.id } }
     private var nextRaceId: String? { season.first { ($0.startDate ?? .distantPast) > .now }?.id }
@@ -104,8 +102,8 @@ struct RaceHeroCarousel: View {
             }
         }
         .overlay(alignment: .bottomTrailing) {
-            // until people have found it, say the card can be held
-            if !dockActive, stripOpens < 3 {
+            // the card can be held for all races
+            if !dockActive {
                 HoldHint().padding(12).transition(.opacity)
             }
         }
@@ -153,7 +151,6 @@ struct RaceHeroCarousel: View {
         tickIndex = index
         middle = index
         dockActive = true
-        stripOpens += 1
         DialHaptics.shared.prepare()
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
@@ -302,7 +299,7 @@ struct ShineSweep: View {
     }
 }
 
-/// "Hold for all races", gently pulsing, until the strip has been found.
+/// "Hold for all races", gently pulsing in the card's corner.
 private struct HoldHint: View {
     var body: some View {
         HStack(spacing: 5) {
