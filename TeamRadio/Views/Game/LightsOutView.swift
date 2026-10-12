@@ -69,6 +69,8 @@ struct LightsOutView: View {
         .onDisappear { sequence?.cancel() }
         .task {
             StartSounds.shared.prepare()
+            // Clear a best saved before anticipated starts were caught.
+            if best > 0, best < Self.minReaction { best = 0 }
             #if DEBUG
             if UserDefaults.standard.bool(forKey: "LightsOutAutoStart") { start() }
             #endif
@@ -216,18 +218,27 @@ struct LightsOutView: View {
         case .ready, .result, .jumpStart:
             break
         case .lighting, .holding:
-            sequence?.cancel()
-            UINotificationFeedbackGenerator().notificationOccurred(.error)
-            StartSounds.shared.buzz()
-            phase = .jumpStart
+            jumpStart()
         case .go(let out):
             let seconds = CACurrentMediaTime() - out
+            // Nobody reacts in under 0.1 s: that's anticipation, a jump
+            // start (the server ignores such times too).
+            guard seconds >= Self.minReaction else { return jumpStart() }
             if best == 0 || seconds < best { best = seconds }
             submit(seconds)
             UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
             StartSounds.shared.radioClick()
             phase = .result(seconds)
         }
+    }
+
+    static let minReaction = 0.1
+
+    private func jumpStart() {
+        sequence?.cancel()
+        UINotificationFeedbackGenerator().notificationOccurred(.error)
+        StartSounds.shared.buzz()
+        phase = .jumpStart
     }
 
     private func start() {

@@ -270,6 +270,12 @@ struct GameZoneDraft: View {
         case "c": ZoneGlass()
         case "d": ZoneLiquidTiles()
         case "e": ZoneFloating()
+        case "r1": ZoneCockpit()
+        case "r2": ZoneHero()
+        case "r3": ZoneTimingSheet()
+        case "x": ZoneMixed(result: .hero, bold: .dotd)
+        case "y": ZoneMixed(result: .sheet, bold: .lights)
+        case "z": ZoneMixed(result: .cockpit, bold: .emily)
         default: BlendDraft(embedded: true, gameZone: true)
         }
     }
@@ -859,6 +865,464 @@ private struct ZoneFloating: View {
             .padding(.horizontal, 18).frame(height: 62)
             .liquid(Capsule(), interactive: true)
         }
+    }
+}
+
+// MARK: - Result-state redesigns in the app's existing card families
+
+private let exactGreen = Color(red: 0.2, green: 0.78, blue: 0.35)
+private let missRed = Color(red: 1, green: 0.4, blue: 0.35)
+private let redbullBlue = Color(red: 0.25, green: 0.35, blue: 0.95)
+private let ferrariRed = Color(red: 0.93, green: 0.1, blue: 0.14)
+
+private enum Outcome { case exact, partial, miss
+    var color: Color { switch self { case .exact: exactGreen; case .partial: Theme.accent; case .miss: missRed } }
+}
+
+private struct SamplePick: Identifiable {
+    let slot: String, code: String, team: Color, outcome: Outcome, points: Int
+    var id: String { slot }
+    var mark: String { outcome == .miss ? "✗ 0" : (outcome == .exact ? "✓ \(points)" : "~ \(points)") }
+}
+
+private let samplePicks = [
+    SamplePick(slot: "SPR", code: "—", team: .clear, outcome: .miss, points: 0),
+    SamplePick(slot: "POLE", code: "ANT", team: mercedes, outcome: .miss, points: 0),
+    SamplePick(slot: "P1", code: "ANT", team: mercedes, outcome: .partial, points: 2),
+    SamplePick(slot: "P2", code: "VER", team: redbullBlue, outcome: .partial, points: 2),
+    SamplePick(slot: "P3", code: "NOR", team: papaya, outcome: .miss, points: 0),
+    SamplePick(slot: "FL", code: "ANT", team: mercedes, outcome: .miss, points: 0),
+]
+private let sampleComment = "You picked ANT for pole and fastest lap. VER took pole and LEC fastest lap, but ANT on the podium still scored. Nice 4-point haul."
+
+private func gameZoneHeader(_ chip: String) -> some View {
+    HStack {
+        SectionTitle("GAME ZONE")
+        Spacer()
+        countdownChip(chip)
+    }
+}
+
+/// The countdown card's neon tile, with any text.
+private func neonBox(_ value: String, _ label: String, _ tint: Color) -> some View {
+    VStack(spacing: 2) {
+        Text(value).font(.f1Digits(30)).foregroundStyle(Theme.chromeText).shadow(color: .white.opacity(0.4), radius: 6)
+        Text(label).font(.f1(10, weight: .bold)).tracking(1.5).foregroundStyle(.white.opacity(0.7))
+    }
+    .frame(maxWidth: .infinity).padding(.vertical, 12)
+    .background(
+        ZStack {
+            RoundedRectangle(cornerRadius: 16).fill(LinearGradient(colors: [Color(white: 0.03), Color(white: 0.09)], startPoint: .top, endPoint: .bottom))
+            RoundedRectangle(cornerRadius: 16).fill(LinearGradient(colors: [Color.white.opacity(0.10), .clear], startPoint: .top, endPoint: .center))
+            RoundedRectangle(cornerRadius: 16).strokeBorder(tint.opacity(0.9), lineWidth: 3).blur(radius: 5)
+            RoundedRectangle(cornerRadius: 16).strokeBorder(LinearGradient(colors: [Color.white.opacity(0.95), tint, tint.opacity(0.8)], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 2)
+        }
+    )
+    .shadow(color: tint.opacity(0.45), radius: 10)
+}
+
+/// The session chip's neon rim (NeonChip), sized to any content.
+private func neonRim(_ tint: Color, lit: Bool) -> some View {
+    ZStack {
+        RoundedRectangle(cornerRadius: 12).fill(LinearGradient(colors: [Color(white: 0.03), Color(white: 0.085)], startPoint: .top, endPoint: .bottom))
+        RoundedRectangle(cornerRadius: 12).fill(LinearGradient(colors: [Color.white.opacity(0.09), .clear], startPoint: .top, endPoint: .center))
+        if lit { RoundedRectangle(cornerRadius: 12).strokeBorder(tint.opacity(0.9), lineWidth: 2.5).blur(radius: 4) }
+        RoundedRectangle(cornerRadius: 12)
+            .strokeBorder(LinearGradient(colors: [lit ? Color.white.opacity(0.95) : tint.opacity(0.55), tint.opacity(lit ? 1 : 0.5), tint.opacity(lit ? 0.8 : 0.35)],
+                                         startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: lit ? 1.6 : 1)
+    }
+    .shadow(color: tint.opacity(lit ? 0.5 : 0), radius: 8)
+}
+
+/// The countdown card's carbon panel.
+private extension View {
+    func carbonPanel(_ radius: CGFloat = 20) -> some View {
+        background(
+            CarbonFiber()
+                .clipShape(RoundedRectangle(cornerRadius: radius))
+                .overlay(RoundedRectangle(cornerRadius: radius).strokeBorder(Theme.glassStroke, lineWidth: 1))
+                .trioGlow(cornerRadius: radius)
+        )
+    }
+}
+
+// 1 · Cockpit: the countdown card's parts. Carbon, neon tiles for the
+// score, neon chips for the picks (rim colour = outcome), a carbon list.
+private struct ZoneCockpit: View {
+    var resultOnly = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            gameZoneHeader("SCORED · R17")
+            VStack(alignment: .leading, spacing: 14) {
+                Text("YOUR RESULT · SINGAPORE").font(.f1(11, weight: .bold)).tracking(2).foregroundStyle(Theme.accent)
+                HStack(spacing: 10) {
+                    neonBox("+4", "POINTS", Theme.accent)
+                    neonBox("1ST", "OF 1", Theme.violet)
+                    neonBox("✓", "BEAT THE AI", exactGreen)
+                }
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                    ForEach(samplePicks) { pick in
+                        VStack(spacing: 2) {
+                            Text(pick.slot).font(.f1(9, weight: .heavy)).tracking(1.5).foregroundStyle(Theme.dimText)
+                            Text(pick.code).font(.f1(17)).foregroundStyle(.white)
+                            Text(pick.mark).font(.f1(10, weight: .bold)).foregroundStyle(pick.outcome.color)
+                        }
+                        .frame(maxWidth: .infinity).padding(.vertical, 8)
+                        .background(neonRim(pick.outcome.color, lit: pick.outcome != .miss))
+                    }
+                }
+                RadioComment(text: sampleComment)
+                Button {} label: { Text("SEE BREAKDOWN") }.buttonStyle(GamePrimaryButtonStyle())
+            }
+            .padding(16)
+            .carbonPanel()
+
+            if !resultOnly {
+            VStack(spacing: 0) {
+                row(lead: AnyView(LEDText(text: "LEC", pitch: 3.6, color: ferrariRed)), title: "DRIVER OF THE DAY", sub: "LEC leads · 1 vote", chip: "CHANGE", tint: Theme.violet)
+                Divider().overlay(Color.white.opacity(0.08))
+                row(lead: AnyView(LEDText(text: "0.198", pitch: 3.0)), title: "LIGHTS OUT", sub: "Best · P1 this week", chip: "PLAY", tint: Theme.live)
+                Divider().overlay(Color.white.opacity(0.08))
+                row(lead: AnyView(Color.clear.overlay(Image("EmilyAvatar").resizable().scaledToFill()).frame(width: 40, height: 40).clipShape(Circle())),
+                    title: "ASK EMILY", sub: "Your AI race engineer", chip: "ASK", tint: Theme.accent)
+            }
+            .padding(.horizontal, 16).padding(.vertical, 4)
+            .carbonPanel()
+            }
+        }
+    }
+
+    private func row(lead: AnyView, title: String, sub: String, chip: String, tint: Color) -> some View {
+        HStack(spacing: 14) {
+            lead.frame(width: 76, alignment: .leading)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.f1(14, weight: .bold)).foregroundStyle(.white)
+                Text(sub).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.dimText)
+            }
+            Spacer()
+            NeonChip(title: chip, tint: tint, selected: true).frame(width: 82)
+        }
+        .padding(.vertical, 12)
+    }
+}
+
+// 2 · Hero: the result as a race-hero card (gradient, flag watermark,
+// chrome title, big score), picks as one compact strip; the rest as rows
+// in the race-weekend list panel.
+private struct ZoneHero: View {
+    var resultOnly = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            gameZoneHeader("SCORED · R17")
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(LinearGradient(colors: [Theme.card, Theme.violet.opacity(0.16), Theme.accent.opacity(0.24)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Theme.glassStroke, lineWidth: 1))
+                    .trioGlow(cornerRadius: 20)
+                Text("🇸🇬").font(.system(size: 110)).opacity(0.14).rotationEffect(.degrees(-12))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .offset(x: 14, y: -10)
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("ROUND 17").font(.f1(13).italic()).tracking(1).foregroundStyle(Theme.onAccent)
+                            .padding(.horizontal, 10).padding(.vertical, 5)
+                            .background(Theme.accentGradient, in: RoundedRectangle(cornerRadius: 7))
+                        Spacer()
+                        Text("YOUR RESULT").font(.f1(15).italic()).foregroundStyle(Theme.dimText)
+                    }
+                    Text("SINGAPORE").font(.f1(32).italic()).foregroundStyle(Theme.chromeText)
+                    HStack(alignment: .firstTextBaseline, spacing: 14) {
+                        HStack(alignment: .firstTextBaseline, spacing: 4) {
+                            Text("+4").font(.f1Digits(52))
+                            Text("PTS").font(.f1(16))
+                        }
+                        .foregroundStyle(Theme.accent).shadow(color: Theme.accent.opacity(0.5), radius: 10)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("1st of 1").font(.system(size: 15, weight: .semibold)).foregroundStyle(.white)
+                            Text("You beat the AI Strategist ✓").font(.system(size: 12, weight: .medium)).foregroundStyle(exactGreen)
+                        }
+                    }
+                    HStack(spacing: 6) {
+                        ForEach(samplePicks) { pick in
+                            VStack(spacing: 3) {
+                                Text(pick.slot).font(.f1(10, weight: .bold)).tracking(1).foregroundStyle(Theme.faintText)
+                                Text(pick.code).font(.f1(15)).foregroundStyle(.white)
+                                Capsule().fill(pick.team).frame(width: 18, height: 3)
+                                Text(pick.mark).font(.f1(10, weight: .bold)).foregroundStyle(pick.outcome.color)
+                            }
+                            .frame(maxWidth: .infinity).padding(.vertical, 7)
+                            .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.25)))
+                        }
+                    }
+                    RadioComment(text: sampleComment)
+                    Button {} label: { Text("SEE BREAKDOWN") }.buttonStyle(GameOutlineButtonStyle())
+                }
+                .padding(18)
+            }
+
+            if !resultOnly {
+            VStack(spacing: 0) {
+                listRow(chip: "VOTE", title: "DRIVER OF THE DAY", sub: "LEC leads · 1 vote", trailing: AnyView(countdownChip("3D LEFT")))
+                Divider().overlay(Color.white.opacity(0.06))
+                listRow(chip: "START", title: "LIGHTS OUT", sub: "Best · P1 this week", trailing: AnyView(LEDText(text: "0.198", pitch: 2.8)))
+                Divider().overlay(Color.white.opacity(0.06))
+                listRow(chip: "AI", title: "ASK EMILY", sub: "Your AI race engineer", filled: true, trailing: AnyView(
+                    Image(systemName: "mic.fill").font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.onAccent)
+                        .frame(width: 32, height: 32).background(Circle().fill(Theme.accentGradient))))
+            }
+            .appCard()
+            }
+        }
+    }
+}
+
+/// A row in the race-weekend list language.
+private func listRow(chip: String, title: String, sub: String, filled: Bool = false, next: Bool = false, trailing: AnyView) -> some View {
+    HStack(spacing: 12) {
+        sessionChip(chip, filled: filled, width: 52)
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title).font(.f1(15, weight: .bold)).foregroundStyle(.white)
+            Text(sub).font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.dimText)
+        }
+        Spacer(minLength: 6)
+        trailing
+    }
+    .padding(.horizontal, 14).padding(.vertical, 11)
+    .background(next ? Theme.accent.opacity(0.08) : .clear)
+    .overlay(alignment: .leading) { if next { Rectangle().fill(Theme.accent).frame(width: 3) } }
+}
+
+/// The outlined countdown chip, in any colour.
+private func outlineChip(_ s: String, _ color: Color) -> some View {
+    Text(s).font(.f1(10, weight: .heavy).monospacedDigit()).tracking(1).foregroundStyle(color)
+        .padding(.horizontal, 6).padding(.vertical, 3)
+        .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(color.opacity(0.65), lineWidth: 1))
+}
+
+// 3 · Timing sheet: everything in the race-weekend list language. A result
+// list with outcome chips, then a second list for the vote, Lights Out
+// and Emily.
+private struct ZoneTimingSheet: View {
+    var resultOnly = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            gameZoneHeader("SCORED · R17")
+            VStack(spacing: 0) {
+                HStack(spacing: 12) {
+                    sessionChip("R17", filled: true, width: 52)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("YOUR RESULT").font(.f1(15, weight: .bold)).foregroundStyle(.white)
+                        Text("1st of 1 · beat the AI ✓").font(.system(size: 11, weight: .medium)).foregroundStyle(exactGreen)
+                    }
+                    Spacer()
+                    HStack(alignment: .firstTextBaseline, spacing: 3) {
+                        Text("+4").font(.f1Digits(30))
+                        Text("PTS").font(.f1(12))
+                    }
+                    .foregroundStyle(Theme.accent).shadow(color: Theme.accent.opacity(0.5), radius: 8)
+                }
+                .padding(.horizontal, 14).padding(.vertical, 12)
+                .background(Theme.accent.opacity(0.08))
+                .overlay(alignment: .leading) { Rectangle().fill(Theme.accent).frame(width: 3) }
+                ForEach(samplePicks) { pick in
+                    Divider().overlay(Color.white.opacity(0.06))
+                    HStack(spacing: 12) {
+                        sessionChip(pick.slot, width: 52)
+                        Capsule().fill(pick.team).frame(width: 3, height: 16)
+                        Text(pick.code).font(.f1(15, weight: .bold)).foregroundStyle(.white)
+                        Spacer()
+                        outlineChip(pick.mark, pick.outcome.color)
+                    }
+                    .padding(.horizontal, 14).padding(.vertical, 8)
+                }
+                Divider().overlay(Color.white.opacity(0.06))
+                RadioComment(text: sampleComment).padding(12)
+            }
+            .appCard()
+
+            if !resultOnly {
+            VStack(spacing: 0) {
+                listRow(chip: "VOTE", title: "DRIVER OF THE DAY", sub: "LEC leads · 1 vote", trailing: AnyView(countdownChip("3D LEFT")))
+                Divider().overlay(Color.white.opacity(0.06))
+                listRow(chip: "START", title: "LIGHTS OUT", sub: "Best 0.198 · P1 this week", trailing: AnyView(outlineChip("PLAY", Theme.live)))
+                Divider().overlay(Color.white.opacity(0.06))
+                listRow(chip: "AI", title: "ASK EMILY", sub: "Your AI race engineer", filled: true, trailing: AnyView(outlineChip("ASK", Theme.accent)))
+            }
+            .appCard()
+            }
+        }
+    }
+}
+
+// MARK: - Separate cards, one bold "Call in your crew" style card
+
+/// A result card from 1–3, then the vote, Lights Out and Emily as their own
+/// cards: dark app cards, with one of them bold and filled like the invite.
+private struct ZoneMixed: View {
+    enum Result { case cockpit, hero, sheet }
+    enum Bold { case dotd, lights, emily }
+    let result: Result
+    let bold: Bold
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            resultCard
+            Group {
+                if bold == .dotd { boldDotd } else { darkDotd }
+            }
+            .id("zoneLower")
+            if bold == .lights { boldLights } else { darkLights }
+            if bold == .emily { boldEmily } else { darkEmily }
+        }
+    }
+
+    /// Only the result card of each draft (the header and lower cards dropped).
+    @ViewBuilder
+    private var resultCard: some View {
+        switch result {
+        case .cockpit: ZoneCockpit(resultOnly: true)
+        case .hero: ZoneHero(resultOnly: true)
+        case .sheet: ZoneTimingSheet(resultOnly: true)
+        }
+    }
+
+    // Dark cards: the app's standard panel.
+
+    private var darkDotd: some View {
+        HStack(spacing: 16) {
+            LEDText(text: "LEC", pitch: 4.6, color: ferrariRed)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("DRIVER OF THE DAY").font(.f1(16).italic()).foregroundStyle(Theme.chromeText)
+                Text("LEC leads · 1 vote").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.dimText)
+                Text("CHANGE VOTE →").font(.f1(12).italic()).tracking(1.5).foregroundStyle(Theme.accent).padding(.top, 2)
+            }
+            Spacer(minLength: 4)
+            countdownChip("3D LEFT")
+        }
+        .padding(18)
+        .appCard(20)
+    }
+
+    private var darkLights: some View {
+        HStack(spacing: 16) {
+            LEDText(text: "0.198", pitch: 3.6)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("LIGHTS OUT").font(.f1(16).italic()).foregroundStyle(Theme.chromeText)
+                Text("Best · P1 this week").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.dimText)
+            }
+            Spacer(minLength: 4)
+            NeonChip(title: "PLAY", tint: Theme.live, selected: true).frame(width: 74)
+        }
+        .padding(18)
+        .appCard(20)
+    }
+
+    private var darkEmily: some View {
+        HStack(spacing: 12) {
+            Color.clear.overlay(Image("EmilyAvatar").resizable().scaledToFill())
+                .frame(width: 46, height: 46).clipShape(Circle())
+                .shadow(color: Theme.accent.opacity(0.6), radius: 6)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("ASK EMILY").font(.f1(16).italic()).foregroundStyle(Theme.chromeText)
+                Text("Your AI race engineer").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.dimText)
+            }
+            Spacer()
+            Image(systemName: "mic.fill").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.onAccent)
+                .frame(width: 42, height: 42).background(Circle().fill(Theme.accentGradient))
+        }
+        .padding(14)
+        .appCard(20)
+    }
+
+    // Bold cards: the "Call in your crew" recipe in a new colour.
+
+    private var boldDotd: some View {
+        boldCard(colors: [Color(red: 1, green: 0.84, blue: 0.35), Color(red: 1, green: 0.55, blue: 0.2)],
+                 ring: [Color(red: 1, green: 0.84, blue: 0.35), Color(red: 1, green: 0.55, blue: 0.2)],
+                 badge: AnyView(Image(systemName: "star.fill").font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(Color(red: 1, green: 0.84, blue: 0.35))),
+                 kicker: "FAN VOTE · 3 DAYS LEFT",
+                 title: "DRIVER OF\nTHE DAY",
+                 sub: "LEC leads the fans. Change your vote until Thursday.",
+                 icon: "hand.thumbsup.fill",
+                 // the leader's team suit, standing on the right
+                 art: AnyView(Image("Suits/ferrari").resizable().scaledToFit().frame(height: 300)
+                    .shadow(color: .black.opacity(0.35), radius: 10, x: -4, y: 8)
+                    .offset(x: 18, y: 90)))
+    }
+
+    private var boldLights: some View {
+        boldCard(colors: [Theme.live, Color(red: 1, green: 0.55, blue: 0.15)],
+                 ring: [Theme.live, Color(red: 1, green: 0.6, blue: 0.2)],
+                 badge: AnyView(HStack(spacing: 3) {
+                    ForEach(0..<5, id: \.self) { _ in Circle().fill(Theme.live).frame(width: 6, height: 6).shadow(color: Theme.live, radius: 2) }
+                 }),
+                 kicker: "BEST 0.198 · P1 THIS WEEK",
+                 title: "LIGHTS\nOUT",
+                 sub: "Hold like the clutch, let go when the lights go out.",
+                 icon: "play.fill",
+                 // a car on the grid, nose towards you
+                 art: AnyView(Image("Cars/red_bull").resizable().scaledToFit().frame(width: 230)
+                    .shadow(color: .black.opacity(0.4), radius: 12, x: -4, y: 10)
+                    .offset(x: 50, y: 34)))
+    }
+
+    private var boldEmily: some View {
+        boldCard(colors: [Theme.violet, Color(red: 0.88, green: 0.36, blue: 0.85)],
+                 ring: [Theme.violet, Color(red: 0.95, green: 0.45, blue: 0.9)],
+                 badge: AnyView(Image(systemName: "dot.radiowaves.left.and.right").font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(LinearGradient(colors: [Theme.violet, Color(red: 0.95, green: 0.45, blue: 0.9)],
+                                                    startPoint: .leading, endPoint: .trailing))),
+                 kicker: "TEAM RADIO · AI",
+                 title: "ASK YOUR\nENGINEER",
+                 sub: "Strategy, tyres, rules or the standings. Emily answers on the radio.",
+                 icon: "mic.fill",
+                 // Emily herself, fading into the card
+                 art: AnyView(Image("EmilyAvatar").resizable().scaledToFill().frame(width: 190, height: 260).clipped()
+                    .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.45)],
+                                         startPoint: .leading, endPoint: .trailing))))
+    }
+
+    /// InviteBanner's recipe: gradient fill, dark badge with a neon ring,
+    /// big dark title, a round action at the top right.
+    private func boldCard(colors: [Color], ring: [Color], badge: AnyView, kicker: String,
+                          title: String, sub: String, icon: String, art: AnyView? = nil) -> some View {
+        let gradient = LinearGradient(colors: colors, startPoint: .leading, endPoint: .trailing)
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                badge
+                    .frame(width: 58, height: 58)
+                    .background(
+                        Circle().fill(Theme.onAccent)
+                            .overlay(Circle().strokeBorder(LinearGradient(colors: ring, startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 2))
+                            .shadow(color: ring[0].opacity(0.55), radius: 7)
+                    )
+                Spacer()
+                Image(systemName: icon).font(.system(size: 17, weight: .semibold)).foregroundStyle(Theme.onAccent)
+                    .frame(width: 42, height: 42).background(Circle().fill(Theme.onAccent.opacity(0.15)))
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                Text(kicker).font(.f1(10, weight: .bold)).tracking(1.5).foregroundStyle(Theme.onAccent.opacity(0.6))
+                Text(title).font(.f1(32)).foregroundStyle(Theme.onAccent).lineLimit(2).minimumScaleFactor(0.8)
+                Text(sub).font(.system(size: 15, weight: .medium)).foregroundStyle(Theme.onAccent.opacity(0.85))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: art == nil ? .infinity : 185, alignment: .leading)
+        }
+        .padding(22)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            ZStack(alignment: .bottomTrailing) {
+                RoundedRectangle(cornerRadius: 20).fill(gradient)
+                if let art { art }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 20))
+            .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
+        )
     }
 }
 
