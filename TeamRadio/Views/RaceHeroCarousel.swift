@@ -3,23 +3,27 @@ import UIKit
 
 /// The race hero card with two ways to travel through the season:
 /// swipe left or right for the next or previous grand prix, or press and
-/// hold to call up a dock of every race. Slide along it without letting go:
-/// the race under your finger magnifies like the Mac's Dock, and releasing
-/// goes to it.
+/// hold to bring up a strip of the season's race boxes over the card. Keep
+/// holding and drag: the strip slides with your finger, the box in the
+/// middle is zoomed, and letting go goes to that race.
 struct RaceHeroCarousel: View {
     let season: [Race]
     let race: Race
-    /// True while the dock is up (the page shouldn't scroll meanwhile).
+    /// True while the strip is up (the page shouldn't scroll meanwhile).
     @Binding var dockActive: Bool
     let onSelect: (Race) -> Void
 
     @State private var edge: Edge = .trailing
     @State private var width: CGFloat = 0
-    @State private var fingerX: CGFloat?
-    @State private var hovered: Int?
+    @State private var height: CGFloat = 0
+    /// Where the strip was centred when it opened, and how far it's dragged.
+    @State private var startIndex = 0
+    @State private var dragX: CGFloat = 0
+    @State private var centered: Int?
     @GestureState private var pull: CGFloat = 0
 
     private var index: Int? { season.firstIndex { $0.id == race.id } }
+    private var nextRaceId: String? { season.first { ($0.startDate ?? .distantPast) > .now }?.id }
 
     var body: some View {
         ZStack {
@@ -31,37 +35,31 @@ struct RaceHeroCarousel: View {
         }
         .animation(.snappy(duration: 0.35), value: race.id)
         .offset(x: dockActive ? 0 : pull * 0.35)
-        .overlay(alignment: .bottom) {
+        .overlay {
             if dockActive {
-                ZStack(alignment: .bottom) {
-                    // dim the card so the dock stands out
-                    RoundedRectangle(cornerRadius: 20).fill(Color.black.opacity(0.55))
-                    dock
-                }
-                .transition(.opacity)
+                strip.transition(.opacity.combined(with: .scale(scale: 0.96)))
             }
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: dockActive)
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: dockActive)
         .background(GeometryReader { geo in
             Color.clear
-                .onAppear { width = geo.size.width }
-                .onChange(of: geo.size.width) { _, w in width = w }
+                .onAppear { width = geo.size.width; height = geo.size.height }
+                .onChange(of: geo.size) { _, size in width = size.width; height = size.height }
         })
         .contentShape(Rectangle())
-        .coordinateSpace(name: "raceHero")
         .simultaneousGesture(swipe)
-        .simultaneousGesture(holdAndScrub)
+        .simultaneousGesture(holdAndSlide)
         .accessibilityAction(named: "Next grand prix") { step(1) }
         .accessibilityAction(named: "Previous grand prix") { step(-1) }
         #if DEBUG
-        // -RaceDockDemo N: show the dock with round N under the finger, for screenshots
+        // -RaceStripDemo N: show the strip with round N in the middle, for screenshots
         .task {
-            let n = UserDefaults.standard.integer(forKey: "RaceDockDemo")
+            let n = UserDefaults.standard.integer(forKey: "RaceStripDemo")
             guard n > 0 else { return }
             try? await Task.sleep(for: .seconds(2))
+            startIndex = n - 1
+            centered = n - 1
             dockActive = true
-            hovered = n - 1
-            fingerX = center(of: n - 1)
         }
         #endif
     }
@@ -89,88 +87,75 @@ struct RaceHeroCarousel: View {
         onSelect(season[i + delta])
     }
 
-    // MARK: Hold and scrub
+    // MARK: Hold, then slide the strip
 
-    private var holdAndScrub: some Gesture {
+    /// Distance between box centres in the strip.
+    private let pitch: CGFloat = 104
+
+    /// The strip's position in boxes: the current race plus the drag.
+    private var position: CGFloat {
+        let raw = CGFloat(startIndex) - dragX / pitch
+        return min(max(raw, -0.4), CGFloat(max(season.count - 1, 0)) + 0.4)
+    }
+
+    private var holdAndSlide: some Gesture {
         LongPressGesture(minimumDuration: 0.35)
-            .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .named("raceHero")))
+            .sequenced(before: DragGesture(minimumDistance: 0))
             .onChanged { value in
                 guard case .second(true, let drag) = value else { return }
                 if !dockActive {
+                    startIndex = index ?? 0
+                    centered = startIndex
                     dockActive = true
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 }
-                let x = drag?.location.x ?? center(of: index ?? 0)
-                fingerX = x
-                let i = slotIndex(at: x)
-                if i != hovered {
-                    hovered = i
+                dragX = drag?.translation.width ?? 0
+                let i = min(max(Int(position.rounded()), 0), max(season.count - 1, 0))
+                if i != centered {
+                    centered = i
                     UISelectionFeedbackGenerator().selectionChanged()
                 }
             }
             .onEnded { value in
-                if case .second(true, _) = value, let i = hovered, season.indices.contains(i), season[i].id != race.id {
+                if case .second(true, _) = value, let i = centered, season.indices.contains(i), season[i].id != race.id {
                     edge = i > (index ?? 0) ? .trailing : .leading
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     onSelect(season[i])
                 }
                 dockActive = false
-                fingerX = nil
-                hovered = nil
+                dragX = 0
+                centered = nil
             }
     }
 
-    private let inset: CGFloat = 14
-    private var slot: CGFloat { (width - inset * 2) / CGFloat(max(season.count, 1)) }
-    private func center(of i: Int) -> CGFloat { inset + slot * (CGFloat(i) + 0.5) }
-    private func slotIndex(at x: CGFloat) -> Int {
-        min(max(Int(((x - inset) / max(slot, 1)).rounded(.down)), 0), max(season.count - 1, 0))
-    }
-
-    /// The dock: a frosted shelf of flags that swell under the finger.
-    private var dock: some View {
-        let x = fingerX ?? center(of: index ?? 0)
-        let shelf: CGFloat = 46
-        return ZStack(alignment: .topLeading) {
-            // shelf
-            RoundedRectangle(cornerRadius: 16)
-                .fill(.ultraThinMaterial)
-                .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.glassStroke, lineWidth: 1))
-                .frame(width: max(width - 12, 0), height: shelf)
-                .position(x: width / 2, y: 150 - shelf / 2 - 6)
-                .environment(\.colorScheme, .dark)
-
+    /// The season's race boxes over the dimmed card: they slide with the
+    /// finger, the middle one zoomed and lit, the others shrinking away.
+    private var strip: some View {
+        let p = position
+        return ZStack {
+            RoundedRectangle(cornerRadius: 20).fill(Theme.background.opacity(0.96))
+            RoundedRectangle(cornerRadius: 20).fill(RadialGradient(colors: [Theme.violet.opacity(0.18), .clear],
+                                                                   center: .center, startRadius: 0, endRadius: 200))
             ForEach(Array(season.enumerated()), id: \.element.id) { i, r in
-                let distance = center(of: i) - x
-                let magnify = 1 + 1.9 * exp(-(distance * distance) / (2 * 30 * 30))
-                let isNext = r.id == season.first(where: { ($0.startDate ?? .distantPast) > .now })?.id
-                Text(Flags.emoji(for: r.circuit.location.country))
-                    .font(.system(size: 13))
-                    .scaleEffect(magnify, anchor: .bottom)
-                    .opacity((r.startDate ?? .distantFuture) < .now && !isNext ? 0.7 : 1)
-                    .overlay(alignment: .bottom) {
-                        if isNext { Circle().fill(Theme.accent).frame(width: 4, height: 4).offset(y: 6) }
-                    }
-                    .position(x: center(of: i), y: 150 - shelf / 2 - 12)
-                    .animation(.interactiveSpring(response: 0.18, dampingFraction: 0.8), value: x)
-            }
-
-            // label of the race under the finger
-            if let i = hovered, season.indices.contains(i) {
-                let r = season[i]
-                VStack(spacing: 1) {
-                    Text("ROUND \(r.roundNumber)").font(.f1(9, weight: .heavy)).tracking(1.5).foregroundStyle(Theme.accent)
-                    Text(PicksCard.shortName(r)).font(.f1(13).italic()).foregroundStyle(.white).lineLimit(1)
+                let distance = CGFloat(i) - p
+                if abs(distance) < 3.5 {
+                    let zoom = max(0.68, 1.22 - 0.24 * abs(distance))
+                    RoundCard(race: r, isNext: r.id == nextRaceId, isSelected: i == centered)
+                        .scaleEffect(zoom)
+                        .opacity(Double(max(0.3, 1 - 0.28 * abs(distance))))
+                        .zIndex(10 - Double(abs(distance)))
+                        .position(x: width / 2 + distance * pitch, y: height / 2 + 6)
+                        .animation(.interactiveSpring(response: 0.22, dampingFraction: 0.86), value: p)
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(Capsule().fill(Color.black.opacity(0.75)))
-                .overlay(Capsule().strokeBorder(Theme.accent.opacity(0.5), lineWidth: 1))
-                .fixedSize()
-                .position(x: min(max(center(of: i), 70), width - 70), y: 22)
             }
+            Text("SLIDE · RELEASE TO GO")
+                .font(.f1(9, weight: .heavy))
+                .tracking(2)
+                .foregroundStyle(Theme.dimText)
+                .position(x: width / 2, y: height - 16)
         }
-        .frame(width: width, height: 150)
+        .frame(width: width, height: height)
+        .clipShape(RoundedRectangle(cornerRadius: 20))
         .allowsHitTesting(false)
     }
 }

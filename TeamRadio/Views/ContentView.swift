@@ -113,14 +113,16 @@ struct ContentView: View {
                     .id("top")
 
                 if let race = model.displayRace {
-                    if model.isBrowsing {
-                        browsingBar(race)
-                    }
 
                     RaceHeroCarousel(season: model.season, race: race, dockActive: $raceDock) { picked in
                         Task { await model.select(picked) }
                     }
                     .id("hero")
+
+                    // Below the card, clear of the helmet.
+                    if model.isBrowsing {
+                        browsingBar(race)
+                    }
 
                     CountdownView(race: race)
                         .id(race.id)
@@ -243,7 +245,7 @@ struct ContentView: View {
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 4)
-        .padding(.bottom, -10)
+        .padding(.top, -8)
     }
 }
 
