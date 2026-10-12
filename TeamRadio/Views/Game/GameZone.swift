@@ -729,8 +729,9 @@ private struct DotdBoldCard: View {
     let now: Date
     let onVote: () -> Void
 
-    /// Pure, bright yellow; no orange.
-    private static let yellow = [Color(red: 1, green: 0.9, blue: 0.24), Color(red: 1, green: 0.87, blue: 0.16)]
+    /// Warm yellow flowing to amber, corner to corner (the user's pick,
+    /// from the first card draft).
+    private static let yellow = [Color(red: 1, green: 0.84, blue: 0.35), Color(red: 1, green: 0.6, blue: 0.2)]
     private static let ink = Theme.onAccent
 
     /// The entrance plays each time the card scrolls in: the suit strides in,
@@ -891,7 +892,7 @@ private struct DotdBoldCard: View {
 
     private var background: some View {
         RoundedRectangle(cornerRadius: 20)
-            .fill(LinearGradient(colors: Self.yellow, startPoint: .leading, endPoint: .trailing))
+            .fill(LinearGradient(colors: Self.yellow, startPoint: .topLeading, endPoint: .bottomTrailing))
             // a soft spotlight behind the suit
             .overlay(alignment: .topTrailing) {
                 Circle().fill(Color.white.opacity(0.35)).frame(width: 220).blur(radius: 40).offset(x: 50, y: -30)
