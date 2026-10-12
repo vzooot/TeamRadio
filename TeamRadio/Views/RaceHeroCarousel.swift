@@ -39,6 +39,8 @@ struct RaceHeroCarousel: View {
     @State private var centeredId: String?
     /// The card the line has settled on.
     @State private var pagedId: String?
+    /// How often the strip has been opened (the hold hint retires at 3).
+    @AppStorage("raceStripOpens") private var stripOpens = 0
 
     private var index: Int? { season.firstIndex { $0.id == race.id } }
     private var nextRaceId: String? { season.first { ($0.startDate ?? .distantPast) > .now }?.id }
@@ -48,6 +50,7 @@ struct RaceHeroCarousel: View {
             LazyHStack(alignment: .top, spacing: 14) {
                 ForEach(season) { r in
                     RaceHeroView(race: r)
+                        .overlay { ShineSweep(cornerRadius: 20) }
                         .containerRelativeFrame(.horizontal)
                         .id(r.id)
                 }
@@ -71,6 +74,12 @@ struct RaceHeroCarousel: View {
         .onChange(of: race.id) { _, id in
             guard pagedId != id else { return }
             withAnimation(.snappy(duration: 0.4)) { pagedId = id }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            // until people have found it, say the card can be held
+            if !dockActive, stripOpens < 3 {
+                HoldHint().padding(12).transition(.opacity)
+            }
         }
         .overlay {
             if dockActive {
@@ -113,6 +122,7 @@ struct RaceHeroCarousel: View {
         centeredId = race.id
         tickIndex = index
         dockActive = true
+        stripOpens += 1
         DialHaptics.shared.prepare()
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
@@ -218,5 +228,56 @@ struct RaceHeroCarousel: View {
         }
         .frame(width: width, height: height)
         .clipShape(RoundedRectangle(cornerRadius: 20))
+    }
+}
+
+/// A band of light sweeping across a card every few seconds, like light
+/// catching glass (none under Reduce Motion).
+struct ShineSweep: View {
+    var cornerRadius: CGFloat = 20
+    var every: Double = 6
+    var duration: Double = 1.3
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        if !reduceMotion {
+            TimelineView(.animation(minimumInterval: 1 / 30)) { context in
+                let phase = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: every) / duration
+                GeometryReader { geo in
+                    if phase < 1 {
+                        LinearGradient(colors: [.clear, .white.opacity(0.16), .white.opacity(0.28), .white.opacity(0.16), .clear],
+                                       startPoint: .leading, endPoint: .trailing)
+                            .frame(width: geo.size.width * 0.4, height: geo.size.height * 1.6)
+                            .rotationEffect(.degrees(20))
+                            .offset(x: -geo.size.width * 0.5 + CGFloat(phase) * geo.size.width * 1.6,
+                                    y: -geo.size.height * 0.3)
+                            .blendMode(.plusLighter)
+                    }
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+    }
+}
+
+/// "Hold for all races", gently pulsing, until the strip has been found.
+private struct HoldHint: View {
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "hand.tap.fill").font(.system(size: 10, weight: .bold))
+            Text("HOLD · ALL RACES").font(.f1(9, weight: .heavy)).tracking(1.2)
+        }
+        .foregroundStyle(Theme.accent)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .background(Capsule().fill(Color.black.opacity(0.45)))
+        .overlay(Capsule().strokeBorder(Theme.accent.opacity(0.4), lineWidth: 1))
+        .phaseAnimator([0.55, 1.0]) { hint, opacity in
+            hint.opacity(opacity)
+        } animation: { _ in .easeInOut(duration: 1.2) }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
