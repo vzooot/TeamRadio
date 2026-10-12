@@ -165,8 +165,10 @@ struct ContentView: View {
                                  onEmily: { showEmily = true })
                             .id("picks")
                             // heavy (3D chart, animations): appears and
-                            // disappears without joining the race-switch animation
-                            .transaction { $0.animation = nil }
+                            // disappears without joining the race-switch
+                            // animation — only then, so its own animations
+                            // (rings filling, cards rising) still play
+                            .transaction(value: model.isBrowsing) { $0.animation = nil }
                     }
 
                     SessionAlertsCard(season: model.season)
