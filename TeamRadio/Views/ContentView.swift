@@ -15,18 +15,24 @@ struct ContentView: View {
     /// Which way the last race switch went, so the page follows the card.
     @State private var raceEdge: Edge = .trailing
 
-    /// One snappy animation for the switch itself; map and weather load
-    /// after it, outside the animation, so nothing heavy runs mid-slide.
-    private func switchRace(to race: Race) {
-        withAnimation(.snappy(duration: 0.35)) { model.show(race) }
-        Task { await model.refreshExtras() }
-    }
+    /// The race's sections dim while a switch is under way.
+    @State private var contentDimmed = false
 
-    /// The race's sections slide in from the side the card moved to (the
-    /// old ones leave at once so nothing stacks).
-    private var raceSwitch: AnyTransition {
-        .asymmetric(insertion: .opacity.combined(with: .offset(x: raceEdge == .trailing ? 60 : -60)),
-                    removal: .identity)
+    /// Dim, swap, reveal: the content under the card dims quickly, the new
+    /// race's sections are swapped in without animation while it's dim (so
+    /// the rebuild never shows as a stutter), then it fades back up; map
+    /// and weather load after that. nil goes back to the next race.
+    private func switchRace(to race: Race?) {
+        withAnimation(.easeOut(duration: 0.12)) { contentDimmed = true }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(130))
+            var instant = Transaction()
+            instant.disablesAnimations = true
+            withTransaction(instant) { model.show(race) }
+            try? await Task.sleep(for: .milliseconds(40))
+            withAnimation(.easeOut(duration: 0.28)) { contentDimmed = false }
+            await model.refreshExtras()
+        }
     }
 
     var body: some View {
@@ -142,7 +148,7 @@ struct ContentView: View {
 
                     CountdownView(race: race)
                         .id(race.id)
-                        .transition(raceSwitch)
+                        .opacity(contentDimmed ? 0.15 : 1)
 
                     #if DEBUG
                     if BlendDraft.gameZoneInApp {
@@ -165,8 +171,8 @@ struct ContentView: View {
                     VStack {
                         WeekendScheduleView(race: race, weather: model.weather, weatherLoading: model.extrasLoading)
                             .id(race.id)
-                            .transition(raceSwitch)
                     }
+                    .opacity(contentDimmed ? 0.15 : 1)
                     .id("schedule")
 
                     SessionAlertsCard(season: model.season)
@@ -181,11 +187,11 @@ struct ContentView: View {
                             // fades only: the 3D scene is too heavy to slide
                             TrackSectionView(map: map, circuit: race.circuit)
                                 .id(race.circuit.circuitId)
-                                .transition(.opacity)
                         } else if model.extrasLoading {
                             TrackPlaceholder()
                         }
                     }
+                    .opacity(contentDimmed ? 0.15 : 1)
                     .id("trackSection")
                 } else {
                     SeasonOverBanner()
@@ -260,8 +266,7 @@ struct ContentView: View {
                 let from = model.season.firstIndex { $0.id == model.displayRace?.id } ?? 0
                 let to = model.season.firstIndex { $0.id == model.nextRace?.id } ?? 0
                 raceEdge = to >= from ? .trailing : .leading
-                withAnimation(.snappy(duration: 0.35)) { model.show(nil) }
-                Task { await model.refreshExtras() }
+                switchRace(to: nil)
             } label: {
                 HStack(spacing: 5) {
                     Image(systemName: "arrow.uturn.backward")
