@@ -69,6 +69,9 @@ struct RootView: View {
                 .tag(4)
         }
         .tint(Theme.accent)
+        #if DEBUG
+        .overlay { if let id = UserDefaults.standard.string(forKey: "DesignLab") { DesignLab(id: id) } }
+        #endif
         .overlay {
             if showIntro {
                 IntroView { showIntro = false }
