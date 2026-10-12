@@ -3,23 +3,21 @@ import UIKit
 
 /// The race hero card with two ways to travel through the season:
 /// swipe left or right for the next or previous grand prix, or press and
-/// hold to bring up a strip of the season's race boxes over the card. Keep
-/// holding and drag: the strip slides with your finger, the box in the
-/// middle is zoomed, and letting go goes to that race.
+/// hold to open a strip of the season's race boxes over the card. The strip
+/// stays open: scroll it freely (the box in the middle is zoomed), then tap
+/// the race to go to. Tapping around the boxes closes it.
 struct RaceHeroCarousel: View {
     let season: [Race]
     let race: Race
-    /// True while the strip is up (the page shouldn't scroll meanwhile).
+    /// True while the strip is open (the page holds still meanwhile).
     @Binding var dockActive: Bool
     let onSelect: (Race) -> Void
 
     @State private var edge: Edge = .trailing
     @State private var width: CGFloat = 0
     @State private var height: CGFloat = 0
-    /// Where the strip was centred when it opened, and how far it's dragged.
-    @State private var startIndex = 0
-    @State private var dragX: CGFloat = 0
-    @State private var centered: Int?
+    /// The race box in the middle of the strip.
+    @State private var centeredId: String?
     @GestureState private var pull: CGFloat = 0
 
     private var index: Int? { season.firstIndex { $0.id == race.id } }
@@ -33,14 +31,14 @@ struct RaceHeroCarousel: View {
                     insertion: .move(edge: edge).combined(with: .opacity),
                     removal: .move(edge: edge == .trailing ? .leading : .trailing).combined(with: .opacity)))
         }
-        .animation(.snappy(duration: 0.35), value: race.id)
+        .animation(.snappy(duration: 0.4), value: race.id)
         .offset(x: dockActive ? 0 : pull * 0.35)
         .overlay {
             if dockActive {
                 strip.transition(.opacity.combined(with: .scale(scale: 0.96)))
             }
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: dockActive)
+        .animation(.spring(response: 0.32, dampingFraction: 0.85), value: dockActive)
         .background(GeometryReader { geo in
             Color.clear
                 .onAppear { width = geo.size.width; height = geo.size.height }
@@ -48,17 +46,19 @@ struct RaceHeroCarousel: View {
         })
         .contentShape(Rectangle())
         .simultaneousGesture(swipe)
-        .simultaneousGesture(holdAndSlide)
+        .simultaneousGesture(
+            LongPressGesture(minimumDuration: 0.35).onEnded { _ in open() }
+        )
         .accessibilityAction(named: "Next grand prix") { step(1) }
         .accessibilityAction(named: "Previous grand prix") { step(-1) }
+        .accessibilityAction(named: "All races") { open() }
         #if DEBUG
-        // -RaceStripDemo N: show the strip with round N in the middle, for screenshots
+        // -RaceStripDemo N: open the strip on round N, for screenshots
         .task {
             let n = UserDefaults.standard.integer(forKey: "RaceStripDemo")
-            guard n > 0 else { return }
+            guard n > 0, season.indices.contains(n - 1) else { return }
             try? await Task.sleep(for: .seconds(2))
-            startIndex = n - 1
-            centered = n - 1
+            centeredId = season[n - 1].id
             dockActive = true
         }
         #endif
@@ -87,75 +87,95 @@ struct RaceHeroCarousel: View {
         onSelect(season[i + delta])
     }
 
-    // MARK: Hold, then slide the strip
+    // MARK: The strip
 
-    /// Distance between box centres in the strip.
-    private let pitch: CGFloat = 104
-
-    /// The strip's position in boxes: the current race plus the drag.
-    private var position: CGFloat {
-        let raw = CGFloat(startIndex) - dragX / pitch
-        return min(max(raw, -0.4), CGFloat(max(season.count - 1, 0)) + 0.4)
+    private func open() {
+        guard !dockActive else { return }
+        centeredId = race.id
+        dockActive = true
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
 
-    private var holdAndSlide: some Gesture {
-        LongPressGesture(minimumDuration: 0.35)
-            .sequenced(before: DragGesture(minimumDistance: 0))
-            .onChanged { value in
-                guard case .second(true, let drag) = value else { return }
-                if !dockActive {
-                    startIndex = index ?? 0
-                    centered = startIndex
-                    dockActive = true
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                }
-                dragX = drag?.translation.width ?? 0
-                let i = min(max(Int(position.rounded()), 0), max(season.count - 1, 0))
-                if i != centered {
-                    centered = i
-                    UISelectionFeedbackGenerator().selectionChanged()
-                }
-            }
-            .onEnded { value in
-                if case .second(true, _) = value, let i = centered, season.indices.contains(i), season[i].id != race.id {
-                    edge = i > (index ?? 0) ? .trailing : .leading
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    onSelect(season[i])
-                }
-                dockActive = false
-                dragX = 0
-                centered = nil
-            }
+    private func close() {
+        dockActive = false
     }
 
-    /// The season's race boxes over the dimmed card: they slide with the
-    /// finger, the middle one zoomed and lit, the others shrinking away.
+    /// Go to a race from the strip: the strip closes and the card slides over.
+    private func pick(_ picked: Race) {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        close()
+        guard picked.id != race.id else { return }
+        edge = (season.firstIndex { $0.id == picked.id } ?? 0) > (index ?? 0) ? .trailing : .leading
+        // let the strip fade first, then slide the card
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(180))
+            onSelect(picked)
+        }
+    }
+
+    private let boxWidth: CGFloat = 92
+
     private var strip: some View {
-        let p = position
-        return ZStack {
-            RoundedRectangle(cornerRadius: 20).fill(Theme.background.opacity(0.96))
-            RoundedRectangle(cornerRadius: 20).fill(RadialGradient(colors: [Theme.violet.opacity(0.18), .clear],
-                                                                   center: .center, startRadius: 0, endRadius: 200))
-            ForEach(Array(season.enumerated()), id: \.element.id) { i, r in
-                let distance = CGFloat(i) - p
-                if abs(distance) < 3.5 {
-                    let zoom = max(0.68, 1.22 - 0.24 * abs(distance))
-                    RoundCard(race: r, isNext: r.id == nextRaceId, isSelected: i == centered)
-                        .scaleEffect(zoom)
-                        .opacity(Double(max(0.3, 1 - 0.28 * abs(distance))))
-                        .zIndex(10 - Double(abs(distance)))
-                        .position(x: width / 2 + distance * pitch, y: height / 2 + 6)
-                        .animation(.interactiveSpring(response: 0.22, dampingFraction: 0.86), value: p)
+        ZStack(alignment: .topTrailing) {
+            // tapping around the boxes closes the strip
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Theme.background)
+                .overlay(RoundedRectangle(cornerRadius: 20)
+                    .fill(RadialGradient(colors: [Theme.violet.opacity(0.18), .clear], center: .center, startRadius: 0, endRadius: 200)))
+                .onTapGesture { close() }
+
+            ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 14) {
+                    ForEach(season) { r in
+                        Button { pick(r) } label: {
+                            RoundCard(race: r, isNext: r.id == nextRaceId, isSelected: r.id == race.id)
+                        }
+                        .buttonStyle(.plain)
+                        .id(r.id)
+                        // the box in the middle zooms, the others shrink and fade
+                        .visualEffect { content, proxy in
+                            let frame = proxy.frame(in: .scrollView(axis: .horizontal))
+                            let viewport = proxy.bounds(of: .scrollView(axis: .horizontal))?.width ?? 0
+                            let distance = abs(frame.midX - viewport / 2)
+                            return content
+                                .scaleEffect(max(0.74, 1.2 - distance / 380))
+                                .opacity(max(0.35, 1 - distance / 420))
+                        }
+                    }
                 }
+                .scrollTargetLayout()
+                .padding(.vertical, 24)
             }
-            Text("SLIDE · RELEASE TO GO")
+            .contentMargins(.horizontal, max((width - boxWidth) / 2, 0), for: .scrollContent)
+            .scrollTargetBehavior(.viewAligned)
+            .frame(height: height)
+            .onAppear {
+                // open centred on the race in the card
+                if let id = centeredId { proxy.scrollTo(id, anchor: .center) }
+            }
+            }
+
+            Button { close() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Theme.dimText)
+                    .frame(width: 30, height: 30)
+                    .background(Circle().fill(Color.white.opacity(0.08)))
+            }
+            .buttonStyle(.plain)
+            .padding(10)
+            .accessibilityLabel("Close")
+
+            Text("SCROLL · TAP A RACE")
                 .font(.f1(9, weight: .heavy))
                 .tracking(2)
                 .foregroundStyle(Theme.dimText)
-                .position(x: width / 2, y: height - 16)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                .padding(.bottom, 10)
+                .allowsHitTesting(false)
         }
         .frame(width: width, height: height)
         .clipShape(RoundedRectangle(cornerRadius: 20))
-        .allowsHitTesting(false)
     }
 }
