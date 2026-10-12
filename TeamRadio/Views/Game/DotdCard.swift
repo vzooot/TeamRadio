@@ -8,6 +8,8 @@ import UIKit
 final class DotdModel {
     var race: Race?
     var drivers: [GameDriver] = []
+    /// True when `drivers` is the race's finishing order (results are out).
+    var driversInFinishingOrder = false
     var myVote: String?
     var tally: DotdService.Tally?
     var isSaving = false
@@ -26,8 +28,10 @@ final class DotdModel {
                 GameDriver(id: $0.driver.driverId, code: $0.driver.shortCode, familyName: $0.driver.familyName,
                            number: $0.driver.permanentNumber, teamId: $0.constructor.constructorId)
             }
+            driversInFinishingOrder = true
         } else {
             drivers = fallbackDrivers
+            driversInFinishingOrder = false
         }
         userId = await ChatService.currentUserId()
         if let userId { myVote = await DotdService.myVote(round: race.id, userId: userId) }

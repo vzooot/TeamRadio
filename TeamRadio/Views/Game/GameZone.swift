@@ -37,6 +37,7 @@ struct GameZone: View {
                 }
                 if dotd.race != nil {
                     DotdBoldCard(model: dotd, now: now, onVote: onVote)
+                        .id("dotdCard")
                 }
                 LightsStrip(onPlay: onLightsOut)
                 EmilyBar(onTap: onEmily)
@@ -728,90 +729,43 @@ private struct DotdBoldCard: View {
     let now: Date
     let onVote: () -> Void
 
-    private static let yellow = [Color(red: 1, green: 0.84, blue: 0.35), Color(red: 1, green: 0.55, blue: 0.2)]
+    /// Proper yellow, only a breath of warmth towards the right.
+    private static let yellow = [Color(red: 1, green: 0.88, blue: 0.22), Color(red: 1, green: 0.8, blue: 0.08)]
+    private static let ink = Theme.onAccent
 
     /// The entrance plays each time the card scrolls in: the suit strides in,
     /// the star spins, a shine sweeps across, the bars fill and count up.
     @State private var shown = false
 
+    private var voted: Bool { model.myVote != nil && !(model.tally?.votes.isEmpty ?? true) }
+
+    /// The driver in the spotlight: the fans' leader once you've voted,
+    /// before that the race winner.
+    private var spotlight: GameDriver? {
+        model.driver(voted ? model.tally?.votes.first?.driverId : model.drivers.first?.id)
+    }
+
     var body: some View {
         Button(action: onVote) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 8) {
-                    Image(systemName: "star.fill")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Self.yellow[0])
-                        .rotationEffect(.degrees(shown ? 360 : 0))
-                        .scaleEffect(shown ? 1 : 0.4)
-                        .frame(width: 30, height: 30)
-                        .background(Circle().fill(Theme.onAccent)
-                            .overlay(Circle().strokeBorder(LinearGradient(colors: Self.yellow, startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1.5)))
-                        .shadow(color: Self.yellow[0].opacity(shown ? 0.9 : 0), radius: 8)
-                    Text(kicker)
-                        .font(.f1(10, weight: .bold))
-                        .tracking(1.5)
-                        .foregroundStyle(Theme.onAccent.opacity(0.6))
-                        .lineLimit(1)
-                }
-                Text("DRIVER OF THE DAY").font(.f1(22)).foregroundStyle(Theme.onAccent)
-                if model.myVote != nil, let votes = model.tally?.votes, !votes.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                header
+                if let driver = spotlight { spotlightRow(driver) }
+                if voted, let votes = model.tally?.votes {
                     VStack(spacing: 5) {
                         ForEach(Array(votes.prefix(3).enumerated()), id: \.element.id) { index, v in
                             bar(model.driver(v.driverId)?.code ?? String(v.driverId.prefix(3)).uppercased(),
                                 Double(v.pct) / 100, leader: index == 0, mine: v.driverId == model.myVote)
                         }
                     }
-                    .frame(width: 190)
-                    .padding(.top, 2)
+                    .frame(width: 200)
                 } else {
-                    Text("Who impressed you most?")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Theme.onAccent.opacity(0.8))
-                    Text("TAP TO VOTE")
-                        .font(.f1(12).italic())
-                        .tracking(1.5)
-                        .foregroundStyle(Self.yellow[0])
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(Capsule().fill(Theme.onAccent))
-                        .phaseAnimator([1.0, 1.06]) { pill, scale in
-                            pill.scaleEffect(scale)
-                        } animation: { _ in .easeInOut(duration: 0.9) }
-                        .padding(.top, 4)
+                    candidates
                 }
+                chips
             }
             .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(minHeight: 168, alignment: .topLeading)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(LinearGradient(colors: Self.yellow, startPoint: .leading, endPoint: .trailing))
-                    .overlay(alignment: .topTrailing) {
-                        if let suit {
-                            Image(suit)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(height: 250)
-                                .shadow(color: .black.opacity(0.3), radius: 8, x: -3, y: 6)
-                                .offset(x: shown ? -6 : 130, y: 14)
-                                .rotationEffect(.degrees(shown ? 0 : 6), anchor: .bottom)
-                                .accessibilityHidden(true)
-                        }
-                    }
-                    // one sweep of light across the card
-                    .overlay {
-                        GeometryReader { geo in
-                            LinearGradient(colors: [.clear, .white.opacity(0.45), .clear], startPoint: .leading, endPoint: .trailing)
-                                .frame(width: geo.size.width * 0.35)
-                                .rotationEffect(.degrees(18))
-                                .offset(x: shown ? geo.size.width * 1.2 : -geo.size.width * 0.5)
-                                .blendMode(.plusLighter)
-                        }
-                        .allowsHitTesting(false)
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
-                    .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
-            )
+            .background(background)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Driver of the day vote")
@@ -823,23 +777,156 @@ private struct DotdBoldCard: View {
         })
     }
 
-    /// "FAN VOTE · R17 · 3D LEFT" (short: the suit stands to the right)
-    private var kicker: String {
-        guard let race = model.race else { return "FAN VOTE" }
-        var parts = ["FAN VOTE", "R\(race.round)"]
-        if let closes = DotdService.window(for: race)?.closes {
-            let left = Int(closes.timeIntervalSince(now))
-            if left > 0 { parts.append(left >= 86400 ? "\(left / 86400)D LEFT" : "\(max(1, left / 3600))H LEFT") }
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: "star.fill")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Self.yellow[0])
+                    .rotationEffect(.degrees(shown ? 360 : 0))
+                    .scaleEffect(shown ? 1 : 0.4)
+                    .frame(width: 30, height: 30)
+                    .background(Circle().fill(Self.ink))
+                    .shadow(color: Color.white.opacity(shown ? 0.8 : 0), radius: 8)
+                Text(model.race.map { "FAN VOTE · R\($0.round) \(PicksCard.shortName($0))" } ?? "FAN VOTE")
+                    .font(.f1(10, weight: .bold))
+                    .tracking(1.5)
+                    .foregroundStyle(Self.ink.opacity(0.6))
+                    .lineLimit(1)
+                    .frame(maxWidth: 190, alignment: .leading)
+            }
+            Text("DRIVER OF THE DAY").font(.f1(22)).foregroundStyle(Self.ink)
         }
-        return parts.joined(separator: " · ")
     }
 
-    /// The suit of the leader's team once you've voted; before that the
-    /// winner's (the ballot is in finishing order).
+    /// Big car number, name and team, and where they finished.
+    private func spotlightRow(_ driver: GameDriver) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            Text(driver.number ?? driver.code)
+                .font(.f1Digits(44))
+                .foregroundStyle(Self.ink)
+                .shadow(color: .white.opacity(0.5), radius: 0, x: 1.5, y: 1.5)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(voted ? "FANS' FAVOURITE" : "RACE WINNER")
+                    .font(.f1(9, weight: .heavy))
+                    .tracking(1.5)
+                    .foregroundStyle(Self.ink.opacity(0.55))
+                Text(driver.familyName.uppercased())
+                    .font(.f1(17).italic())
+                    .foregroundStyle(Self.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                Text(teamLine(driver))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Self.ink.opacity(0.7))
+                    .lineLimit(1)
+            }
+        }
+        .frame(maxWidth: 210, alignment: .leading)
+    }
+
+    /// "Ferrari · finished P3"
+    private func teamLine(_ driver: GameDriver) -> String {
+        let team = (driver.teamId ?? "")
+            .split(separator: "_").map { $0.capitalized }.joined(separator: " ")
+        guard model.driversInFinishingOrder, let i = model.drivers.firstIndex(where: { $0.id == driver.id }) else { return team }
+        return team.isEmpty ? "Finished P\(i + 1)" : "\(team) · finished P\(i + 1)"
+    }
+
+    /// Before you vote: the podium three as candidates, and the call to vote.
+    private var candidates: some View {
+        HStack(spacing: 6) {
+            if model.driversInFinishingOrder {
+                ForEach(Array(model.drivers.prefix(3).enumerated()), id: \.element.id) { index, d in
+                    HStack(spacing: 4) {
+                        Text("P\(index + 1)").font(.f1(9, weight: .heavy)).foregroundStyle(Self.ink.opacity(0.55))
+                        Text(d.code).font(.f1(12)).foregroundStyle(Self.ink)
+                    }
+                    .padding(.horizontal, 8).padding(.vertical, 5)
+                    .background(Capsule().fill(Self.ink.opacity(0.1)))
+                }
+            }
+            Text("TAP TO VOTE")
+                .font(.f1(11).italic())
+                .tracking(1.2)
+                .foregroundStyle(Self.yellow[0])
+                .padding(.horizontal, 12).padding(.vertical, 6)
+                .background(Capsule().fill(Self.ink))
+                .phaseAnimator([1.0, 1.06]) { pill, scale in
+                    pill.scaleEffect(scale)
+                } animation: { _ in .easeInOut(duration: 0.9) }
+        }
+    }
+
+    /// Votes so far, your vote, time left.
+    private var chips: some View {
+        HStack(spacing: 6) {
+            chip(Image(systemName: "person.2.fill"), "\(model.tally?.total ?? 0) \(model.tally?.total == 1 ? "VOTE" : "VOTES")")
+            if let mine = model.driver(model.myVote)?.code {
+                chip(Image(systemName: "checkmark"), "YOU: \(mine)")
+            }
+            if let left = timeLeft {
+                chip(Image(systemName: "clock.fill"), left)
+            }
+        }
+    }
+
+    private func chip(_ icon: Image, _ text: String) -> some View {
+        HStack(spacing: 4) {
+            icon.font(.system(size: 8, weight: .bold))
+            Text(text).font(.f1(9, weight: .heavy)).tracking(1)
+        }
+        .foregroundStyle(Self.ink)
+        .padding(.horizontal, 8).padding(.vertical, 5)
+        .background(Capsule().strokeBorder(Self.ink.opacity(0.35), lineWidth: 1))
+    }
+
+    /// "3D LEFT", "9H LEFT" until the vote closes.
+    private var timeLeft: String? {
+        guard let race = model.race, let closes = DotdService.window(for: race)?.closes else { return nil }
+        let left = Int(closes.timeIntervalSince(now))
+        guard left > 0 else { return nil }
+        return left >= 86400 ? "\(left / 86400)D LEFT" : "\(max(1, left / 3600))H LEFT"
+    }
+
+    /// The suit of the driver in the spotlight.
     private var suit: String? {
-        let id = model.myVote != nil ? model.tally?.votes.first?.driverId : model.drivers.first?.id
-        guard let team = model.driver(id)?.teamId, UIImage(named: "Suits/\(team)") != nil else { return nil }
+        guard let team = spotlight?.teamId, UIImage(named: "Suits/\(team)") != nil else { return nil }
         return "Suits/\(team)"
+    }
+
+    private var background: some View {
+        RoundedRectangle(cornerRadius: 20)
+            .fill(LinearGradient(colors: Self.yellow, startPoint: .leading, endPoint: .trailing))
+            // a soft spotlight behind the suit
+            .overlay(alignment: .topTrailing) {
+                Circle().fill(Color.white.opacity(0.35)).frame(width: 220).blur(radius: 40).offset(x: 50, y: -30)
+            }
+            .overlay(alignment: .topTrailing) {
+                if let suit {
+                    Image(suit)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 290)
+                        .shadow(color: .black.opacity(0.3), radius: 8, x: -3, y: 6)
+                        .offset(x: shown ? -4 : 130, y: 10)
+                        .rotationEffect(.degrees(shown ? 0 : 6), anchor: .bottom)
+                        .accessibilityHidden(true)
+                }
+            }
+            // one sweep of light across the card
+            .overlay {
+                GeometryReader { geo in
+                    LinearGradient(colors: [.clear, .white.opacity(0.5), .clear], startPoint: .leading, endPoint: .trailing)
+                        .frame(width: geo.size.width * 0.35)
+                        .rotationEffect(.degrees(18))
+                        .offset(x: shown ? geo.size.width * 1.2 : -geo.size.width * 0.5)
+                        .blendMode(.plusLighter)
+                }
+                .allowsHitTesting(false)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 20))
+            .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.white.opacity(0.45), lineWidth: 1))
     }
 
     /// A vote bar that fills and counts up on entrance; the leader gets a
@@ -848,24 +935,24 @@ private struct DotdBoldCard: View {
         let shownPct = shown ? pct : 0
         return HStack(spacing: 8) {
             HStack(spacing: 3) {
-                Text(code).font(.f1(12)).foregroundStyle(Theme.onAccent)
-                if leader { Image(systemName: "star.fill").font(.system(size: 7, weight: .black)).foregroundStyle(Theme.onAccent) }
+                Text(code).font(.f1(12)).foregroundStyle(Self.ink)
+                if leader { Image(systemName: "star.fill").font(.system(size: 7, weight: .black)).foregroundStyle(Self.ink) }
             }
             .frame(width: 40, alignment: .leading)
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(Theme.onAccent.opacity(0.12))
-                    Capsule().fill(Theme.onAccent).frame(width: max(4, geo.size.width * shownPct))
+                    Capsule().fill(Self.ink.opacity(0.12))
+                    Capsule().fill(Self.ink).frame(width: max(4, geo.size.width * shownPct))
                     if mine {
-                        Capsule().strokeBorder(Theme.onAccent.opacity(0.6), lineWidth: 1).padding(-2)
+                        Capsule().strokeBorder(Self.ink.opacity(0.6), lineWidth: 1).padding(-2)
                     }
                 }
             }
             .frame(height: 7)
             CountingText(value: shownPct * 100, prefix: "")
                 .font(.f1Digits(11))
-                .foregroundStyle(Theme.onAccent)
-                .overlay(alignment: .trailing) { Text("%").font(.f1Digits(11)).foregroundStyle(Theme.onAccent).offset(x: 10) }
+                .foregroundStyle(Self.ink)
+                .overlay(alignment: .trailing) { Text("%").font(.f1Digits(11)).foregroundStyle(Self.ink).offset(x: 10) }
                 .frame(width: 26, alignment: .trailing)
                 .padding(.trailing, 8)
         }
