@@ -135,17 +135,21 @@ struct ContentView: View {
 
                 if let race = model.displayRace {
 
-                    RaceHeroCarousel(season: model.season, race: race, dockActive: $raceDock, edge: $raceEdge) { picked in
+                    RaceHeroCarousel(season: model.season, race: race, dockActive: $raceDock, edge: $raceEdge,
+                                     nextId: model.nextRace?.id, onBack: backToNextRace) { picked in
                         switchRace(to: picked)
                     }
                     .id("hero")
 
-                    // Below the card, clear of the helmet.
-                    if model.isBrowsing {
-                        browsingBar(race)
-                    }
-
                     CountdownView(race: race)
+
+                    // The weekend's sessions always right under the countdown.
+                    VStack {
+                        WeekendScheduleView(race: race, weather: model.weather, weatherLoading: model.extrasLoading)
+                            .id(race.id)
+                    }
+                    .cascade(sectionsShown, delay: 0)
+                    .id("schedule")
 
                     #if DEBUG
                     if BlendDraft.gameZoneInApp {
@@ -164,13 +168,6 @@ struct ContentView: View {
                             // disappears without joining the race-switch animation
                             .transaction { $0.animation = nil }
                     }
-
-                    VStack {
-                        WeekendScheduleView(race: race, weather: model.weather, weatherLoading: model.extrasLoading)
-                            .id(race.id)
-                    }
-                    .cascade(sectionsShown, delay: 0)
-                    .id("schedule")
 
                     SessionAlertsCard(season: model.season)
                         .id("alerts")
@@ -267,39 +264,12 @@ struct ContentView: View {
     }
 
     /// Shown while looking at a round other than the next one.
-    private func browsingBar(_ race: Race) -> some View {
-        HStack(spacing: 10) {
-            Text(race.isPast ? "PAST ROUND" : "UPCOMING ROUND")
-                .font(.f1(11, weight: .bold))
-                .tracking(2)
-                .foregroundStyle(Theme.dimText)
-            Spacer()
-            Button {
-                let from = model.season.firstIndex { $0.id == model.displayRace?.id } ?? 0
-                let to = model.season.firstIndex { $0.id == model.nextRace?.id } ?? 0
-                raceEdge = to >= from ? .trailing : .leading
-                switchRace(to: nil)
-            } label: {
-                HStack(spacing: 5) {
-                    Image(systemName: "arrow.uturn.backward")
-                        .font(.system(size: 10, weight: .bold))
-                    Text("BACK TO NEXT RACE")
-                        .font(.f1(11, weight: .bold))
-                        .tracking(1)
-                }
-                .foregroundStyle(Theme.accent)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(
-                    Capsule()
-                        .fill(Theme.accent.opacity(0.1))
-                        .overlay(Capsule().strokeBorder(Theme.accent.opacity(0.5), lineWidth: 1))
-                )
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.horizontal, 4)
-        .padding(.top, -8)
+    /// The card's "next race" button: back from browsing.
+    private func backToNextRace() {
+        let from = model.season.firstIndex { $0.id == model.displayRace?.id } ?? 0
+        let to = model.season.firstIndex { $0.id == model.nextRace?.id } ?? 0
+        raceEdge = to >= from ? .trailing : .leading
+        switchRace(to: nil)
     }
 }
 

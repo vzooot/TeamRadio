@@ -45,6 +45,9 @@ struct RaceHeroCarousel: View {
     @Binding var dockActive: Bool
     /// Which way the switch goes (shared so the page below follows).
     @Binding var edge: Edge
+    /// The next race (its card has no way back; every other card does).
+    var nextId: String? = nil
+    var onBack: (() -> Void)? = nil
     let onSelect: (Race) -> Void
     @State private var width: CGFloat = 0
     @State private var height: CGFloat = 0
@@ -64,7 +67,7 @@ struct RaceHeroCarousel: View {
         ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(alignment: .top, spacing: 14) {
                 ForEach(season) { r in
-                    RaceHeroView(race: r)
+                    RaceHeroView(race: r, onBack: r.id == nextId ? nil : onBack)
                         .overlay { ShineSweep(cornerRadius: 20) }
                         .containerRelativeFrame(.horizontal)
                         .id(r.id)
@@ -299,16 +302,16 @@ struct ShineSweep: View {
     }
 }
 
-/// "Hold for all races", gently pulsing in the card's corner.
+/// "Hold" for all races, gently pulsing in the card's corner.
 private struct HoldHint: View {
     var body: some View {
-        HStack(spacing: 5) {
-            Image(systemName: "hand.tap.fill").font(.system(size: 10, weight: .bold))
-            Text("HOLD · ALL RACES").font(.f1(9, weight: .heavy)).tracking(1.2)
+        HStack(spacing: 4) {
+            Image(systemName: "hand.tap.fill").font(.system(size: 9, weight: .bold))
+            Text("HOLD").font(.f1(9, weight: .heavy)).tracking(1.2)
         }
         .foregroundStyle(Theme.accent)
-        .padding(.horizontal, 9)
-        .padding(.vertical, 5)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 4)
         .background(Capsule().fill(Color.black.opacity(0.45)))
         .overlay(Capsule().strokeBorder(Theme.accent.opacity(0.4), lineWidth: 1))
         .phaseAnimator([0.55, 1.0]) { hint, opacity in
