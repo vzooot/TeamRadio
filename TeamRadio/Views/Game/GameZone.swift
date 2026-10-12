@@ -158,7 +158,6 @@ private struct PicksHero: View {
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(.white)
             }
-            strip(prediction, score: score)
             aiSection
             if let comment = game.lastBoard?.me?.comment {
                 RadioComment(text: comment)
@@ -166,13 +165,11 @@ private struct PicksHero: View {
             Button(action: onResult) { Text("SEE BREAKDOWN") }
                 .buttonStyle(GameOutlineButtonStyle())
         case .locked:
-            strip(current, score: nil)
             aiSection
             Label("All picks locked · scored after the race", systemImage: "lock.fill")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(Theme.dimText)
         case .open, .picked:
-            strip(current, score: nil)
             aiSection
             Text(PicksCard.lockStatus(game, now: now))
                 .font(.system(size: 12))
@@ -205,47 +202,10 @@ private struct PicksHero: View {
             .foregroundStyle(Theme.dimText)
             .fixedSize(horizontal: false, vertical: true)
     }
-
-    /// One tile per pick: code and team colour, a cyan "+" where a pick is
-    /// still open, a padlock where it locked empty, the points once scored.
-    private func strip(_ p: Prediction, score: ScoreBreakdown?) -> some View {
-        let picks: [(String, String?, ScoreBreakdown.Kind, PickGroup)] =
-            (p.hasSprint ? [("SPR", p.sprintWinner, .sprint, .sprint)] : []) + [
-                ("POLE", p.pole, .pole, .quali), ("P1", p.p1, .p1, .race), ("P2", p.p2, .p2, .race),
-                ("P3", p.p3, .p3, .race), ("FL", p.fastestLap, .fastestLap, .race),
-            ]
-        return HStack(spacing: 6) {
-            ForEach(picks, id: \.0) { label, id, kind, group in
-                let driver = game.driver(id)
-                let open = id == nil && score == nil && !game.isLocked(group, at: now)
-                VStack(spacing: 3) {
-                    Text(label).font(.f1(10, weight: .bold)).tracking(1).foregroundStyle(Theme.faintText)
-                    if let driver {
-                        Text(driver.code).font(.f1(15)).foregroundStyle(.white)
-                    } else if open {
-                        Text("+").font(.f1(15)).foregroundStyle(Theme.accent)
-                    } else {
-                        Text("—").font(.f1(15)).foregroundStyle(Theme.faintText)
-                    }
-                    Capsule()
-                        .fill(driver.map { Theme.teamColor($0.teamId) } ?? (open ? Theme.accent.opacity(0.4) : .clear))
-                        .frame(width: 18, height: 3)
-                    if let item = score?.items.first(where: { $0.kind == kind }) {
-                        Text(PicksStrip.mark(item))
-                            .font(.f1(10, weight: .bold))
-                            .foregroundStyle(PicksStrip.color(item.outcome))
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.25)))
-                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(open ? Theme.accent.opacity(0.4) : .clear))
-            }
-        }
-    }
 }
 
 // MARK: - AI Strategist
+
 
 /// The AI's picks (sealed until the round is scored, then revealed with
 /// their points) and the season duel: totals in rings, every round in 3D.
@@ -339,99 +299,137 @@ private struct StrategistCard: View {
         return "Beat the AI every round"
     }
 
-    private func duel(_ rounds: [LeaderboardService.DuelRound]) -> some View {
-        // One column per round of the season; unscored rounds stay empty.
+    // MARK: Season duel
+
+    private struct Season {
+        let byRound: [Int: LeaderboardService.DuelRound]
+        let youCols: [Double?]
+        let aiCols: [Double?]
+        let you: Double
+        let ai: Double
+        let raced: Int
+        let count: Int
+        let played: Int
+    }
+
+    private func season(_ rounds: [LeaderboardService.DuelRound]) -> Season {
         let count = max(seasonRounds, rounds.map(\.round).max() ?? 0)
         let byRound = Dictionary(rounds.map { ($0.round, $0) }, uniquingKeysWith: { a, _ in a })
         let youCols = (1...max(count, 1)).map { byRound[$0]?.you.map(Double.init) }
         let aiCols = (1...max(count, 1)).map { byRound[$0]?.ai.map(Double.init) }
-        let you = youCols.compactMap { $0 }
-        let ai = aiCols.compactMap { $0 }
-        // Rounds before the next race have been raced (lighter columns).
-        let raced = min(count, max(0, (game.race?.roundNumber ?? count + 1) - 1))
-        // A compact season line on top; the 3D bars get the full width below.
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 10) {
-                SeasonDuelRings(you: you.reduce(0, +), ai: ai.reduce(0, +), progress: shown ? 1 : 0, compact: true)
-                    .frame(width: 40, height: 40)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("SEASON · \(rounds.count)/\(count)")
-                        .font(.f1(9, weight: .heavy))
-                        .tracking(1.5)
-                        .foregroundStyle(Theme.faintText)
-                    HStack(spacing: 10) {
-                        CountingText(value: you.reduce(0, +) * (shown ? 1 : 0), prefix: "YOU ")
-                            .foregroundStyle(Theme.accent)
-                        CountingText(value: ai.reduce(0, +) * (shown ? 1 : 0), prefix: "AI ")
-                            .foregroundStyle(Theme.violet)
-                    }
-                    .font(.f1(13, weight: .heavy))
-                }
-                Spacer(minLength: 6)
-                if let selected {
-                    // the tapped round
-                    let round = byRound[selected + 1]
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("R\(selected + 1)\(round?.name.map { " · " + $0.replacingOccurrences(of: " Grand Prix", with: "").uppercased() } ?? "")")
-                            .font(.f1(10, weight: .heavy))
-                            .tracking(1)
-                            .foregroundStyle(.white)
-                            .lineLimit(1)
-                        if let round {
-                            Text("YOU \(round.you.map(String.init) ?? "—") · AI \(round.ai.map(String.init) ?? "—")")
-                                .font(.f1(10, weight: .heavy))
-                                .foregroundStyle(Theme.accent)
-                        } else {
-                            Text(selected < raced ? "NOT SCORED" : "TO COME")
-                                .font(.f1(9, weight: .bold))
-                                .tracking(1)
-                                .foregroundStyle(Theme.faintText)
-                        }
-                    }
-                } else {
-                    Text("DRAG · TAP A ROUND")
-                        .font(.f1(9, weight: .bold))
-                        .tracking(1)
-                        .foregroundStyle(Theme.faintText)
-                }
+        return Season(byRound: byRound, youCols: youCols, aiCols: aiCols,
+                      you: youCols.compactMap { $0 }.reduce(0, +), ai: aiCols.compactMap { $0 }.reduce(0, +),
+                      raced: min(count, max(0, (game.race?.roundNumber ?? count + 1) - 1)),
+                      count: count, played: rounds.count)
+    }
+
+    /// The tapped round's score, or how to use the chart.
+    @ViewBuilder
+    private func roundLine(_ s: Season, alignment: HorizontalAlignment) -> some View {
+        if let selected {
+            let round = s.byRound[selected + 1]
+            let name = round?.name.map { " · " + $0.replacingOccurrences(of: " Grand Prix", with: "").uppercased() } ?? ""
+            let score = round.map { "YOU \($0.you.map(String.init) ?? "—") · AI \($0.ai.map(String.init) ?? "—")" }
+                ?? (selected < s.raced ? "NOT SCORED" : "TO COME")
+            Text("R\(selected + 1)\(name)  \(score)")
+                .font(.f1(10, weight: .heavy))
+                .tracking(1)
+                .foregroundStyle(round == nil ? Theme.faintText : Theme.accent)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        } else {
+            Text("SEASON · \(s.played)/\(s.count) · DRAG · TAP A ROUND")
+                .font(.f1(9, weight: .bold))
+                .tracking(1)
+                .foregroundStyle(Theme.faintText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+    }
+
+    /// The season: big rings between the two totals, every round in 3D
+    /// underneath.
+    private func duel(_ rounds: [LeaderboardService.DuelRound]) -> some View {
+        let s = season(rounds)
+        return VStack(spacing: 6) {
+            HStack {
+                total("YOU", s.you, Theme.accent, alignment: .leading)
+                Spacer()
+                SeasonDuelRings(you: s.you, ai: s.ai, progress: shown ? 1 : 0,
+                                caption: "\(s.played)/\(s.count)")
+                    .frame(width: 120, height: 120)
+                Spacer()
+                total("AI", s.ai, Theme.violet, alignment: .trailing)
             }
-            SeasonDuelBars(you: youCols, ai: aiCols, raced: raced, grown: shown, selected: $selected)
-                .frame(height: 150)
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Season: you \(Int(you.reduce(0, +))) points, AI \(Int(ai.reduce(0, +))) points")
-    }
-
-    private func legend(_ s: String, _ c: Color) -> some View {
-        HStack(spacing: 4) {
-            Circle().fill(c).frame(width: 6, height: 6).shadow(color: c, radius: 3)
-            Text(s).font(.f1(9, weight: .heavy)).tracking(1).foregroundStyle(.white.opacity(0.8))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Season: you \(Int(s.you)) points, AI \(Int(s.ai)) points")
+            SeasonDuelBars(you: s.youCols, ai: s.aiCols, raced: s.raced, grown: shown, selected: $selected)
+                .frame(height: 140)
+                .accessibilityHidden(true)
+            roundLine(s, alignment: .center)
         }
     }
 
-    /// Sealed "?" tiles, or the revealed picks with their points.
+    private func total(_ label: String, _ value: Double, _ color: Color, alignment: HorizontalAlignment) -> some View {
+        VStack(alignment: alignment, spacing: 0) {
+            CountingText(value: value * (shown ? 1 : 0), prefix: "")
+                .font(.f1Digits(34))
+                .foregroundStyle(color)
+                .shadow(color: color.opacity(0.5), radius: 8)
+            Text(label).font(.f1(10, weight: .heavy)).tracking(2).foregroundStyle(Theme.dimText)
+        }
+        .frame(width: 70, alignment: alignment == .leading ? .leading : .trailing)
+    }
+
+    /// One tile per pick: yours on top (a cyan "+" while it's still open, a
+    /// dash once it locked empty), the AI's underneath — sealed until the
+    /// round is scored, then revealed with its points.
     private var tiles: some View {
-        let order: [(String, String)] = (game.draft.hasSprint || revealed?.items?.contains { $0.kind == "sprint" } == true
-                                        ? [("SPR", "sprint")] : []) +
-            [("POLE", "pole"), ("P1", "p1"), ("P2", "p2"), ("P3", "p3"), ("FL", "fastestLap")]
+        let mine: Prediction = {
+            if case let .scored(_, _, p) = state { return p }
+            return game.saved?.prediction ?? game.draft
+        }()
+        let score = scored?.score
+        let order: [(String, String?, ScoreBreakdown.Kind, PickGroup, String)] =
+            (mine.hasSprint ? [("SPR", mine.sprintWinner, .sprint, .sprint, "sprint")] : []) + [
+                ("POLE", mine.pole, .pole, .quali, "pole"), ("P1", mine.p1, .p1, .race, "p1"),
+                ("P2", mine.p2, .p2, .race, "p2"), ("P3", mine.p3, .p3, .race, "p3"),
+                ("FL", mine.fastestLap, .fastestLap, .race, "fastestLap"),
+            ]
         return HStack(spacing: 6) {
-            ForEach(order, id: \.1) { label, kind in
-                let item = scored == nil ? nil : revealed?.items?.first { $0.kind == kind }
+            ForEach(order, id: \.0) { label, id, kind, group, key in
+                let driver = game.driver(id)
+                let open = id == nil && score == nil && !game.isLocked(group, at: .now)
+                let myItem = score?.items.first { $0.kind == kind }
+                let aiItem = scored == nil ? nil : revealed?.items?.first { $0.kind == key }
                 VStack(spacing: 3) {
                     Text(label).font(.f1(9, weight: .bold)).tracking(1).foregroundStyle(Theme.faintText)
-                    if let item {
-                        Text(game.driver(item.picked)?.code ?? "—").font(.f1(14)).foregroundStyle(.white)
-                        Text(item.outcome == "miss" ? "✗ 0" : item.outcome == "exact" ? "✓ \(item.points)" : "~ \(item.points)")
+                    Text(driver?.code ?? (open ? "+" : "—"))
+                        .font(.f1(15))
+                        .foregroundStyle(driver != nil ? .white : open ? Theme.accent : Theme.faintText)
+                    Capsule()
+                        .fill(driver.map { Theme.teamColor($0.teamId) } ?? (open ? Theme.accent.opacity(0.4) : .clear))
+                        .frame(width: 18, height: 3)
+                    if let myItem {
+                        Text(PicksStrip.mark(myItem))
                             .font(.f1(9, weight: .bold))
-                            .foregroundStyle(item.outcome == "miss" ? PicksStrip.color(.miss)
-                                             : item.outcome == "exact" ? PicksStrip.color(.exact) : PicksStrip.color(.partial))
+                            .foregroundStyle(PicksStrip.color(myItem.outcome))
+                    }
+                    Rectangle().fill(Theme.violet.opacity(0.35)).frame(height: 1).padding(.horizontal, 10).padding(.vertical, 2)
+                    if let aiItem {
+                        Text(game.driver(aiItem.picked)?.code ?? "—").font(.f1(12)).foregroundStyle(Theme.violet)
+                        Text(aiItem.outcome == "miss" ? "✗ 0" : aiItem.outcome == "exact" ? "✓ \(aiItem.points)" : "~ \(aiItem.points)")
+                            .font(.f1(9, weight: .bold))
+                            .foregroundStyle(aiItem.outcome == "miss" ? PicksStrip.color(.miss)
+                                             : aiItem.outcome == "exact" ? PicksStrip.color(.exact) : PicksStrip.color(.partial))
                     } else {
-                        Text("?").font(.f1(14)).foregroundStyle(Theme.violet)
+                        Text("AI ?").font(.f1(10, weight: .bold)).foregroundStyle(Theme.violet)
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 7)
-                .background(RoundedRectangle(cornerRadius: 9).fill(Theme.violet.opacity(item == nil ? 0.12 : 0.08)))
+                .padding(.vertical, 8)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.25)))
+                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(open ? Theme.accent.opacity(0.4) : .clear))
             }
         }
     }
@@ -446,13 +444,20 @@ private struct SeasonDuelRings: View {
     var progress: Double = 1
     /// Small badge: just the two rings, the totals sit beside it.
     var compact = false
+    /// Shown in the middle instead of the totals (they sit beside it).
+    var caption: String? = nil
 
     var body: some View {
         let top = max(you, ai, 1) * 1.08
         ZStack {
             ring(you / top * progress, Theme.accent, inset: 0)
             ring(ai / top * progress, Theme.violet, inset: compact ? 7 : 13)
-            if !compact {
+            if let caption {
+                VStack(spacing: 0) {
+                    Text(caption).font(.f1Digits(18)).foregroundStyle(.white)
+                    Text("ROUNDS").font(.f1(8, weight: .heavy)).tracking(1.5).foregroundStyle(Theme.dimText)
+                }
+            } else if !compact {
                 VStack(spacing: 0) {
                     CountingText(value: you * progress, prefix: "")
                         .font(.f1Digits(18))
@@ -624,13 +629,14 @@ private struct SeasonDuelBars: UIViewRepresentable {
         }
     }
 
-    static let restAngle: Float = -0.75
+    static let restAngle: Float = -0.5
 
-    /// A wide, eased swing so the depth is obvious.
+    /// A slow, gentle swing: enough to show the depth without pulling the
+    /// eye (dragging still turns it all the way).
     static var swing: SCNAction {
-        let right = SCNAction.rotateBy(x: 0, y: 1.5, z: 0, duration: 3.2)
+        let right = SCNAction.rotateBy(x: 0, y: 0.6, z: 0, duration: 5)
         right.timingMode = .easeInEaseOut
-        let left = SCNAction.rotateBy(x: 0, y: -1.5, z: 0, duration: 3.2)
+        let left = SCNAction.rotateBy(x: 0, y: -0.6, z: 0, duration: 5)
         left.timingMode = .easeInEaseOut
         return .repeatForever(.sequence([right, left]))
     }
@@ -644,10 +650,10 @@ private struct SeasonDuelBars: UIViewRepresentable {
             return a
         }
         return .repeatForever(.sequence([
-            step(0.22, 0.05, 2.3),
-            step(-0.12, -0.04, 2.6),
-            step(0.08, 0.06, 2.1),
-            step(0, 0, 2.0),
+            step(0.1, 0.02, 3.4),
+            step(-0.05, -0.015, 3.8),
+            step(0.04, 0.02, 3.2),
+            step(0, 0, 3.0),
         ]))
     }
 
