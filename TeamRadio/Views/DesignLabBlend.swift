@@ -1,4 +1,5 @@
 #if DEBUG
+import SceneKit
 import SwiftUI
 
 // Debug-only draft: the Countdown feature cards as a blend of liquid glass,
@@ -277,6 +278,8 @@ struct GameZoneDraft: View {
         case "y": ZoneMixed(result: .sheet, bold: .lights)
         case "z": ZoneMixed(result: .cockpit, bold: .emily)
         case "w": ZoneMixed(result: .hero, bold: .dotd, photoLights: true, waveEmily: true)
+        case "v": ZoneCompact(scored: true)
+        case "u": ZoneCompact(scored: false)
         default: BlendDraft(embedded: true, gameZone: true)
         }
     }
@@ -1368,13 +1371,365 @@ private struct ZoneMixed: View {
         .padding(22)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            ZStack(alignment: .bottomTrailing) {
-                RoundedRectangle(cornerRadius: 20).fill(gradient)
-                if let art { art }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 20))
-            .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
+            // Art as an overlay so it can never make the card bigger.
+            RoundedRectangle(cornerRadius: 20).fill(gradient)
+                .overlay(alignment: .bottomTrailing) { if let art { art } }
+                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
         )
+    }
+}
+
+// MARK: - Compact mix with the AI Strategist
+
+/// Separate cards in different sizes: the result (or picks) card, the AI
+/// Strategist (sealed before the race, revealed after), a compact yellow
+/// driver-of-the-day card, a slim Lights Out photo strip, the Emily bar.
+private struct ZoneCompact: View {
+    let scored: Bool
+
+    private let aiPicks = [
+        SamplePick(slot: "SPR", code: "—", team: .clear, outcome: .miss, points: 0),
+        SamplePick(slot: "POLE", code: "NOR", team: papaya, outcome: .miss, points: 0),
+        SamplePick(slot: "P1", code: "VER", team: redbullBlue, outcome: .miss, points: 0),
+        SamplePick(slot: "P2", code: "ANT", team: mercedes, outcome: .partial, points: 2),
+        SamplePick(slot: "P3", code: "PIA", team: papaya, outcome: .miss, points: 0),
+        SamplePick(slot: "FL", code: "NOR", team: papaya, outcome: .miss, points: 0),
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if scored { ZoneHero(resultOnly: true) } else { picksHero }
+            strategist.id("zoneLower")
+            dotd
+            lights
+            emily
+        }
+    }
+
+    // Before the race: the hero card holding your picks.
+    private var picksHero: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            gameZoneHeader("LOCKS IN 12D 11H")
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("ROUND 18").font(.f1(13).italic()).tracking(1).foregroundStyle(Theme.onAccent)
+                        .padding(.horizontal, 10).padding(.vertical, 5)
+                        .background(Theme.accentGradient, in: RoundedRectangle(cornerRadius: 7))
+                    Spacer()
+                    Text("YOUR PICKS").font(.f1(15).italic()).foregroundStyle(Theme.dimText)
+                }
+                Text("UNITED STATES").font(.f1(30).italic()).foregroundStyle(Theme.chromeText)
+                HStack(spacing: 6) {
+                    pickTile("POLE", "RUS", mercedes)
+                    pickTile("P1", "ANT", mercedes)
+                    pickTile("P2", "HAM", ferrariRed)
+                    pickTile("P3", nil, nil)
+                    pickTile("FL", nil, nil)
+                }
+                Button {} label: { Text("FINISH YOUR PICKS") }.buttonStyle(GamePrimaryButtonStyle())
+            }
+            .padding(18)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(LinearGradient(colors: [Theme.card, Theme.violet.opacity(0.16), Theme.accent.opacity(0.24)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .overlay(alignment: .topTrailing) {
+                        Text("🇺🇸").font(.system(size: 100)).opacity(0.14).rotationEffect(.degrees(-12)).offset(x: 14, y: -6)
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Theme.glassStroke, lineWidth: 1))
+                    .trioGlow(cornerRadius: 20)
+            )
+        }
+    }
+
+    private func pickTile(_ slot: String, _ code: String?, _ team: Color?) -> some View {
+        VStack(spacing: 3) {
+            Text(slot).font(.f1(10, weight: .bold)).tracking(1).foregroundStyle(Theme.faintText)
+            Text(code ?? "+").font(.f1(15)).foregroundStyle(code == nil ? Theme.accent : .white)
+            Capsule().fill(team ?? Theme.accent.opacity(0.4)).frame(width: 18, height: 3)
+        }
+        .frame(maxWidth: .infinity).padding(.vertical, 8)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.25)))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(code == nil ? Theme.accent.opacity(0.4) : .clear))
+    }
+
+    // The AI Strategist: violet (the app's AI colour), sealed or revealed.
+    private var strategist: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: "cpu").font(.system(size: 16, weight: .bold)).foregroundStyle(Theme.violet)
+                    .frame(width: 36, height: 36).background(Circle().fill(Theme.violet.opacity(0.15)))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("AI STRATEGIST").font(.f1(16).italic()).foregroundStyle(Theme.chromeText)
+                    Text(scored ? "Its Singapore picks, revealed" : "Has picked R18 · revealed at lights out")
+                        .font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.dimText)
+                }
+                Spacer(minLength: 4)
+                if scored {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("YOU 4 · AI 2").font(.f1(12, weight: .heavy)).foregroundStyle(.white)
+                        Text("YOU WIN ✓").font(.f1(10, weight: .bold)).tracking(1).foregroundStyle(exactGreen)
+                    }
+                } else {
+                    Image(systemName: "lock.fill").font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.violet)
+                }
+            }
+            // Season duel: totals as rings, every round as 3D bars.
+            HStack(spacing: 14) {
+                DuelRings(you: 170, ai: 167)
+                    .frame(width: 92, height: 92)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 10) {
+                        legend("YOU", Theme.accent)
+                        legend("AI", Theme.violet)
+                        Spacer()
+                        Text("SEASON · R1–R17").font(.f1(9, weight: .bold)).tracking(1).foregroundStyle(Theme.faintText)
+                    }
+                    DuelBars3D(you: Self.youRounds, ai: Self.aiRounds)
+                        .frame(height: 96)
+                }
+            }
+            HStack(spacing: 6) {
+                ForEach(aiPicks) { pick in
+                    VStack(spacing: 3) {
+                        Text(pick.slot).font(.f1(9, weight: .bold)).tracking(1).foregroundStyle(Theme.faintText)
+                        Text(scored ? pick.code : "?").font(.f1(14)).foregroundStyle(scored ? .white : Theme.violet)
+                        if scored {
+                            Text(pick.mark).font(.f1(9, weight: .bold)).foregroundStyle(pick.outcome.color)
+                        }
+                    }
+                    .frame(maxWidth: .infinity).padding(.vertical, 7)
+                    .background(RoundedRectangle(cornerRadius: 9).fill(Theme.violet.opacity(scored ? 0.08 : 0.12)))
+                }
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(LinearGradient(colors: [Theme.card, Theme.violet.opacity(0.14)], startPoint: .leading, endPoint: .trailing))
+                .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Theme.violet.opacity(0.35), lineWidth: 1))
+        )
+    }
+
+    static let youRounds: [Double] = [12, 8, 15, 4, 10, 18, 6, 9, 14, 11, 7, 16, 5, 13, 10, 8, 4]
+    static let aiRounds: [Double] = [10, 11, 9, 12, 8, 10, 13, 7, 12, 9, 11, 8, 14, 10, 9, 12, 2]
+
+    private func legend(_ s: String, _ c: Color) -> some View {
+        HStack(spacing: 4) {
+            Circle().fill(c).frame(width: 6, height: 6).shadow(color: c, radius: 3)
+            Text(s).font(.f1(9, weight: .heavy)).tracking(1).foregroundStyle(.white.opacity(0.8))
+        }
+    }
+
+    // Driver of the day: the yellow invite-style card, compact.
+    private var dotd: some View {
+        let yellow = [Color(red: 1, green: 0.84, blue: 0.35), Color(red: 1, green: 0.55, blue: 0.2)]
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: "star.fill").font(.system(size: 13, weight: .bold)).foregroundStyle(yellow[0])
+                    .frame(width: 30, height: 30)
+                    .background(Circle().fill(Theme.onAccent).overlay(Circle().strokeBorder(LinearGradient(colors: yellow, startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1.5)))
+                Text("FAN VOTE · 3D LEFT").font(.f1(10, weight: .bold)).tracking(1.5).foregroundStyle(Theme.onAccent.opacity(0.6))
+            }
+            Text("DRIVER OF THE DAY").font(.f1(22)).foregroundStyle(Theme.onAccent)
+            VStack(spacing: 5) {
+                voteBar("LEC", 0.52)
+                voteBar("ANT", 0.30)
+                voteBar("VER", 0.18)
+            }
+            .frame(width: 190)
+            .padding(.top, 2)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(height: 168)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(LinearGradient(colors: yellow, startPoint: .leading, endPoint: .trailing))
+                .overlay(alignment: .topTrailing) {
+                    Image("Suits/ferrari").resizable().scaledToFit().frame(height: 250)
+                        .shadow(color: .black.opacity(0.3), radius: 8, x: -3, y: 6)
+                        .offset(x: -6, y: 14)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
+        )
+    }
+
+    /// A dark bar on the yellow card: code, share, percentage.
+    private func voteBar(_ code: String, _ pct: Double) -> some View {
+        HStack(spacing: 8) {
+            Text(code).font(.f1(12)).foregroundStyle(Theme.onAccent).frame(width: 34, alignment: .leading)
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Theme.onAccent.opacity(0.12))
+                    Capsule().fill(Theme.onAccent).frame(width: geo.size.width * pct)
+                }
+            }
+            .frame(height: 7)
+            Text("\(Int(pct * 100))%").font(.f1Digits(11)).foregroundStyle(Theme.onAccent).frame(width: 32, alignment: .trailing)
+        }
+    }
+
+    // Lights Out: a slim strip on the AI car photo.
+    private var lights: some View {
+        HStack(alignment: .bottom) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("REACTION TEST").font(.f1(10, weight: .bold)).tracking(2).foregroundStyle(Theme.live)
+                Text("LIGHTS OUT").font(.f1(22).italic()).foregroundStyle(Theme.chromeText)
+                HStack(spacing: 10) {
+                    LEDText(text: "0.198", pitch: 2.8)
+                    Text("P1 this week").font(.system(size: 11, weight: .semibold)).foregroundStyle(.white.opacity(0.85))
+                }
+            }
+            Spacer()
+            // last ten starts: shorter is faster, the best one lit
+            HStack(alignment: .bottom, spacing: 3) {
+                ForEach(Array(reactionHistory.enumerated()), id: \.offset) { i, t in
+                    let best = i == reactionHistory.count - 1
+                    Capsule().fill(best ? Theme.live : Color.white.opacity(0.35))
+                        .frame(width: 4, height: CGFloat((t - 0.15) * 260))
+                        .shadow(color: best ? Theme.live : .clear, radius: 3)
+                }
+            }
+            .padding(.trailing, 8)
+            NeonChip(title: "PLAY ▸", tint: Theme.live, selected: true).frame(width: 84)
+        }
+        .padding(16)
+        .frame(height: 118)
+        .background(
+            Color.clear
+                .overlay(alignment: .trailing) { Image("LightsOutHero").resizable().scaledToFill() }
+                .overlay(LinearGradient(stops: [.init(color: Theme.background.opacity(0.95), location: 0),
+                                                .init(color: Theme.background.opacity(0.55), location: 0.5),
+                                                .init(color: .clear, location: 0.85)],
+                                        startPoint: .leading, endPoint: .trailing))
+                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Theme.glassStroke, lineWidth: 1))
+        )
+    }
+
+    private var emily: some View {
+        HStack(spacing: 12) {
+            Color.clear.overlay(Image("EmilyAvatar").resizable().scaledToFill())
+                .frame(width: 44, height: 44).clipShape(Circle())
+                .shadow(color: Theme.accent.opacity(0.7), radius: 6)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("ASK EMILY").font(.f1(16).italic()).foregroundStyle(Theme.chromeText)
+                Text("AI race engineer").font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.dimText)
+            }
+            RadioWave().frame(height: 26)
+            Image(systemName: "mic.fill").font(.system(size: 15, weight: .bold)).foregroundStyle(Theme.onAccent)
+                .frame(width: 42, height: 42).background(Circle().fill(Theme.accentGradient))
+        }
+        .padding(8).padding(.leading, 2)
+        .glassPanel(Capsule(), light: Theme.violet, lightOffset: CGSize(width: 0, height: 10))
+    }
+}
+
+/// Season totals as two concentric rings: you (cyan) outside, the AI
+/// (violet) inside, each against the larger total.
+private struct DuelRings: View {
+    let you: Double
+    let ai: Double
+
+    var body: some View {
+        let top = max(you, ai) * 1.08
+        ZStack {
+            ring(you / top, Theme.accent, inset: 0)
+            ring(ai / top, Theme.violet, inset: 13)
+            VStack(spacing: 0) {
+                Text("\(Int(you))").font(.f1Digits(18)).foregroundStyle(.white)
+                Text("VS \(Int(ai))").font(.f1(9, weight: .heavy)).tracking(1).foregroundStyle(Theme.violet)
+            }
+        }
+    }
+
+    private func ring(_ value: Double, _ color: Color, inset: CGFloat) -> some View {
+        ZStack {
+            Circle().stroke(color.opacity(0.15), lineWidth: 9)
+            Circle().trim(from: 0, to: value)
+                .stroke(color, style: StrokeStyle(lineWidth: 9, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .shadow(color: color.opacity(0.8), radius: 4)
+        }
+        .padding(inset)
+    }
+}
+
+/// Points per round as glowing 3D bars, you in front and the AI behind,
+/// gently swaying (SceneKit, like the circuit map).
+private struct DuelBars3D: UIViewRepresentable {
+    let you: [Double]
+    let ai: [Double]
+
+    func makeUIView(context: Context) -> SCNView {
+        let view = SCNView()
+        view.backgroundColor = .clear
+        view.antialiasingMode = .multisampling4X
+        view.isUserInteractionEnabled = false
+        view.scene = scene()
+        return view
+    }
+
+    func updateUIView(_ view: SCNView, context: Context) {}
+
+    private func scene() -> SCNScene {
+        let scene = SCNScene()
+        scene.background.contents = UIColor.clear
+        let chart = SCNNode()
+        scene.rootNode.addChildNode(chart)
+        let n = max(you.count, ai.count)
+        let pitch: Float = 0.42
+        let x0 = -Float(n - 1) * pitch / 2
+        let cyan = UIColor(red: 0.15, green: 0.82, blue: 1, alpha: 1)
+        let violet = UIColor(red: 0.52, green: 0.42, blue: 1, alpha: 1)
+        for (row, values, color) in [(0, you, cyan), (1, ai, violet)] {
+            for (i, v) in values.enumerated() {
+                let h = CGFloat(max(v, 0.5) * 0.09)
+                let box = SCNBox(width: 0.26, height: h, length: 0.26, chamferRadius: 0.04)
+                let m = SCNMaterial()
+                m.lightingModel = .lambert
+                m.diffuse.contents = color.withAlphaComponent(row == 0 ? 1 : 0.85)
+                m.emission.contents = color.withAlphaComponent(0.35)
+                box.materials = [m]
+                let node = SCNNode(geometry: box)
+                node.position = SCNVector3(x0 + Float(i) * pitch, Float(h) / 2, row == 0 ? 0.22 : -0.22)
+                chart.addChildNode(node)
+            }
+        }
+        // floor line
+        let floor = SCNNode(geometry: SCNBox(width: CGFloat(Float(n) * pitch + 0.3), height: 0.01, length: 0.9, chamferRadius: 0))
+        floor.geometry?.firstMaterial?.diffuse.contents = UIColor(white: 1, alpha: 0.06)
+        floor.geometry?.firstMaterial?.lightingModel = .constant
+        chart.addChildNode(floor)
+
+        chart.runAction(.repeatForever(.sequence([
+            .rotateBy(x: 0, y: 0.35, z: 0, duration: 4),
+            .rotateBy(x: 0, y: -0.35, z: 0, duration: 4),
+        ])))
+        chart.eulerAngles.y = -0.45
+
+        let ambient = SCNNode()
+        ambient.light = SCNLight()
+        ambient.light?.type = .ambient
+        ambient.light?.intensity = 500
+        scene.rootNode.addChildNode(ambient)
+        let sun = SCNNode()
+        sun.light = SCNLight()
+        sun.light?.type = .directional
+        sun.light?.intensity = 900
+        sun.eulerAngles = SCNVector3(-Float.pi / 3, 0.6, 0)
+        scene.rootNode.addChildNode(sun)
+
+        let camera = SCNNode()
+        camera.camera = SCNCamera()
+        camera.camera?.fieldOfView = 30
+        camera.position = SCNVector3(0, 3.6, 6.2)
+        camera.look(at: SCNVector3(0, 0.35, 0))
+        scene.rootNode.addChildNode(camera)
+        return scene
     }
 }
 
