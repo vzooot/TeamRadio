@@ -43,6 +43,15 @@ struct ContentView: View {
         .task(id: model.nextRace?.id) {
             guard GameFeature.isEnabled else { return }
             await game.load(race: model.nextRace, season: model.season)
+            #if DEBUG
+            // -FakePicks YES: a signed-in player with three picks, for screenshots
+            if UserDefaults.standard.bool(forKey: "FakePicks"), game.drivers.count > 2 {
+                game.access = .ready
+                game.draft.pole = game.drivers[1].id
+                game.draft.p1 = game.drivers[0].id
+                game.draft.p2 = game.drivers[2].id
+            }
+            #endif
             await dotd.load(season: model.season, fallbackDrivers: game.drivers)
         }
         .fullScreenCover(isPresented: $showLightsOut) {
@@ -106,11 +115,13 @@ struct ContentView: View {
                     }
                     #endif
                     if GameFeature.isEnabled, !model.isBrowsing, !Self.gameZoneDraft {
-                        DotdCard(model: dotd) { showDotd = true }
-                        PicksCard(game: game, onOpen: { showPicks = true }, onShowResult: { showResult = true })
+                        GameZone(game: game, dotd: dotd,
+                                 onPicks: { showPicks = true },
+                                 onResult: { showResult = true },
+                                 onVote: { showDotd = true },
+                                 onLightsOut: { showLightsOut = true },
+                                 onEmily: { showEmily = true })
                             .id("picks")
-                        AskEmilyCard { showEmily = true }
-                        LightsOutCard { showLightsOut = true }
                     }
 
                     WeekendScheduleView(race: race, weather: model.weather)

@@ -11,52 +11,7 @@ private let papaya = Color(red: 1, green: 0.53, blue: 0)
 private let hair = Color.white.opacity(0.12)
 private let reactionHistory: [Double] = [0.312, 0.268, 0.290, 0.241, 0.255, 0.226, 0.233, 0.211, 0.204, 0.198]
 
-// MARK: - LED type (5×7, like the main board)
-
-private let ledGlyphs: [Character: [String]] = [
-    "0": [".###.", "#...#", "#..##", "#.#.#", "##..#", "#...#", ".###."],
-    "1": ["..#..", ".##..", "..#..", "..#..", "..#..", "..#..", ".###."],
-    "2": [".###.", "#...#", "....#", "...#.", "..#..", ".#...", "#####"],
-    "3": ["#####", "...#.", "..#..", "...#.", "....#", "#...#", ".###."],
-    "4": ["...#.", "..##.", ".#.#.", "#..#.", "#####", "...#.", "...#."],
-    "5": ["#####", "#....", "####.", "....#", "....#", "#...#", ".###."],
-    "6": ["..##.", ".#...", "#....", "####.", "#...#", "#...#", ".###."],
-    "7": ["#####", "....#", "...#.", "..#..", ".#...", ".#...", ".#..."],
-    "8": [".###.", "#...#", "#...#", ".###.", "#...#", "#...#", ".###."],
-    "9": [".###.", "#...#", "#...#", ".####", "....#", "...#.", ".##.."],
-    ".": [".", ".", ".", ".", ".", ".", "#"],
-    "A": [".###.", "#...#", "#...#", "#####", "#...#", "#...#", "#...#"],
-    "N": ["#...#", "##..#", "#.#.#", "#..##", "#...#", "#...#", "#...#"],
-    "T": ["#####", "..#..", "..#..", "..#..", "..#..", "..#..", "..#.."],
-]
-
-/// Text in round LEDs with dim sockets, glowing like the countdown board.
-private struct LEDText: View {
-    let text: String
-    var pitch: CGFloat = 5.5
-    var color: Color = led
-
-    private var glyphs: [[String]] { text.compactMap { ledGlyphs[$0] } }
-    private var columns: Int { glyphs.reduce(0) { $0 + $1[0].count } + max(0, glyphs.count - 1) }
-
-    var body: some View {
-        Canvas { ctx, _ in
-            let d = pitch * 0.72
-            var x: CGFloat = 0
-            for glyph in glyphs {
-                for (r, row) in glyph.enumerated() {
-                    for (c, ch) in row.enumerated() {
-                        let rect = CGRect(x: x + CGFloat(c) * pitch, y: CGFloat(r) * pitch, width: d, height: d)
-                        ctx.fill(Path(ellipseIn: rect), with: .color(ch == "#" ? color : .white.opacity(0.05)))
-                    }
-                }
-                x += CGFloat(glyph[0].count + 1) * pitch
-            }
-        }
-        .frame(width: CGFloat(columns) * pitch, height: 7 * pitch)
-        .shadow(color: color.opacity(0.75), radius: pitch * 0.8)
-    }
-}
+// LED type: the shipping `LEDText` in Views/Game/GameZone.swift.
 
 // MARK: - Pieces
 
