@@ -100,7 +100,12 @@ struct ContentView: View {
                     CountdownView(race: race)
                         .id(race.id)
 
-                    if GameFeature.isEnabled, !model.isBrowsing {
+                    #if DEBUG
+                    if BlendDraft.gameZoneInApp {
+                        BlendDraft(embedded: true, gameZone: true).id("gameZone")
+                    }
+                    #endif
+                    if GameFeature.isEnabled, !model.isBrowsing, !Self.gameZoneDraft {
                         DotdCard(model: dotd) { showDotd = true }
                         PicksCard(game: game, onOpen: { showPicks = true }, onShowResult: { showResult = true })
                             .id("picks")
@@ -147,6 +152,12 @@ struct ContentView: View {
         .refreshable { await model.load() }
         #if DEBUG
         .task { await DemoDirector.shared.runIfNeeded() }
+        .task {
+            // -ScrollTo <id>: jump to a section for screenshots
+            guard let id = UserDefaults.standard.string(forKey: "ScrollTo") else { return }
+            try? await Task.sleep(for: .seconds(4))
+            proxy.scrollTo(id, anchor: .top)
+        }
         .onChange(of: DemoDirector.shared.scroll) { _, step in
             guard let step else { return }
             let id: String = step.target == "countdown" ? (model.displayRace?.id ?? "") : step.target
@@ -154,6 +165,15 @@ struct ContentView: View {
         }
         #endif
         }
+    }
+
+    /// Debug-only: the four game cards replaced by the game-zone design draft.
+    private static var gameZoneDraft: Bool {
+        #if DEBUG
+        BlendDraft.gameZoneInApp
+        #else
+        false
+        #endif
     }
 
     /// Debug-only demo recordings hide anything not yet released.

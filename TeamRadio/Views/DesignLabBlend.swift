@@ -122,6 +122,11 @@ private struct GlassSurface: ViewModifier {
 struct BlendDraft: View {
     /// Just the sections, for use inside the full-screen draft.
     var embedded = false
+    /// The lighter step: one "game zone" rule over all four cards.
+    var gameZone = false
+
+    /// Debug hook: show the game-zone draft in the real Countdown tab.
+    static var gameZoneInApp: Bool { UserDefaults.standard.bool(forKey: "GameZoneDraft") }
 
     var body: some View {
         if embedded {
@@ -136,16 +141,27 @@ struct BlendDraft: View {
         }
     }
 
+    @ViewBuilder
     private var sections: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            SectionRule(number: "01", name: "PREDICTION GAME", meta: "LOCKS SAT 23:00", metaColor: Theme.accent)
-            picks
-            SectionRule(number: "02", name: "FAN VOTE · REACTION", meta: "LIVE", metaColor: Theme.live)
-                .padding(.top, 10)
-            HStack(spacing: 12) { dotd; lights }
-            SectionRule(number: "03", name: "TEAM RADIO", meta: "AI ONLINE", metaColor: Theme.accent)
-                .padding(.top, 10)
-            emily
+        if gameZone {
+            VStack(alignment: .leading, spacing: 12) {
+                SectionRule(number: "R18", name: "GAME ZONE", meta: "LOCKS SAT 23:00", metaColor: Theme.accent)
+                    .padding(.bottom, 2)
+                picks
+                HStack(spacing: 12) { dotd; lights }
+                emily
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 14) {
+                SectionRule(number: "01", name: "PREDICTION GAME", meta: "LOCKS SAT 23:00", metaColor: Theme.accent)
+                picks
+                SectionRule(number: "02", name: "FAN VOTE · REACTION", meta: "LIVE", metaColor: Theme.live)
+                    .padding(.top, 10)
+                HStack(spacing: 12) { dotd; lights }
+                SectionRule(number: "03", name: "TEAM RADIO", meta: "AI ONLINE", metaColor: Theme.accent)
+                    .padding(.top, 10)
+                emily
+            }
         }
     }
 
