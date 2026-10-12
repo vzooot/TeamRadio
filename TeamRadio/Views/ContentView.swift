@@ -123,15 +123,19 @@ struct ContentView: View {
         ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                if let race = model.nextRace {
-                    // Broadcast-style LIVE bar sits above everything, so the
-                    // helmet below still hangs over the race card.
-                    LiveSessionBanner(race: race)
-                }
+                // The very top of the page (the LIVE bar included), where a
+                // pick from the season list glides back to.
+                VStack(alignment: .leading, spacing: 22) {
+                    if let race = model.nextRace {
+                        // Broadcast-style LIVE bar sits above everything, so the
+                        // helmet below still hangs over the race card.
+                        LiveSessionBanner(race: race)
+                    }
 
-                HeaderView(onInfo: { showAbout = true })
-                    .padding(.bottom, -6)
-                    .id("top")
+                    HeaderView(onInfo: { showAbout = true })
+                }
+                .padding(.bottom, -6)
+                .id("top")
 
                 if let race = model.displayRace {
 
@@ -171,9 +175,6 @@ struct ContentView: View {
                             .transaction(value: model.isBrowsing) { $0.animation = nil }
                     }
 
-                    SessionAlertsCard(season: model.season)
-                        .id("alerts")
-
                     if !Self.demoMode {
                         InviteBanner()
                     }
@@ -197,14 +198,18 @@ struct ContentView: View {
                     StandingsView(standings: model.standings)
                 }
 
+                if model.displayRace != nil {
+                    // Settings for every session, just above the season's races.
+                    SessionAlertsCard(season: model.season)
+                        .id("alerts")
+                }
+
                 if !model.season.isEmpty {
                     SeasonView(season: model.season, nextRaceId: model.nextRace?.id,
                                selectedId: model.displayRace?.id) { race in
-                        let from = model.season.firstIndex { $0.id == model.displayRace?.id } ?? 0
-                        raceEdge = (model.season.firstIndex { $0.id == race.id } ?? 0) >= from ? .trailing : .leading
-                        switchRace(to: race)
-                        withAnimation(.easeInOut(duration: 0.45)) { proxy.scrollTo("hero", anchor: .top) }
+                        pickFromSeason(race, proxy: proxy)
                     }
+                    .id("season")
                 }
 
                 FooterView()
@@ -222,6 +227,16 @@ struct ContentView: View {
             guard let id = UserDefaults.standard.string(forKey: "ScrollTo") else { return }
             try? await Task.sleep(for: .seconds(4))
             proxy.scrollTo(id, anchor: .top)
+        }
+        .task {
+            // -SeasonTap N: scroll to the season list and pick round N there
+            let n = UserDefaults.standard.integer(forKey: "SeasonTap")
+            guard n > 0 else { return }
+            try? await Task.sleep(for: .seconds(4))
+            guard model.season.indices.contains(n - 1) else { return }
+            proxy.scrollTo("season", anchor: .bottom)
+            try? await Task.sleep(for: .seconds(1.5))
+            pickFromSeason(model.season[n - 1], proxy: proxy)
         }
         .task {
             // -RaceCycle N: switch race N times (ahead, ahead, back to the
@@ -266,6 +281,19 @@ struct ContentView: View {
     }
 
     /// Shown while looking at a round other than the next one.
+    /// A race tapped in the season list at the bottom of the page.
+    private func pickFromSeason(_ race: Race, proxy: ScrollViewProxy) {
+        let from = model.season.firstIndex { $0.id == model.displayRace?.id } ?? 0
+        raceEdge = (model.season.firstIndex { $0.id == race.id } ?? 0) >= from ? .trailing : .leading
+        // Glide all the way up first, then switch: switching changes the
+        // page's height, which stopped the glide short when both ran at once.
+        withAnimation(.easeInOut(duration: 0.45)) { proxy.scrollTo("top", anchor: .top) }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(380))
+            switchRace(to: race)
+        }
+    }
+
     /// The card's "next race" button: back from browsing.
     private func backToNextRace() {
         let from = model.season.firstIndex { $0.id == model.displayRace?.id } ?? 0
