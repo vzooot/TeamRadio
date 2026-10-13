@@ -70,6 +70,9 @@ struct ReactionWallView: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
+            // Phone-sized on iPad: the lights stay big and close together
+            // instead of scattering over a board the width of the screen.
+            .frame(maxWidth: 520)
         }
         .onDisappear { game?.cancel() }
         .task {

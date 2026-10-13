@@ -46,6 +46,20 @@ final class GamesModel {
         seasonBoard = await board
         _ = await duel
         await loadArcadeBoards()
+        #if DEBUG
+        // -DemoGame YES: a made-up season table for store screenshots
+        if UserDefaults.standard.string(forKey: "DemoGame") != nil {
+            let names = ["Pole2Win", "GridWalker", "Kimi_Fan", "ApexHunter", "Ledger44", "LateBraker", "DRS_Train",
+                         "Undercut", "SlowButton", "TurboTom", "BoxBoxBox", "You", "Slipstream", "Parc_Ferme"]
+            let points = [128, 121, 117, 109, 104, 101, 97, 95, 92, 90, 88, 86, 84, 81]
+            let top = zip(names, points).enumerated().map { i, e in
+                LeaderboardService.Entry(userId: e.0 == "You" ? "me" : "p\(i)", name: e.0, points: e.1, exact: 3, rank: i + 1)
+            }
+            seasonBoard = LeaderboardService.Board(total: 340, top: top,
+                                                   me: .init(userId: "me", name: "You", points: 86, exact: 4, rank: 12, comment: nil),
+                                                   strategist: .init(name: "AI Strategist", points: 71, exact: 2))
+        }
+        #endif
         ready = true
     }
 

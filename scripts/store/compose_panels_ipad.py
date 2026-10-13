@@ -19,7 +19,8 @@ TX, TY = track["x"], track["y"]
 
 PANELS = [
     ("countdown", "NEVER MISS", "LIGHTS OUT", "Alerts & Lock Screen countdowns, automatic"),
-    ("game", "BEAT THE", "AI STRATEGIST", "Call the podium. Can you out-predict the AI?"),
+    ("game", "BEAT THE", "AI STRATEGIST", "Predict every race & climb the leaderboard"),
+    ("wall", "TRAIN LIKE", "A DRIVER", "Reaction Wall: 60 seconds, every light counts"),
     ("track", "THE CIRCUIT,", "ALIVE IN 3D", "Ghost car, sector colors & real elevation"),
     ("chat", "THE PADDOCK,", "LIVE", "Fan chat with GIFs, photos & videos"),
     ("results", "RESULTS,", "SPOILER-SAFE", "Hidden until you say so"),
