@@ -70,7 +70,7 @@ struct Track3DView: UIViewRepresentable {
         // look-at constraint, then animate to an exact pose facing the turn.
         let pose = SCNNode()
         pose.position = position
-        pose.look(at: look)
+        pose.look(at: look, up: SCNVector3(0, 1, 0), localFront: TrackSceneBuilder.front)
         cameraNode.transform = cameraNode.presentation.transform
         cameraNode.constraints = nil
         target.position = look
@@ -80,7 +80,7 @@ struct Track3DView: UIViewRepresentable {
         SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         SCNTransaction.completionBlock = {
             // Back home: hand the camera to the centre constraint again.
-            if corner == nil { cameraNode.constraints = [SCNLookAtConstraint(target: target)] }
+            if corner == nil { cameraNode.constraints = [TrackSceneBuilder.lookAt(target)] }
         }
         cameraNode.transform = pose.transform
         SCNTransaction.commit()
@@ -155,6 +155,26 @@ enum TrackSceneBuilder {
     static let spinKey = "spin"
     static var spin: SCNAction { .repeatForever(.rotateBy(x: 0, y: 2 * .pi, z: 0, duration: 45)) }
     static let homeCamera = SCNVector3(0, 7.5, 10.5)
+
+    /// The scene runs behind the whole circuit card and fades out at the
+    /// bottom: `framed` points of it are the map proper, `bleed` more run
+    /// under the stats. The camera looks a little low (`tilt`) so the
+    /// circuit, or the turn it flies to, stays centred in the framed part.
+    static let framed: CGFloat = 300
+    static let bleed: CGFloat = 170
+    /// Horizontal field of view: the circuit keeps its width however tall
+    /// the view is.
+    static let fieldOfView: CGFloat = 75
+    private static let tilt = atan(Float(bleed / 390) * tan(Float(fieldOfView / 2 * .pi / 180)))
+    /// The camera's "front" for look-at, pitched up by `tilt`, so the real
+    /// view axis points that much below the target.
+    static let front = SCNVector3(0, sin(tilt), -cos(tilt))
+
+    static func lookAt(_ target: SCNNode) -> SCNLookAtConstraint {
+        let constraint = SCNLookAtConstraint(target: target)
+        constraint.localFront = front
+        return constraint
+    }
 
     static func build(map: TrackMap) -> SCNScene {
         let scene = SCNScene()
@@ -300,6 +320,8 @@ enum TrackSceneBuilder {
         camera.bloomIntensity = 0.5
         camera.bloomThreshold = 0.55
         camera.zFar = 200
+        camera.projectionDirection = .horizontal
+        camera.fieldOfView = fieldOfView
         // The camera looks at a focus point: the circuit's centre, or the
         // tapped corner (Track3DView.focus moves both).
         let focus = SCNNode()
@@ -309,7 +331,7 @@ enum TrackSceneBuilder {
         cameraNode.name = "camera"
         cameraNode.camera = camera
         cameraNode.position = homeCamera
-        cameraNode.constraints = [SCNLookAtConstraint(target: focus)]
+        cameraNode.constraints = [lookAt(focus)]
         scene.rootNode.addChildNode(cameraNode)
 
         return scene
