@@ -85,8 +85,9 @@ struct TrackSectionView: View {
                     }
                     .frame(height: TrackSceneBuilder.framed + TrackSceneBuilder.bleed)
                     .mask(LinearGradient(stops: [.init(color: .black, location: 0),
-                                                 .init(color: .black, location: 0.58),
-                                                 .init(color: .clear, location: 1)],
+                                                 .init(color: .black, location: 0.48),
+                                                 .init(color: .black.opacity(0.3), location: 0.68),
+                                                 .init(color: .clear, location: 0.88)],
                                          startPoint: .top, endPoint: .bottom))
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     .clipShape(RoundedRectangle(cornerRadius: 20))
