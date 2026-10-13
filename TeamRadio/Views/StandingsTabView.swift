@@ -64,6 +64,8 @@ struct StandingsTabView: View {
                 }
                 .padding(.top, 8)
 
+                ResultsPageSwitch()
+
                 modePicker
 
                 if mode == .drivers {

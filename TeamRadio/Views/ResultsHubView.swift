@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// The Results tab: race results and the championship standings behind a
-/// RESULTS | STANDINGS switch. Both stay alive, so switching is instant and
-/// keeps each page's place.
+/// The Results tab: race results and the championship standings. Each page
+/// shows a RESULTS | STANDINGS switch under its own title (`ResultsPageSwitch`,
+/// handed down through the environment). Both pages stay alive, so switching
+/// is instant and keeps each page's place.
 struct ResultsHubView: View {
     enum Page { case results, standings }
 
@@ -14,34 +15,44 @@ struct ResultsHubView: View {
     #endif
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                chip("RESULTS", .results, tint: Theme.accent)
-                chip("STANDINGS", .standings, tint: Theme.violet)
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-            .padding(.bottom, 6)
-
-            ZStack {
-                ResultsView()
-                    .opacity(page == .results ? 1 : 0)
-                    .allowsHitTesting(page == .results)
-                    .accessibilityHidden(page != .results)
-                StandingsTabView()
-                    .opacity(page == .standings ? 1 : 0)
-                    .allowsHitTesting(page == .standings)
-                    .accessibilityHidden(page != .standings)
-            }
+        ZStack {
+            ResultsView()
+                .opacity(page == .results ? 1 : 0)
+                .allowsHitTesting(page == .results)
+                .accessibilityHidden(page != .results)
+            StandingsTabView()
+                .opacity(page == .standings ? 1 : 0)
+                .allowsHitTesting(page == .standings)
+                .accessibilityHidden(page != .standings)
         }
+        .environment(\.resultsPage, $page)
         .background(Theme.background.ignoresSafeArea())
     }
+}
 
-    private func chip(_ title: String, _ value: Page, tint: Color) -> some View {
-        Button { page = value } label: {
-            NeonChip(title: title, tint: tint, selected: page == value)
+/// RESULTS | STANDINGS, placed under each page's title. Shows nothing
+/// outside the Results tab.
+struct ResultsPageSwitch: View {
+    @Environment(\.resultsPage) private var page
+
+    var body: some View {
+        if let page {
+            HStack(spacing: 8) {
+                chip("RESULTS", .results, tint: Theme.accent, page: page)
+                chip("STANDINGS", .standings, tint: Theme.violet, page: page)
+            }
+        }
+    }
+
+    private func chip(_ title: String, _ value: ResultsHubView.Page, tint: Color, page: Binding<ResultsHubView.Page>) -> some View {
+        Button { page.wrappedValue = value } label: {
+            NeonChip(title: title, tint: tint, selected: page.wrappedValue == value)
         }
         .buttonStyle(.plain)
-        .accessibilityAddTraits(page == value ? .isSelected : [])
+        .accessibilityAddTraits(page.wrappedValue == value ? .isSelected : [])
     }
+}
+
+extension EnvironmentValues {
+    @Entry var resultsPage: Binding<ResultsHubView.Page>? = nil
 }

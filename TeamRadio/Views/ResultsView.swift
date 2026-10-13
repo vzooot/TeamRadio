@@ -94,6 +94,8 @@ struct ResultsView: View {
                 if let race = model.calendarRace {
                     header(race: race)
 
+                    ResultsPageSwitch()
+
                     if model.pickerRaces.count > 1 {
                         roundPicker
                     }
@@ -106,6 +108,9 @@ struct ResultsView: View {
                         VStack(alignment: .leading, spacing: 22) {
                             sessionContent
                         }
+                        // A new race arrives as fresh content (the podium
+                        // rises again) instead of morphing out of the last one.
+                        .id(model.selectedRound)
                         .blur(radius: isShielded ? 18 : 0)
                         .allowsHitTesting(!isShielded)
                         .overlay(alignment: .top) {
@@ -122,13 +127,16 @@ struct ResultsView: View {
                         }
                         .animation(.easeInOut(duration: 0.25), value: isShielded)
                     }
-                    .opacity(model.isSwitching ? 0.35 : 1)
+                    // Only the dimming animates: animating everything with it
+                    // made the new race's rows and podium morph out of the old.
+                    .animation(.easeInOut(duration: 0.2)) { content in
+                        content.opacity(model.isSwitching ? 0.35 : 1)
+                    }
                     .overlay {
                         if model.isSwitching {
                             ProgressView().tint(Theme.accent)
                         }
                     }
-                    .animation(.easeInOut(duration: 0.2), value: model.isSwitching)
                 } else {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("🏁 NO RESULTS YET")
@@ -139,6 +147,7 @@ struct ResultsView: View {
                             .foregroundStyle(Theme.dimText)
                     }
                     .padding(.top, 8)
+                    ResultsPageSwitch()
                 }
 
                 if !model.constructorStandings.isEmpty {
