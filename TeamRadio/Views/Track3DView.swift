@@ -25,6 +25,12 @@ struct Track3DView: UIViewRepresentable {
         context.coordinator.resetToken = resetToken
         context.coordinator.onSelectCorner = onSelectCorner
         view.addGestureRecognizer(UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.tapped(_:))))
+        // Our own pinch replaces the built-in one, which zooms toward the
+        // middle of the whole view (down behind the stats).
+        let pinch = UIPinchGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.pinched(_:)))
+        view.addGestureRecognizer(pinch)
+        context.coordinator.pinch = pinch
+        Self.disableBuiltInPinch(in: view, keeping: pinch)
         Self.highlight(selectedCorner, in: view)
         Self.focus(selectedCorner, in: view, animated: false)
         context.coordinator.selectedCorner = selectedCorner
@@ -87,6 +93,13 @@ struct Track3DView: UIViewRepresentable {
         view.defaultCameraController.target = look
     }
 
+    /// Switches off the pinch SceneKit adds for camera control.
+    static func disableBuiltInPinch(in view: SCNView, keeping ours: UIGestureRecognizer?) {
+        for recognizer in view.gestureRecognizers ?? [] where recognizer is UIPinchGestureRecognizer && recognizer !== ours {
+            recognizer.isEnabled = false
+        }
+    }
+
     /// Selected corner: bigger and cyan; the others dim back.
     static func highlight(_ number: Int?, in view: SCNView) {
         view.scene?.rootNode.enumerateChildNodes { node, _ in
@@ -105,6 +118,8 @@ struct Track3DView: UIViewRepresentable {
 
     func updateUIView(_ view: SCNView, context: Context) {
         context.coordinator.onSelectCorner = onSelectCorner
+        // SceneKit may add its recognizers after the view is made.
+        Self.disableBuiltInPinch(in: view, keeping: context.coordinator.pinch)
         if context.coordinator.circuitName != map.circuitName || context.coordinator.resetToken != resetToken {
             context.coordinator.circuitName = map.circuitName
             context.coordinator.resetToken = resetToken
@@ -147,6 +162,36 @@ struct Track3DView: UIViewRepresentable {
             }
             guard let best else { return }
             onSelectCorner?(best.number == selectedCorner ? nil : best.number)
+        }
+
+        weak var pinch: UIPinchGestureRecognizer?
+        private var lastScale: CGFloat = 1
+
+        /// Pinch moves the camera straight toward (or away from) the point
+        /// it looks at: the circuit's centre or the chosen turn, which sits
+        /// in the middle of the visible map. That point stays put on screen
+        /// and everything grows around it.
+        @objc func pinched(_ gesture: UIPinchGestureRecognizer) {
+            pinch = gesture
+            guard let view = gesture.view as? SCNView, let camera = view.pointOfView else { return }
+            switch gesture.state {
+            case .began:
+                lastScale = 1
+            case .changed:
+                let step = Float(gesture.scale / lastScale)
+                lastScale = gesture.scale
+                guard step > 0 else { return }
+                let target = view.defaultCameraController.target
+                let p = camera.worldPosition
+                let d = SCNVector3(p.x - target.x, p.y - target.y, p.z - target.z)
+                let length = sqrt(d.x * d.x + d.y * d.y + d.z * d.z)
+                guard length > 0.001 else { return }
+                let newLength = min(max(length / step, 1.2), 30)
+                let k = newLength / length
+                camera.worldPosition = SCNVector3(target.x + d.x * k, target.y + d.y * k, target.z + d.z * k)
+            default:
+                break
+            }
         }
     }
 }
