@@ -30,6 +30,79 @@ struct ResultsHubView: View {
     }
 }
 
+/// Both pages' header, built the same way so the switch never moves when
+/// flipping between them: title, one-line subtitle, the spoiler toggle,
+/// then RESULTS | STANDINGS at a fixed gap.
+struct ResultsHubHeader: View {
+    let title: String
+    let subtitle: String
+    /// Called when spoiler mode is toggled (the page hides its content again).
+    var onToggle: () -> Void = {}
+    @AppStorage("spoilerMode") private var spoilerMode = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(alignment: .top, spacing: 9) {
+                        TrioSlashes(height: 24)
+                            .padding(.top, 6)
+                        Text(title)
+                    }
+                    .font(.f1(30).italic())
+                    .foregroundStyle(Theme.chromeText)
+                    Text(subtitle)
+                        .font(.f1(12, weight: .semibold))
+                        .tracking(2)
+                        .foregroundStyle(Theme.dimText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+                Spacer(minLength: 8)
+                // Spoiler mode: results and standings stay hidden until tapped.
+                Button {
+                    spoilerMode.toggle()
+                    onToggle()
+                } label: {
+                    Image(systemName: spoilerMode ? "eye.slash.fill" : "eye")
+                        .font(.system(size: 17))
+                        .foregroundStyle(spoilerMode ? Theme.accent : Theme.dimText)
+                        .padding(8)
+                        .background(
+                            Circle()
+                                .fill(Color.white.opacity(0.05))
+                                .overlay(Circle().strokeBorder(spoilerMode ? Theme.accent.opacity(0.5) : Theme.cardStroke, lineWidth: 1))
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(spoilerMode ? "Show spoilers" : "Hide spoilers")
+            }
+            ResultsPageSwitch()
+        }
+        .padding(.top, 8)
+    }
+}
+
+/// Tap-to-reveal cover for people watching sessions delayed.
+struct SpoilerShield: View {
+    var text = "Tap to reveal the results"
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "eye.slash.fill")
+                .font(.system(size: 28))
+                .foregroundStyle(Theme.accent)
+            Text("SPOILERS HIDDEN")
+                .font(.f1(17).italic())
+                .foregroundStyle(.white)
+            Text(text)
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.dimText)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
 /// RESULTS | STANDINGS, placed under each page's title. Shows nothing
 /// outside the Results tab.
 struct ResultsPageSwitch: View {

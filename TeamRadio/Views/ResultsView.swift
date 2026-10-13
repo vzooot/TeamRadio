@@ -72,29 +72,13 @@ struct ResultsView: View {
         }
     }
 
-    /// Tap-to-reveal cover for people watching sessions delayed.
-    private var spoilerShield: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "eye.slash.fill")
-                .font(.system(size: 28))
-                .foregroundStyle(Theme.accent)
-            Text("SPOILERS HIDDEN")
-                .font(.f1(17).italic())
-                .foregroundStyle(.white)
-            Text("Tap to reveal the results")
-                .font(.system(size: 12))
-                .foregroundStyle(Theme.dimText)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
     private var loadedContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 if let race = model.calendarRace {
-                    header(race: race)
-
-                    ResultsPageSwitch()
+                    ResultsHubHeader(title: "RESULTS",
+                                     subtitle: "\(Flags.emoji(for: race.circuit.location.country)) \(race.raceName.uppercased()) · ROUND \(race.roundNumber)",
+                                     onToggle: { revealed = false })
 
                     if model.pickerRaces.count > 1 {
                         roundPicker
@@ -117,7 +101,7 @@ struct ResultsView: View {
                             // Pinned near the top so it's visible without
                             // scrolling, however tall the hidden content is.
                             if isShielded {
-                                spoilerShield
+                                SpoilerShield()
                                     .frame(height: 300)
                             }
                         }
@@ -138,6 +122,7 @@ struct ResultsView: View {
                         }
                     }
                 } else {
+                    ResultsHubHeader(title: "RESULTS", subtitle: "NO CLASSIFIED SESSION YET", onToggle: { revealed = false })
                     VStack(alignment: .leading, spacing: 6) {
                         Text("🏁 NO RESULTS YET")
                             .font(.f1(24).italic())
@@ -146,8 +131,6 @@ struct ResultsView: View {
                             .font(.subheadline)
                             .foregroundStyle(Theme.dimText)
                     }
-                    .padding(.top, 8)
-                    ResultsPageSwitch()
                 }
 
                 if !model.constructorStandings.isEmpty {
@@ -213,43 +196,6 @@ struct ResultsView: View {
         )
     }
 
-    private func header(race: Race) -> some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(alignment: .top, spacing: 9) {
-                    TrioSlashes(height: 24)
-                        .padding(.top, 6)   // centred on the first line when the title wraps
-                    Text("RESULTS")
-                }
-                    .font(.f1(30).italic())
-                    .foregroundStyle(Theme.chromeText)
-                Text("\(Flags.emoji(for: race.circuit.location.country)) \(race.raceName.uppercased()) · ROUND \(race.roundNumber)")
-                    .font(.f1(12, weight: .semibold))
-                    .tracking(2)
-                    .foregroundStyle(Theme.dimText)
-            }
-
-            Spacer()
-
-            // Spoiler mode toggle: when on, results stay hidden until tapped.
-            Button {
-                spoilerMode.toggle()
-                revealed = false
-            } label: {
-                Image(systemName: spoilerMode ? "eye.slash.fill" : "eye")
-                    .font(.system(size: 17))
-                    .foregroundStyle(spoilerMode ? Theme.accent : Theme.dimText)
-                    .padding(8)
-                    .background(
-                        Circle()
-                            .fill(Color.white.opacity(0.05))
-                            .overlay(Circle().strokeBorder(spoilerMode ? Theme.accent.opacity(0.5) : Theme.cardStroke, lineWidth: 1))
-                    )
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.top, 8)
-    }
 
     /// Horizontal strip of every completed round; tap to load its results.
     private var roundPicker: some View {
