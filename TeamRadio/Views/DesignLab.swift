@@ -39,6 +39,9 @@ struct DesignLab: View {
             case "wall1": WallDraftGrid()
             case "wall2": WallDraftArcs()
             case "wall3": WallDraftWheel()
+            case "boardA": BoardDraftA()
+            case "boardB": BoardDraftB()
+            case "boardC": BoardDraftC()
             default: Text("unknown draft \(id)").foregroundStyle(.white)
             }
         }
