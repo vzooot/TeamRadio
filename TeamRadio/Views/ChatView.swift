@@ -14,15 +14,10 @@ struct ChatView: View {
     @State private var pendingMedia: PendingMedia?
     @State private var isLoadingMedia = false
     @State private var inbox = InboxViewModel()
-    #if DEBUG
-    // -PaddockMode news: open on the News pane, for screenshots
-    @State private var mode: Mode = UserDefaults.standard.string(forKey: "PaddockMode") == "news" ? .news : .room
-    #else
     @State private var mode: Mode = .room
-    #endif
     @State private var dmPath: [InboxView.DMTarget] = []
 
-    enum Mode { case room, messages, news }
+    enum Mode { case room, messages }
 
     struct Member: Identifiable {
         let id: String
@@ -65,28 +60,18 @@ struct ChatView: View {
             )
             .ignoresSafeArea()
 
-            // The news reads without iCloud or a paddock name, so it sits
-            // above the chat's gates.
-            if mode == .news {
-                VStack(spacing: 0) {
-                    modeChips(messages: inRoom)
-                        .padding(.top, 8)
-                    NewsView()
-                }
-            } else {
-                switch model.state {
-                case .checking:
-                    LoadingView()
-                case .needsICloud:
-                    gated(needsICloud)
-                case .ready:
-                    if !model.agreedToRules {
-                        gated(rulesGate)
-                    } else if model.nickname.isEmpty || editingName {
-                        nicknamePrompt
-                    } else {
-                        chatRoom
-                    }
+            switch model.state {
+            case .checking:
+                LoadingView()
+            case .needsICloud:
+                needsICloud
+            case .ready:
+                if !model.agreedToRules {
+                    rulesGate
+                } else if model.nickname.isEmpty || editingName {
+                    nicknamePrompt
+                } else {
+                    chatRoom
                 }
             }
         }
@@ -110,9 +95,6 @@ struct ChatView: View {
         .onReceive(NotificationCenter.default.publisher(for: .openPaddockRoom)) { _ in
             mode = .room
         }
-        .onReceive(NotificationCenter.default.publisher(for: .openPaddockNews)) { _ in
-            mode = .news
-        }
         .sheet(item: $memberCard) { member in
             MemberCard(member: member) {
                 openThread(id: member.id, name: member.name)
@@ -126,46 +108,24 @@ struct ChatView: View {
         }
     }
 
-    /// The chat is open (past iCloud, the rules and the name).
-    private var inRoom: Bool {
-        model.state == .ready && model.agreedToRules && !model.nickname.isEmpty
-    }
-
-    /// Room / Messages / News, the way every social app does it.
-    private func modeChips(messages: Bool) -> some View {
+    /// Room / Messages, the way every social app does it. (The leaderboard
+    /// lives in the Games tab.)
+    private var modeChips: some View {
         HStack(spacing: 8) {
             Button { mode = .room } label: {
                 NeonChip(title: "ROOM", tint: Theme.accent, selected: mode == .room)
             }
             .buttonStyle(.plain)
-            if messages {
-                Button { mode = .messages } label: {
-                    // burns red with the count while something is unread
-                    NeonChip(title: inbox.totalUnread > 0 ? "MESSAGES · \(inbox.totalUnread)" : "MESSAGES",
-                             tint: inbox.totalUnread > 0 ? Theme.live : Theme.violet,
-                             selected: mode == .messages || inbox.totalUnread > 0)
-                }
-                .buttonStyle(.plain)
-            }
-            Button { mode = .news } label: {
-                NeonChip(title: "NEWS", tint: Color(red: 1, green: 0.75, blue: 0.2), selected: mode == .news)
+            Button { mode = .messages } label: {
+                // burns red with the count while something is unread
+                NeonChip(title: inbox.totalUnread > 0 ? "MESSAGES · \(inbox.totalUnread)" : "MESSAGES",
+                         tint: inbox.totalUnread > 0 ? Theme.live : Theme.violet,
+                         selected: mode == .messages || inbox.totalUnread > 0)
             }
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 10)
-    }
-
-    /// A gate with the Room / News switch above it, so the news is never
-    /// locked behind iCloud or the rules.
-    private func gated(_ gate: some View) -> some View {
-        VStack(spacing: 0) {
-            modeChips(messages: false)
-                .padding(.top, 8)
-            Spacer(minLength: 0)
-            gate
-            Spacer(minLength: 0)
-        }
     }
 
     // MARK: - Gates
@@ -388,7 +348,7 @@ struct ChatView: View {
             .padding(.top, 8)
             .padding(.bottom, 10)
 
-            modeChips(messages: true)
+            modeChips
 
             if mode == .messages {
                 InboxView(model: inbox, myName: model.nickname, suggestions: recentMembers, path: $dmPath)

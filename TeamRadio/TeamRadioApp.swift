@@ -43,7 +43,7 @@ struct TeamRadioApp: App {
 struct RootView: View {
     /// Tab tags, also used by deep links and the -Tab screenshot hook.
     enum Tab {
-        static let countdown = 0, results = 1, games = 2, standings = 3, paddock = 4
+        static let countdown = 0, results = 1, games = 2, paddock = 3, news = 4
     }
 
     @Environment(\.scenePhase) private var scenePhase
@@ -69,20 +69,20 @@ struct RootView: View {
             ContentView()
                 .tabItem { Label("Countdown", systemImage: "flag.checkered") }
                 .tag(Tab.countdown)
-            ResultsView()
+            // Results and the standings, behind a RESULTS | STANDINGS switch.
+            ResultsHubView()
                 .tabItem { Label("Results", systemImage: "trophy.fill") }
                 .tag(Tab.results)
             GamesView()
                 .tabItem { Label("Games", systemImage: "gamecontroller.fill") }
                 .tag(Tab.games)
-            StandingsTabView()
-                .tabItem { Label("Standings", systemImage: "list.number") }
-                .tag(Tab.standings)
-            // The news lives in the Paddock (ROOM · MESSAGES · NEWS).
             ChatView()
                 .tabItem { Label("Paddock", systemImage: "bubble.left.and.bubble.right.fill") }
                 .badge(chatBadge.unread)
                 .tag(Tab.paddock)
+            NewsView()
+                .tabItem { Label("News", systemImage: "newspaper.fill") }
+                .tag(Tab.news)
         }
         .tint(Theme.accent)
         #if DEBUG
@@ -109,12 +109,10 @@ struct RootView: View {
         }
         // teamradio://countdown|results|games|standings|paddock|news
         .onOpenURL { url in
-            let host = (url.host ?? "").lowercased()
-            let map = ["countdown": Tab.countdown, "results": Tab.results, "games": Tab.games,
-                       "standings": Tab.standings, "paddock": Tab.paddock, "news": Tab.paddock]
-            if let tab = map[host] {
+            let map = ["countdown": Tab.countdown, "results": Tab.results, "standings": Tab.results,
+                       "games": Tab.games, "paddock": Tab.paddock, "news": Tab.news]
+            if let tab = map[(url.host ?? "").lowercased()] {
                 selection = tab
-                if host == "news" { NotificationCenter.default.post(name: .openPaddockNews, object: nil) }
             }
         }
         .onChange(of: selection) { _, tab in

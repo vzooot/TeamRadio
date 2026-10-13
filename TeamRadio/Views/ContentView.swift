@@ -3,6 +3,9 @@ import SwiftUI
 struct ContentView: View {
     @State private var model = RaceViewModel()
     @State private var showAbout = false
+    @State private var dotd = DotdModel()
+    @State private var showDotd = false
+    @State private var showEmily = false
     /// The race strip is open: the page holds still meanwhile.
     @State private var raceDock = false
     /// Which way the last race switch went, so the page follows the card.
@@ -55,6 +58,39 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showAbout) {
             AboutView()
+        }
+        .task(id: model.nextRace?.id) {
+            guard GameFeature.isEnabled, !model.season.isEmpty else { return }
+            // Before the results are in, the vote lists the championship order.
+            let standings = (try? await F1API.driverStandings(limit: 30)) ?? []
+            let drivers = standings.map {
+                GameDriver(id: $0.driver.driverId, code: $0.driver.shortCode, familyName: $0.driver.familyName,
+                           number: $0.driver.permanentNumber, teamId: $0.teamId)
+            }
+            await dotd.load(season: model.season, fallbackDrivers: drivers)
+            #if DEBUG
+            // -FakeVote YES: a cast vote and a three-way tally, for screenshots
+            if UserDefaults.standard.bool(forKey: "FakeVote"), dotd.drivers.count > 2 {
+                let d = dotd.drivers
+                dotd.myVote = d[1].id
+                dotd.tally = DotdService.Tally(total: 412, votes: [
+                    .init(driverId: d[1].id, count: 214, pct: 52),
+                    .init(driverId: d[0].id, count: 124, pct: 30),
+                    .init(driverId: d[2].id, count: 74, pct: 18),
+                ])
+            }
+            #endif
+        }
+        .sheet(isPresented: $showDotd) {
+            DotdSheet(model: dotd)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.background)
+        }
+        .sheet(isPresented: $showEmily) {
+            AskEmilyView()
+                .presentationDetents([.large])
+                .presentationBackground(Theme.background)
         }
     }
 
@@ -114,7 +150,19 @@ struct ContentView: View {
                         GameZoneDraft(variant: UserDefaults.standard.string(forKey: "GameZoneDraft") ?? "").id("gameZone")
                     }
                     #endif
-                    // (The game features live in the Games tab.)
+                    // The fan vote and the AI race engineer; the games
+                    // themselves live in the Games tab.
+                    if GameFeature.isEnabled, !model.isBrowsing {
+                        TimelineView(.periodic(from: .now, by: 30)) { context in
+                            VStack(spacing: 14) {
+                                if dotd.race != nil {
+                                    DotdBoldCard(model: dotd, now: context.date, onVote: { showDotd = true })
+                                }
+                                EmilyBar(onTap: { showEmily = true })
+                            }
+                        }
+                        .transaction(value: model.isBrowsing) { $0.animation = nil }
+                    }
 
                     if !Self.demoMode {
                         InviteBanner()

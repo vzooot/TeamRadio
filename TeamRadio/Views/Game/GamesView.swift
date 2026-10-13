@@ -1,12 +1,11 @@
 import SwiftUI
 
-/// The Games tab: the player's season standing, the picks card, the arcade
-/// (Reaction Wall and Lights Out), driver of the day, Ask Emily and the
-/// leaderboards. Approved layout A, "pit wall":
+/// The Games tab, games only: the player's season standing, the picks card,
+/// the arcade (Reaction Wall and Lights Out) and the leaderboards. Driver
+/// of the day and Ask Emily live on the Countdown tab. Layout A, "pit wall":
 /// Marketing/drafts/2026-10-13/games-tab-A-B-C.png
 struct GamesView: View {
     @State private var game = GameViewModel()
-    @State private var dotd = DotdModel()
     @State private var season: [Race] = []
     @State private var nextRace: Race?
     @State private var userId: String?
@@ -16,8 +15,6 @@ struct GamesView: View {
 
     @State private var showPicks = false
     @State private var showResult = false
-    @State private var showDotd = false
-    @State private var showEmily = false
     @State private var showLightsOut = false
     @State private var showWall = false
     @State private var leaderboard: BoardSheet?
@@ -63,17 +60,6 @@ struct GamesView: View {
         .fullScreenCover(isPresented: $showLightsOut, onDismiss: { Task { await loadArcadeBoards() } }) {
             LightsOutView()
         }
-        .sheet(isPresented: $showDotd) {
-            DotdSheet(model: dotd)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(Theme.background)
-        }
-        .sheet(isPresented: $showEmily) {
-            AskEmilyView()
-                .presentationDetents([.large])
-                .presentationBackground(Theme.background)
-        }
         .sheet(isPresented: $showPicks) {
             PicksSheet(game: game)
                 .presentationDetents([.large])
@@ -116,10 +102,6 @@ struct GamesView: View {
                 ArcadeTile(kind: .wall, rank: wallBoard?.me?.rank) { showWall = true }
                 ArcadeTile(kind: .lightsOut, rank: lightsBoard?.me?.rank) { showLightsOut = true }
             }
-            if dotd.race != nil {
-                DotdBoldCard(model: dotd, now: now, onVote: { showDotd = true })
-            }
-            EmilyBar(onTap: { showEmily = true })
             SectionTitle("LEADERBOARDS")
             HStack(spacing: 10) {
                 boardButton(.global, icon: "globe.europe.africa.fill", title: "GLOBAL",
@@ -176,19 +158,6 @@ struct GamesView: View {
             game.draft.pole = game.drivers[1].id
             game.draft.p1 = game.drivers[0].id
             game.draft.p2 = game.drivers[2].id
-        }
-        #endif
-        await dotd.load(season: season, fallbackDrivers: game.drivers)
-        #if DEBUG
-        // -FakeVote YES: a cast vote and a three-way tally, for screenshots
-        if UserDefaults.standard.bool(forKey: "FakeVote"), dotd.drivers.count > 2 {
-            let d = dotd.drivers
-            dotd.myVote = d[1].id
-            dotd.tally = DotdService.Tally(total: 412, votes: [
-                .init(driverId: d[1].id, count: 214, pct: 52),
-                .init(driverId: d[0].id, count: 124, pct: 30),
-                .init(driverId: d[2].id, count: 74, pct: 18),
-            ])
         }
         #endif
         userId = await ChatService.currentUserId()
