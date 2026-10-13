@@ -131,16 +131,19 @@ struct Track3DView: UIViewRepresentable {
 
         /// The corner number nearest the tap on screen (generous radius, the
         /// digits are small); tapping the selected one again zooms back out.
+        /// Measured where each number is drawn (`presentation`): the stored
+        /// position doesn't follow the spin and sat 100–140 pt away on screen,
+        /// so taps missed or picked the wrong turn.
         @objc func tapped(_ gesture: UITapGestureRecognizer) {
             guard let view = gesture.view as? SCNView, let root = view.scene?.rootNode else { return }
             let point = gesture.location(in: view)
             var best: (number: Int, distance: CGFloat)?
             root.enumerateChildNodes { node, _ in
                 guard let name = node.name, name.hasPrefix("corner-"), let n = Int(name.dropFirst(7)) else { return }
-                let p = view.projectPoint(node.worldPosition)
+                let p = view.projectPoint(node.presentation.worldPosition)
                 guard p.z > 0, p.z < 1 else { return }
                 let d = hypot(CGFloat(p.x) - point.x, CGFloat(p.y) - point.y)
-                if d < 36, d < (best?.distance ?? .infinity) { best = (n, d) }
+                if d < 40, d < (best?.distance ?? .infinity) { best = (n, d) }
             }
             guard let best else { return }
             onSelectCorner?(best.number == selectedCorner ? nil : best.number)
