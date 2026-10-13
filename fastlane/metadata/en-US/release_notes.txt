@@ -1,10 +1,9 @@
-A faster, sharper Team Radio:
+Games get their own tab:
 
-• Every Grand Prix in one line: swipe the race card to the next or previous race, or press and hold for the whole season
-• Game Zone redesign: your picks and the AI Strategist's side by side, with the season duel in 3D bars you can turn and tilt
-• Driver of the Day: the fan vote rises as a 3D podium
-• Lights Out: hold the brake pedal to start, and go again after every run
-• Circuit guide: tap a turn and the 3D camera flies in
-• News: a new broadcast layout with a live ticker, trending teams and the wire
-• New launch intro with start lights
-• Switching races is much faster and smoother
+• New Games tab: your season rank as a live leaderboard with the players around you, the duel with the AI Strategist, your picks and the arcade
+• New game, Reaction Wall: hit the lights the moment they flash, for 60 seconds, like the reflex trainers drivers use. Weekly leaderboard included
+• Lights Out: the brake pedal now reacts the instant you press it
+• Results and standings together in one tab, both with spoiler hiding
+• Circuit map: tapping a turn number now always flies to the right turn, pinch zooms into the middle, and the track fades away under the stats
+• Hold the race card and slide to run through the whole season without lifting your finger
+• Smoother switching between races in Results
