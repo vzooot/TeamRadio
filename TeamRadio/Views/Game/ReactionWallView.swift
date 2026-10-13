@@ -34,6 +34,10 @@ struct ReactionWallView: View {
     static let duration: TimeInterval = 60
     static let outer = 7
     static let inner = 4
+    /// Arc radii as a share of the board's width: the outer arc's end
+    /// lights keep a clear margin from the panel's edge.
+    static let outerRadius: CGFloat = 0.40
+    static let innerRadius: CGFloat = 0.22
     private static let redLife: Duration = .milliseconds(900)
     private static let appStore = URL(string: "https://apps.apple.com/app/id6804406860")!
 
@@ -116,7 +120,7 @@ struct ReactionWallView: View {
             let w = geo.size.width
             let c = CGPoint(x: w / 2, y: w * 0.58)
             ZStack {
-                ForEach([0.43, 0.25], id: \.self) { r in
+                ForEach([Self.outerRadius, Self.innerRadius], id: \.self) { r in
                     Circle()
                         .trim(from: 0.36, to: 0.78)
                         .stroke(Color.white.opacity(0.06), style: StrokeStyle(lineWidth: 1, dash: [3, 5]))
@@ -128,8 +132,8 @@ struct ReactionWallView: View {
                     let isOuter = i < Self.outer
                     pad(i, size: isOuter ? 62 : 54)
                         .position(isOuter
-                                  ? Self.point(i, of: Self.outer, radius: w * 0.43, center: c, spread: 230)
-                                  : Self.point(i - Self.outer, of: Self.inner, radius: w * 0.25, center: c, spread: 200))
+                                  ? Self.point(i, of: Self.outer, radius: w * Self.outerRadius, center: c, spread: 230)
+                                  : Self.point(i - Self.outer, of: Self.inner, radius: w * Self.innerRadius, center: c, spread: 200))
                 }
                 VStack(spacing: 8) {
                     LEDText(text: centre, pitch: 6, color: centreColor)

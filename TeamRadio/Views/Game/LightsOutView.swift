@@ -169,18 +169,18 @@ struct LightsOutView: View {
         switch phase {
         case .ready, .lighting, .holding, .go:
             BrakePedal(pressed: fingerDown)
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { _ in
-                            guard !fingerDown else { return }
-                            fingerDown = true
-                            press()
-                        }
-                        .onEnded { _ in
-                            fingerDown = false
-                            release()
-                        }
-                )
+                // Down the instant the finger lands, up the instant it lifts
+                // (a drag gesture waited to be recognised, so the pedal lagged).
+                .onLongPressGesture(minimumDuration: .infinity, maximumDistance: .infinity, pressing: { down in
+                    if down {
+                        guard !fingerDown else { return }
+                        fingerDown = true
+                        press()
+                    } else {
+                        fingerDown = false
+                        release()
+                    }
+                }, perform: {})
                 .accessibilityElement()
                 .accessibilityLabel("Brake pedal")
                 .accessibilityHint("Hold to start the lights, release when they go out")
@@ -357,7 +357,7 @@ private struct BrakePedal: View {
             .rotation3DEffect(.degrees(pressed ? 22 : 0), axis: (x: 1, y: 0, z: 0), anchor: .bottom, perspective: 0.5)
             .scaleEffect(pressed ? 0.96 : 1)
             .shadow(color: pressed ? Theme.live.opacity(0.7) : .black.opacity(0.6), radius: pressed ? 18 : 10, y: pressed ? 2 : 10)
-            .animation(.spring(response: 0.18, dampingFraction: 0.7), value: pressed)
+            .animation(.spring(response: 0.12, dampingFraction: 0.8), value: pressed)
             Text(pressed ? "HOLDING…" : "HOLD THE BRAKE")
                 .font(.f1(11, weight: .heavy))
                 .tracking(2)

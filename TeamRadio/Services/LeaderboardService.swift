@@ -5,15 +5,9 @@ import Foundation
 enum LeaderboardService {
     private static let base = URL(string: "https://teamradio-push.eam-adio.workers.dev/game")!
 
-    /// Xcode builds use CloudKit's Development database, TestFlight and the
-    /// App Store use Production; each has its own leaderboard.
-    private static var environment: String {
-        #if DEBUG
-        "development"
-        #else
-        "production"
-        #endif
-    }
+    /// The CloudKit database this build uses, so the boards match the
+    /// player's picks (it follows the signing, not Debug/Release).
+    private static var environment: String { BuildSigning.isDevelopment ? "development" : "production" }
 
     enum Scope: String { case season, round }
 
