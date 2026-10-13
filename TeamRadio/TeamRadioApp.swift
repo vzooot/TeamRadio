@@ -41,6 +41,11 @@ struct TeamRadioApp: App {
 }
 
 struct RootView: View {
+    /// Tab tags, also used by deep links and the -Tab screenshot hook.
+    enum Tab {
+        static let countdown = 0, results = 1, games = 2, standings = 3, paddock = 4
+    }
+
     @Environment(\.scenePhase) private var scenePhase
     #if DEBUG
     // -Tab N: open on a tab, for screenshots
@@ -63,20 +68,21 @@ struct RootView: View {
         TabView(selection: $selection) {
             ContentView()
                 .tabItem { Label("Countdown", systemImage: "flag.checkered") }
-                .tag(0)
+                .tag(Tab.countdown)
             ResultsView()
                 .tabItem { Label("Results", systemImage: "trophy.fill") }
-                .tag(1)
+                .tag(Tab.results)
+            GamesView()
+                .tabItem { Label("Games", systemImage: "gamecontroller.fill") }
+                .tag(Tab.games)
             StandingsTabView()
                 .tabItem { Label("Standings", systemImage: "list.number") }
-                .tag(2)
+                .tag(Tab.standings)
+            // The news lives in the Paddock (ROOM · MESSAGES · NEWS).
             ChatView()
                 .tabItem { Label("Paddock", systemImage: "bubble.left.and.bubble.right.fill") }
                 .badge(chatBadge.unread)
-                .tag(3)
-            NewsView()
-                .tabItem { Label("News", systemImage: "newspaper.fill") }
-                .tag(4)
+                .tag(Tab.paddock)
         }
         .tint(Theme.accent)
         #if DEBUG
@@ -101,21 +107,24 @@ struct RootView: View {
             // registering is all it needs (the token stays with Apple).
             UIApplication.shared.registerForRemoteNotifications()
         }
-        // teamradio://countdown|results|standings|paddock|news
+        // teamradio://countdown|results|games|standings|paddock|news
         .onOpenURL { url in
-            let map = ["countdown": 0, "results": 1, "standings": 2, "paddock": 3, "news": 4]
-            if let tab = map[(url.host ?? "").lowercased()] {
+            let host = (url.host ?? "").lowercased()
+            let map = ["countdown": Tab.countdown, "results": Tab.results, "games": Tab.games,
+                       "standings": Tab.standings, "paddock": Tab.paddock, "news": Tab.paddock]
+            if let tab = map[host] {
                 selection = tab
+                if host == "news" { NotificationCenter.default.post(name: .openPaddockNews, object: nil) }
             }
         }
         .onChange(of: selection) { _, tab in
-            if tab == 3 {
+            if tab == Tab.paddock {
                 chatBadge.markRead()
                 withAnimation(.easeOut(duration: 0.2)) { showMessageToast = false }
             }
         }
         .onChange(of: chatBadge.unread) { old, new in
-            guard new > old, selection != 3 else { return }
+            guard new > old, selection != Tab.paddock else { return }
             withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) { showMessageToast = true }
             toastDismissTask?.cancel()
             toastDismissTask = Task {
@@ -125,10 +134,10 @@ struct RootView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .openPaddockMessages)) { _ in
-            selection = 3
+            selection = Tab.paddock
         }
         .onReceive(NotificationCenter.default.publisher(for: .openPaddockRoom)) { _ in
-            selection = 3
+            selection = Tab.paddock
         }
         // The badge is blue for room chatter, red as soon as a private message waits.
         .onChange(of: chatBadge.unread) { _, _ in TabBarBadge.tint(private: chatBadge.unreadDMs > 0) }
@@ -136,7 +145,7 @@ struct RootView: View {
         .overlay(alignment: .bottom) {
             if showMessageToast && !showIntro && !Self.designLabOpen {
                 MessageToast(sender: chatBadge.latestSender, text: chatBadge.latestText, isPrivate: chatBadge.latestIsPrivate) {
-                    selection = 3
+                    selection = Tab.paddock
                     if chatBadge.latestIsPrivate {
                         NotificationCenter.default.post(name: .openPaddockMessages, object: nil)
                     }

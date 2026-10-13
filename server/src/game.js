@@ -671,6 +671,37 @@ export async function handleGame(request, env) {
                   me: me ? { name: me.name, ms: me.ms, rank: me.rank } : null });
   }
 
+  // Reaction Wall leaderboard, per week: points in one 60-second run,
+  // highest wins.
+  if (url.pathname === "/game/wall") {
+    const week = reactionWeek();
+    const key = `game:${ckEnv}:wall:${week}`;
+    const board = (await env.TOKENS.get(key, "json")) || {};
+    if (request.method === "POST") {
+      let body;
+      try { body = await request.json(); } catch { return new Response("bad json", { status: 400 }); }
+      const user = String(body.user || "").slice(0, 120);
+      const name = String(body.name || "").trim().slice(0, 24);
+      const score = Math.round(Number(body.score));
+      // A light every ~0.25 s, doubles included, is beyond human for 60 s.
+      if (!user || !name || !(score >= 1 && score <= 300)) return json({ error: "rejected" });
+      const day = new Date().toISOString().slice(0, 10);
+      const rateKey = `wx:${day}:${user}`;
+      const tries = Number((await env.TOKENS.get(rateKey)) || 0);
+      if (tries >= 200) return json({ error: "limit" });
+      await env.TOKENS.put(rateKey, String(tries + 1), { expirationTtl: 90000 });
+      if (!board[user] || score > board[user].score) {
+        board[user] = { name, score, at: Date.now() };
+        await env.TOKENS.put(key, JSON.stringify(board), { expirationTtl: 86400 * 21 });
+      }
+    }
+    const list = Object.entries(board).map(([userId, v]) => ({ userId, ...v })).sort((a, b) => b.score - a.score);
+    list.forEach((e, i) => { e.rank = i + 1; });
+    const me = q.get("user") ? list.find((e) => e.userId === q.get("user")) : null;
+    return json({ week, total: list.length, top: list.slice(0, 20).map(({ userId, name, score, rank }) => ({ userId, name, score, rank })),
+                  me: me ? { name: me.name, score: me.score, rank: me.rank } : null });
+  }
+
   if (url.pathname === "/game/dotd") {
     const round = q.get("round") || "";
     const race = (await season()).find((r) => `${r.season}-${r.round}` === round);

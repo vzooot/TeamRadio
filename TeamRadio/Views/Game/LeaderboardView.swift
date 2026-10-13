@@ -17,6 +17,11 @@ struct LeaderboardView: View {
         var id: String { user }
     }
 
+    /// `leagues`: open on the private leagues instead of the global table.
+    init(leagues: Bool = false) {
+        _showLeagues = State(initialValue: leagues)
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {

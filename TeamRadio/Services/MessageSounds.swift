@@ -42,4 +42,6 @@ extension Notification.Name {
     static let openPaddockMessages = Notification.Name("openPaddockMessages")
     /// Jump to the Paddock room (room notification tap).
     static let openPaddockRoom = Notification.Name("openPaddockRoom")
+    /// Jump to the Paddock's News pane (teamradio://news).
+    static let openPaddockNews = Notification.Name("openPaddockNews")
 }

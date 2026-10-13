@@ -87,40 +87,6 @@ private struct GamesTitle: View {
     }
 }
 
-/// One Reaction Wall light: a dark housing, a ring of LEDs and the glass
-/// lens, glowing when it's the one to hit.
-struct WallPad: View {
-    var lit = false
-    var tint: Color = Theme.accent
-    var size: CGFloat = 76
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .fill(LinearGradient(colors: [Color(white: 0.20), Color(white: 0.05)], startPoint: .top, endPoint: .bottom))
-            Circle().strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
-            ForEach(0..<18, id: \.self) { i in
-                Circle()
-                    .fill(lit ? tint : Color.white.opacity(0.07))
-                    .frame(width: size * 0.06, height: size * 0.06)
-                    .offset(y: -size * 0.40)
-                    .rotationEffect(.degrees(Double(i) * 20))
-            }
-            Circle()
-                .fill(lit
-                      ? RadialGradient(colors: [.white, tint, tint.opacity(0.55)], center: .init(x: 0.42, y: 0.38), startRadius: 0, endRadius: size * 0.34)
-                      : RadialGradient(colors: [Color(white: 0.17), Color(white: 0.06)], center: .init(x: 0.42, y: 0.38), startRadius: 0, endRadius: size * 0.34))
-                .padding(size * 0.2)
-            Circle()
-                .fill(LinearGradient(colors: [Color.white.opacity(0.35), .clear], startPoint: .top, endPoint: .center))
-                .padding(size * 0.24)
-                .opacity(lit ? 0.9 : 0.25)
-        }
-        .frame(width: size, height: size)
-        .shadow(color: lit ? tint.opacity(0.9) : .black.opacity(0.6), radius: lit ? 16 : 4, y: lit ? 0 : 3)
-    }
-}
-
 /// Small static wall for tiles and cards.
 private struct MiniWall: View {
     var columns = 3

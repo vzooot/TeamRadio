@@ -3,13 +3,6 @@ import SwiftUI
 struct ContentView: View {
     @State private var model = RaceViewModel()
     @State private var showAbout = false
-    @State private var game = GameViewModel()
-    @State private var showPicks = false
-    @State private var showResult = false
-    @State private var showEmily = false
-    @State private var dotd = DotdModel()
-    @State private var showDotd = false
-    @State private var showLightsOut = false
     /// The race strip is open: the page holds still meanwhile.
     @State private var raceDock = false
     /// Which way the last race switch went, so the page follows the card.
@@ -62,60 +55,6 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showAbout) {
             AboutView()
-        }
-        .task(id: model.nextRace?.id) {
-            guard GameFeature.isEnabled else { return }
-            await game.load(race: model.nextRace, season: model.season)
-            #if DEBUG
-            // -FakePicks YES: a signed-in player with three picks, for screenshots
-            if UserDefaults.standard.bool(forKey: "FakePicks"), game.drivers.count > 2 {
-                game.access = .ready
-                game.draft.pole = game.drivers[1].id
-                game.draft.p1 = game.drivers[0].id
-                game.draft.p2 = game.drivers[2].id
-            }
-            #endif
-            await dotd.load(season: model.season, fallbackDrivers: game.drivers)
-            #if DEBUG
-            // -FakeVote YES: a cast vote and a three-way tally, for screenshots
-            if UserDefaults.standard.bool(forKey: "FakeVote"), dotd.drivers.count > 2 {
-                let d = dotd.drivers
-                dotd.myVote = d[1].id
-                dotd.tally = DotdService.Tally(total: 412, votes: [
-                    .init(driverId: d[1].id, count: 214, pct: 52),
-                    .init(driverId: d[0].id, count: 124, pct: 30),
-                    .init(driverId: d[2].id, count: 74, pct: 18),
-                ])
-            }
-            #endif
-        }
-        .fullScreenCover(isPresented: $showLightsOut) {
-            LightsOutView()
-        }
-        .sheet(isPresented: $showDotd) {
-            DotdSheet(model: dotd)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(Theme.background)
-        }
-        .sheet(isPresented: $showEmily) {
-            AskEmilyView()
-                .presentationDetents([.large])
-                .presentationBackground(Theme.background)
-        }
-        .sheet(isPresented: $showPicks) {
-            PicksSheet(game: game)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(Theme.background)
-        }
-        .sheet(isPresented: $showResult) {
-            if case let .scored(race, score, prediction) = game.cardState(at: .now) {
-                ResultSheet(game: game, race: race, score: score, prediction: prediction)
-                    .presentationDetents([.large])
-                    .presentationDragIndicator(.visible)
-                    .presentationBackground(Theme.background)
-            }
         }
     }
 
@@ -175,20 +114,7 @@ struct ContentView: View {
                         GameZoneDraft(variant: UserDefaults.standard.string(forKey: "GameZoneDraft") ?? "").id("gameZone")
                     }
                     #endif
-                    if GameFeature.isEnabled, !model.isBrowsing, !Self.gameZoneDraft {
-                        GameZone(game: game, dotd: dotd, seasonRounds: model.season.count,
-                                 onPicks: { showPicks = true },
-                                 onResult: { showResult = true },
-                                 onVote: { showDotd = true },
-                                 onLightsOut: { showLightsOut = true },
-                                 onEmily: { showEmily = true })
-                            .id("picks")
-                            // heavy (3D chart, animations): appears and
-                            // disappears without joining the race-switch
-                            // animation — only then, so its own animations
-                            // (rings filling, cards rising) still play
-                            .transaction(value: model.isBrowsing) { $0.animation = nil }
-                    }
+                    // (The game features live in the Games tab.)
 
                     if !Self.demoMode {
                         InviteBanner()

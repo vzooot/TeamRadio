@@ -32,6 +32,7 @@ struct DesignLab: View {
             case "styleSciFi": StyleSciFi()
             case "cards8": CardsDraft8()
             case "lightsOut": LightsOutView()
+            case "wall": ReactionWallView()
             case "gamesA": GamesHubA()
             case "gamesB": GamesHubB()
             case "gamesC": GamesHubC()
