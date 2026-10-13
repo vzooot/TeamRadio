@@ -9,6 +9,11 @@ struct StandingsTabView: View {
 
     @State private var model = StandingsViewModel()
     @State private var mode: Mode = .drivers
+    /// Spoiler mode (shared with Results): the tables stay blurred until tapped.
+    @AppStorage("spoilerMode") private var spoilerMode = false
+    @State private var revealed = false
+
+    private var isShielded: Bool { spoilerMode && !revealed }
 
     var body: some View {
         ZStack {
@@ -48,29 +53,32 @@ struct StandingsTabView: View {
 
     private var loadedContent: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(alignment: .top, spacing: 9) {
-                        TrioSlashes(height: 24)
-                            .padding(.top, 6)   // centred on the first line when the title wraps
-                        Text("STANDINGS")
-                    }
-                        .font(.f1(30).italic())
-                        .foregroundStyle(Theme.chromeText)
-                    Text("WORLD CHAMPIONSHIP")
-                        .font(.f1(12, weight: .semibold))
-                        .tracking(2)
-                        .foregroundStyle(Theme.dimText)
-                }
-                .padding(.top, 8)
+            VStack(alignment: .leading, spacing: 22) {
+                ResultsHubHeader(title: "STANDINGS", subtitle: "WORLD CHAMPIONSHIP", onToggle: { revealed = false })
 
                 modePicker
 
-                if mode == .drivers {
-                    fullDriversList
-                } else {
-                    fullConstructorsList
+                // Spoiler mode hides the tables too (points give results away).
+                Group {
+                    if mode == .drivers {
+                        fullDriversList
+                    } else {
+                        fullConstructorsList
+                    }
                 }
+                .blur(radius: isShielded ? 18 : 0)
+                .allowsHitTesting(!isShielded)
+                .overlay(alignment: .top) {
+                    if isShielded {
+                        SpoilerShield(text: "Tap to reveal the standings")
+                            .frame(height: 300)
+                    }
+                }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if isShielded { revealed = true }
+                }
+                .animation(.easeInOut(duration: 0.25), value: isShielded)
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 32)

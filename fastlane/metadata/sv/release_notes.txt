@@ -1,10 +1,9 @@
-Ett snabbare och vassare Team Radio:
+Spelen får en egen flik:
 
-• Alla Grand Prix på en rad: svep racekortet till nästa eller föregående race, eller håll inne för hela säsongen
-• Ny Game Zone: dina tips och AI-strategens sida vid sida, med säsongsduellen i 3D-staplar som du kan vrida och luta
-• Dagens förare: fansens röster reser sig som en 3D-pall
-• Lights Out: håll inne bromspedalen för att starta, och kör igen efter varje försök
-• Banguide: tryck på en kurva så flyger 3D-kameran dit
-• Nyheter: ny broadcast-layout med nyhetsticker, trendande team och nyhetsflödet
-• Nytt startintro med startljus
-• Att byta race går mycket snabbare och smidigare
+• Ny Spel-flik: din säsongsplacering som en levande topplista med spelarna runt dig, duellen mot AI-strategen, dina tips och arkaden
+• Nytt spel, Reaction Wall: träffa lamporna i samma stund som de tänds, i 60 sekunder, som reflexträningen förarna använder. Med veckans topplista
+• Lights Out: bromspedalen reagerar nu direkt när du trycker
+• Resultat och ställning samlade i en flik, båda med spoilerskydd
+• Banguiden: ett tryck på ett kurvnummer flyger nu alltid till rätt kurva, nyp-zoom zoomar in mot mitten och banan tonar ut under statistiken
+• Håll inne racekortet och dra för att bläddra genom hela säsongen utan att lyfta fingret
+• Smidigare byte mellan race under Resultat

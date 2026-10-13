@@ -39,13 +39,9 @@ enum PushSync {
     }
 
     private static func upload(_ token: String) async {
-        // Debug builds get sandbox APNs tokens; TestFlight/App Store get
-        // production ones. The worker needs to know which gate to knock on.
-        #if DEBUG
-        let env = "sandbox"
-        #else
-        let env = "production"
-        #endif
+        // Development-signed builds get sandbox APNs tokens; TestFlight/App
+        // Store get production ones. The worker needs to know which gate to knock on.
+        let env = BuildSigning.isDevelopment ? "sandbox" : "production"
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")

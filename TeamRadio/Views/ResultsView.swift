@@ -72,27 +72,13 @@ struct ResultsView: View {
         }
     }
 
-    /// Tap-to-reveal cover for people watching sessions delayed.
-    private var spoilerShield: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "eye.slash.fill")
-                .font(.system(size: 28))
-                .foregroundStyle(Theme.accent)
-            Text("SPOILERS HIDDEN")
-                .font(.f1(17).italic())
-                .foregroundStyle(.white)
-            Text("Tap to reveal the results")
-                .font(.system(size: 12))
-                .foregroundStyle(Theme.dimText)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
     private var loadedContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 if let race = model.calendarRace {
-                    header(race: race)
+                    ResultsHubHeader(title: "RESULTS",
+                                     subtitle: "\(Flags.emoji(for: race.circuit.location.country)) \(race.raceName.uppercased()) · ROUND \(race.roundNumber)",
+                                     onToggle: { revealed = false })
 
                     if model.pickerRaces.count > 1 {
                         roundPicker
@@ -106,13 +92,16 @@ struct ResultsView: View {
                         VStack(alignment: .leading, spacing: 22) {
                             sessionContent
                         }
+                        // A new race arrives as fresh content (the podium
+                        // rises again) instead of morphing out of the last one.
+                        .id(model.selectedRound)
                         .blur(radius: isShielded ? 18 : 0)
                         .allowsHitTesting(!isShielded)
                         .overlay(alignment: .top) {
                             // Pinned near the top so it's visible without
                             // scrolling, however tall the hidden content is.
                             if isShielded {
-                                spoilerShield
+                                SpoilerShield()
                                     .frame(height: 300)
                             }
                         }
@@ -122,14 +111,18 @@ struct ResultsView: View {
                         }
                         .animation(.easeInOut(duration: 0.25), value: isShielded)
                     }
-                    .opacity(model.isSwitching ? 0.35 : 1)
+                    // Only the dimming animates: animating everything with it
+                    // made the new race's rows and podium morph out of the old.
+                    .animation(.easeInOut(duration: 0.2)) { content in
+                        content.opacity(model.isSwitching ? 0.35 : 1)
+                    }
                     .overlay {
                         if model.isSwitching {
                             ProgressView().tint(Theme.accent)
                         }
                     }
-                    .animation(.easeInOut(duration: 0.2), value: model.isSwitching)
                 } else {
+                    ResultsHubHeader(title: "RESULTS", subtitle: "NO CLASSIFIED SESSION YET", onToggle: { revealed = false })
                     VStack(alignment: .leading, spacing: 6) {
                         Text("🏁 NO RESULTS YET")
                             .font(.f1(24).italic())
@@ -138,7 +131,6 @@ struct ResultsView: View {
                             .font(.subheadline)
                             .foregroundStyle(Theme.dimText)
                     }
-                    .padding(.top, 8)
                 }
 
                 if !model.constructorStandings.isEmpty {
@@ -204,43 +196,6 @@ struct ResultsView: View {
         )
     }
 
-    private func header(race: Race) -> some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(alignment: .top, spacing: 9) {
-                    TrioSlashes(height: 24)
-                        .padding(.top, 6)   // centred on the first line when the title wraps
-                    Text("RESULTS")
-                }
-                    .font(.f1(30).italic())
-                    .foregroundStyle(Theme.chromeText)
-                Text("\(Flags.emoji(for: race.circuit.location.country)) \(race.raceName.uppercased()) · ROUND \(race.roundNumber)")
-                    .font(.f1(12, weight: .semibold))
-                    .tracking(2)
-                    .foregroundStyle(Theme.dimText)
-            }
-
-            Spacer()
-
-            // Spoiler mode toggle: when on, results stay hidden until tapped.
-            Button {
-                spoilerMode.toggle()
-                revealed = false
-            } label: {
-                Image(systemName: spoilerMode ? "eye.slash.fill" : "eye")
-                    .font(.system(size: 17))
-                    .foregroundStyle(spoilerMode ? Theme.accent : Theme.dimText)
-                    .padding(8)
-                    .background(
-                        Circle()
-                            .fill(Color.white.opacity(0.05))
-                            .overlay(Circle().strokeBorder(spoilerMode ? Theme.accent.opacity(0.5) : Theme.cardStroke, lineWidth: 1))
-                    )
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.top, 8)
-    }
 
     /// Horizontal strip of every completed round; tap to load its results.
     private var roundPicker: some View {

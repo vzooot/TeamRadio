@@ -21,16 +21,16 @@ struct TrackSectionView: View {
                 }
 
             VStack(spacing: 0) {
+                // The 3D map runs behind the whole card (see the background
+                // below); this space is where it's framed. Apple Maps stays here.
                 ZStack {
                     if showRealWorld, let coordinate = circuit.coordinate {
                         CircuitMapView(coordinate: coordinate)
                     } else {
-                        Track3DView(map: map, resetToken: resetToken, selectedCorner: selectedCorner) { number in
-                            withAnimation(.easeOut(duration: 0.2)) { selectedCorner = number }
-                        }
+                        Color.clear
                     }
                 }
-                .frame(height: 300)
+                .frame(height: TrackSceneBuilder.framed)
                 .overlay(alignment: .topTrailing) {
                     HStack(spacing: 8) {
                         if circuit.coordinate != nil {
@@ -74,6 +74,23 @@ struct TrackSectionView: View {
 
                 if let guide, !guide.corners.isEmpty {
                     cornerGuide(guide)
+                }
+            }
+            // The circuit carries on under the stats and fades away instead
+            // of being cut off at the map's edge.
+            .background(alignment: .top) {
+                if !showRealWorld {
+                    Track3DView(map: map, resetToken: resetToken, selectedCorner: selectedCorner) { number in
+                        withAnimation(.easeOut(duration: 0.2)) { selectedCorner = number }
+                    }
+                    .frame(height: TrackSceneBuilder.framed + TrackSceneBuilder.bleed)
+                    .mask(LinearGradient(stops: [.init(color: .black, location: 0),
+                                                 .init(color: .black, location: 0.48),
+                                                 .init(color: .black.opacity(0.3), location: 0.68),
+                                                 .init(color: .clear, location: 0.88)],
+                                         startPoint: .top, endPoint: .bottom))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
                 }
             }
             .background(

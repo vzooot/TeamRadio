@@ -17,7 +17,7 @@ struct ChatView: View {
     @State private var mode: Mode = .room
     @State private var dmPath: [InboxView.DMTarget] = []
 
-    enum Mode { case room, messages, leaderboard }
+    enum Mode { case room, messages }
 
     struct Member: Identifiable {
         let id: String
@@ -106,6 +106,26 @@ struct ChatView: View {
             .presentationDetents([.height(300)])
             .presentationBackground(Theme.background)
         }
+    }
+
+    /// Room / Messages, the way every social app does it. (The leaderboard
+    /// lives in the Games tab.)
+    private var modeChips: some View {
+        HStack(spacing: 8) {
+            Button { mode = .room } label: {
+                NeonChip(title: "ROOM", tint: Theme.accent, selected: mode == .room)
+            }
+            .buttonStyle(.plain)
+            Button { mode = .messages } label: {
+                // burns red with the count while something is unread
+                NeonChip(title: inbox.totalUnread > 0 ? "MESSAGES · \(inbox.totalUnread)" : "MESSAGES",
+                         tint: inbox.totalUnread > 0 ? Theme.live : Theme.violet,
+                         selected: mode == .messages || inbox.totalUnread > 0)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 10)
     }
 
     // MARK: - Gates
@@ -328,34 +348,10 @@ struct ChatView: View {
             .padding(.top, 8)
             .padding(.bottom, 10)
 
-            // Room / Messages, the way every social app does it
-            HStack(spacing: 8) {
-                Button { mode = .room } label: {
-                    NeonChip(title: "ROOM", tint: Theme.accent, selected: mode == .room)
-                }
-                .buttonStyle(.plain)
-                Button { mode = .messages } label: {
-                    // burns red with the count while something is unread
-                    NeonChip(title: inbox.totalUnread > 0 ? "MESSAGES · \(inbox.totalUnread)" : "MESSAGES",
-                             tint: inbox.totalUnread > 0 ? Theme.live : Theme.violet,
-                             selected: mode == .messages || inbox.totalUnread > 0)
-                }
-                .buttonStyle(.plain)
-                if GameFeature.isEnabled {
-                    Button { mode = .leaderboard } label: {
-                        NeonChip(title: "LEADERBOARD", tint: Color(red: 1, green: 0.75, blue: 0.2),
-                                 selected: mode == .leaderboard)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 10)
+            modeChips
 
             if mode == .messages {
                 InboxView(model: inbox, myName: model.nickname, suggestions: recentMembers, path: $dmPath)
-            } else if mode == .leaderboard {
-                LeaderboardView()
             } else {
                 roomBody
             }

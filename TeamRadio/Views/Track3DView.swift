@@ -25,6 +25,12 @@ struct Track3DView: UIViewRepresentable {
         context.coordinator.resetToken = resetToken
         context.coordinator.onSelectCorner = onSelectCorner
         view.addGestureRecognizer(UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.tapped(_:))))
+        // Our own pinch replaces the built-in one, which zooms toward the
+        // middle of the whole view (down behind the stats).
+        let pinch = UIPinchGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.pinched(_:)))
+        view.addGestureRecognizer(pinch)
+        context.coordinator.pinch = pinch
+        Self.disableBuiltInPinch(in: view, keeping: pinch)
         Self.highlight(selectedCorner, in: view)
         Self.focus(selectedCorner, in: view, animated: false)
         context.coordinator.selectedCorner = selectedCorner
@@ -70,7 +76,7 @@ struct Track3DView: UIViewRepresentable {
         // look-at constraint, then animate to an exact pose facing the turn.
         let pose = SCNNode()
         pose.position = position
-        pose.look(at: look)
+        pose.look(at: look, up: SCNVector3(0, 1, 0), localFront: TrackSceneBuilder.front)
         cameraNode.transform = cameraNode.presentation.transform
         cameraNode.constraints = nil
         target.position = look
@@ -80,11 +86,18 @@ struct Track3DView: UIViewRepresentable {
         SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         SCNTransaction.completionBlock = {
             // Back home: hand the camera to the centre constraint again.
-            if corner == nil { cameraNode.constraints = [SCNLookAtConstraint(target: target)] }
+            if corner == nil { cameraNode.constraints = [TrackSceneBuilder.lookAt(target)] }
         }
         cameraNode.transform = pose.transform
         SCNTransaction.commit()
         view.defaultCameraController.target = look
+    }
+
+    /// Switches off the pinch SceneKit adds for camera control.
+    static func disableBuiltInPinch(in view: SCNView, keeping ours: UIGestureRecognizer?) {
+        for recognizer in view.gestureRecognizers ?? [] where recognizer is UIPinchGestureRecognizer && recognizer !== ours {
+            recognizer.isEnabled = false
+        }
     }
 
     /// Selected corner: bigger and cyan; the others dim back.
@@ -105,6 +118,8 @@ struct Track3DView: UIViewRepresentable {
 
     func updateUIView(_ view: SCNView, context: Context) {
         context.coordinator.onSelectCorner = onSelectCorner
+        // SceneKit may add its recognizers after the view is made.
+        Self.disableBuiltInPinch(in: view, keeping: context.coordinator.pinch)
         if context.coordinator.circuitName != map.circuitName || context.coordinator.resetToken != resetToken {
             context.coordinator.circuitName = map.circuitName
             context.coordinator.resetToken = resetToken
@@ -131,19 +146,52 @@ struct Track3DView: UIViewRepresentable {
 
         /// The corner number nearest the tap on screen (generous radius, the
         /// digits are small); tapping the selected one again zooms back out.
+        /// Measured where each number is drawn (`presentation`): the stored
+        /// position doesn't follow the spin and sat 100–140 pt away on screen,
+        /// so taps missed or picked the wrong turn.
         @objc func tapped(_ gesture: UITapGestureRecognizer) {
             guard let view = gesture.view as? SCNView, let root = view.scene?.rootNode else { return }
             let point = gesture.location(in: view)
             var best: (number: Int, distance: CGFloat)?
             root.enumerateChildNodes { node, _ in
                 guard let name = node.name, name.hasPrefix("corner-"), let n = Int(name.dropFirst(7)) else { return }
-                let p = view.projectPoint(node.worldPosition)
+                let p = view.projectPoint(node.presentation.worldPosition)
                 guard p.z > 0, p.z < 1 else { return }
                 let d = hypot(CGFloat(p.x) - point.x, CGFloat(p.y) - point.y)
-                if d < 36, d < (best?.distance ?? .infinity) { best = (n, d) }
+                if d < 40, d < (best?.distance ?? .infinity) { best = (n, d) }
             }
             guard let best else { return }
             onSelectCorner?(best.number == selectedCorner ? nil : best.number)
+        }
+
+        weak var pinch: UIPinchGestureRecognizer?
+        private var lastScale: CGFloat = 1
+
+        /// Pinch moves the camera straight toward (or away from) the point
+        /// it looks at: the circuit's centre or the chosen turn, which sits
+        /// in the middle of the visible map. That point stays put on screen
+        /// and everything grows around it.
+        @objc func pinched(_ gesture: UIPinchGestureRecognizer) {
+            pinch = gesture
+            guard let view = gesture.view as? SCNView, let camera = view.pointOfView else { return }
+            switch gesture.state {
+            case .began:
+                lastScale = 1
+            case .changed:
+                let step = Float(gesture.scale / lastScale)
+                lastScale = gesture.scale
+                guard step > 0 else { return }
+                let target = view.defaultCameraController.target
+                let p = camera.worldPosition
+                let d = SCNVector3(p.x - target.x, p.y - target.y, p.z - target.z)
+                let length = sqrt(d.x * d.x + d.y * d.y + d.z * d.z)
+                guard length > 0.001 else { return }
+                let newLength = min(max(length / step, 1.6), 30)
+                let k = newLength / length
+                camera.worldPosition = SCNVector3(target.x + d.x * k, target.y + d.y * k, target.z + d.z * k)
+            default:
+                break
+            }
         }
     }
 }
@@ -152,6 +200,26 @@ enum TrackSceneBuilder {
     static let spinKey = "spin"
     static var spin: SCNAction { .repeatForever(.rotateBy(x: 0, y: 2 * .pi, z: 0, duration: 45)) }
     static let homeCamera = SCNVector3(0, 7.5, 10.5)
+
+    /// The scene runs behind the whole circuit card and fades out at the
+    /// bottom: `framed` points of it are the map proper, `bleed` more run
+    /// under the stats. The camera looks a little low (`tilt`) so the
+    /// circuit, or the turn it flies to, stays centred in the framed part.
+    static let framed: CGFloat = 300
+    static let bleed: CGFloat = 170
+    /// Horizontal field of view: the circuit keeps its width however tall
+    /// the view is.
+    static let fieldOfView: CGFloat = 75
+    private static let tilt = atan(Float(bleed / 390) * tan(Float(fieldOfView / 2 * .pi / 180)))
+    /// The camera's "front" for look-at, pitched up by `tilt`, so the real
+    /// view axis points that much below the target.
+    static let front = SCNVector3(0, sin(tilt), -cos(tilt))
+
+    static func lookAt(_ target: SCNNode) -> SCNLookAtConstraint {
+        let constraint = SCNLookAtConstraint(target: target)
+        constraint.localFront = front
+        return constraint
+    }
 
     static func build(map: TrackMap) -> SCNScene {
         let scene = SCNScene()
@@ -297,6 +365,11 @@ enum TrackSceneBuilder {
         camera.bloomIntensity = 0.5
         camera.bloomThreshold = 0.55
         camera.zFar = 200
+        // Close up (a pinch, a turn) the track runs right past the lens;
+        // the default 1-unit near plane sliced it off in a straight line.
+        camera.zNear = 0.02
+        camera.projectionDirection = .horizontal
+        camera.fieldOfView = fieldOfView
         // The camera looks at a focus point: the circuit's centre, or the
         // tapped corner (Track3DView.focus moves both).
         let focus = SCNNode()
@@ -306,7 +379,7 @@ enum TrackSceneBuilder {
         cameraNode.name = "camera"
         cameraNode.camera = camera
         cameraNode.position = homeCamera
-        cameraNode.constraints = [SCNLookAtConstraint(target: focus)]
+        cameraNode.constraints = [lookAt(focus)]
         scene.rootNode.addChildNode(cameraNode)
 
         return scene

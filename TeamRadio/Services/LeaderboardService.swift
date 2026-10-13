@@ -5,15 +5,9 @@ import Foundation
 enum LeaderboardService {
     private static let base = URL(string: "https://teamradio-push.eam-adio.workers.dev/game")!
 
-    /// Xcode builds use CloudKit's Development database, TestFlight and the
-    /// App Store use Production; each has its own leaderboard.
-    private static var environment: String {
-        #if DEBUG
-        "development"
-        #else
-        "production"
-        #endif
-    }
+    /// The CloudKit database this build uses, so the boards match the
+    /// player's picks (it follows the signing, not Debug/Release).
+    private static var environment: String { BuildSigning.isDevelopment ? "development" : "production" }
 
     enum Scope: String { case season, round }
 
@@ -80,6 +74,39 @@ enum LeaderboardService {
         }
         guard let (data, _) = try? await URLSession.shared.data(for: request) else { return nil }
         return try? JSONDecoder().decode(ReactionBoard.self, from: data)
+    }
+
+    struct WallBoard: Decodable, Equatable {
+        struct Entry: Decodable, Equatable, Identifiable {
+            let userId: String
+            let name: String
+            let score: Int
+            let rank: Int
+            var id: String { userId }
+        }
+        struct Me: Decodable, Equatable {
+            let name: String
+            let score: Int
+            let rank: Int
+        }
+        let total: Int
+        let top: [Entry]
+        let me: Me?
+    }
+
+    /// This week's Reaction Wall board; with `score` it also submits a run.
+    static func wall(user: String?, name: String?, score: Int?) async -> WallBoard? {
+        var components = URLComponents(url: base.appending(path: "wall"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "env", value: environment)] + (user.map { [URLQueryItem(name: "user", value: $0)] } ?? [])
+        var request = URLRequest(url: components.url!)
+        request.timeoutInterval = 10
+        if let user, let name, let score {
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try? JSONSerialization.data(withJSONObject: ["user": user, "name": name, "score": score])
+        }
+        guard let (data, _) = try? await URLSession.shared.data(for: request) else { return nil }
+        return try? JSONDecoder().decode(WallBoard.self, from: data)
     }
 
     struct PlayerPicks: Decodable, Equatable {

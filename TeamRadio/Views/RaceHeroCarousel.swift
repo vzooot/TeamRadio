@@ -121,8 +121,21 @@ struct RaceHeroCarousel: View {
                 .onAppear { width = geo.size.width; height = geo.size.height }
                 .onChange(of: geo.size) { _, size in width = size.width; height = size.height }
         })
+        // Hold to open the strip; keep the finger down and slide to run
+        // through the races straight away. After lifting, the strip
+        // scrolls as usual.
         .simultaneousGesture(
-            LongPressGesture(minimumDuration: 0.35).onEnded { _ in open() }
+            LongPressGesture(minimumDuration: 0.35)
+                .sequenced(before: DragGesture(minimumDistance: 0))
+                .onChanged { value in
+                    guard case .second(true, let drag) = value else { return }
+                    if !dockActive {
+                        open()
+                        holdStart = index
+                    }
+                    if let drag, let start = holdStart { follow(drag.translation.width, from: start) }
+                }
+                .onEnded { _ in holdStart = nil }
         )
         .accessibilityAction(named: "Next grand prix") { step(1) }
         .accessibilityAction(named: "Previous grand prix") { step(-1) }
@@ -150,6 +163,7 @@ struct RaceHeroCarousel: View {
 
     private func open() {
         guard !dockActive else { return }
+        holdTarget = nil
         centeredId = race.id
         tickIndex = index
         middle = index
@@ -178,6 +192,18 @@ struct RaceHeroCarousel: View {
 
     private func close() {
         dockActive = false
+    }
+
+    /// The round the strip was on when the holding finger opened it (nil
+    /// once it lifts, so later touches scroll the strip normally).
+    @State private var holdStart: Int?
+    /// The round the holding finger has dragged the strip to.
+    @State private var holdTarget: Int?
+
+    /// One box per box-width of finger travel; dragging left goes to later races.
+    private func follow(_ dx: CGFloat, from start: Int) {
+        let target = min(max(start - Int((dx / (boxWidth + spacing)).rounded()), 0), season.count - 1)
+        if target != holdTarget { holdTarget = target }
     }
 
     /// Go to a race from the strip: the strip closes and the card slides over.
@@ -244,6 +270,11 @@ struct RaceHeroCarousel: View {
             .onAppear {
                 // open centred on the race in the card
                 if let id = centeredId { proxy.scrollTo(id, anchor: .center) }
+            }
+            // the finger that opened the strip steers it until it lifts
+            .onChange(of: holdTarget) { _, target in
+                guard let target, season.indices.contains(target) else { return }
+                withAnimation(.snappy(duration: 0.18)) { proxy.scrollTo(season[target].id, anchor: .center) }
             }
             }
 
