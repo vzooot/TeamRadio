@@ -4,14 +4,61 @@ import SwiftUI
 /// the arcade (Reaction Wall and Lights Out) and the leaderboards. Driver
 /// of the day and Ask Emily live on the Countdown tab. Layout A, "pit wall":
 /// Marketing/drafts/2026-10-13/games-tab-A-B-C.png
+/// Everything the Games tab shows. The app starts loading it at launch, so
+/// the first visit opens on a finished page instead of cards arriving (and
+/// animating) one by one.
+@Observable
+@MainActor
+final class GamesModel {
+    let game = GameViewModel()
+    var season: [Race] = []
+    var nextRace: Race?
+    var userId: String?
+    var seasonBoard: LeaderboardService.Board?
+    var wallBoard: LeaderboardService.WallBoard?
+    var lightsBoard: LeaderboardService.ReactionBoard?
+    /// The first load is done; the page shows from then on.
+    var ready = false
+
+    func load() async {
+        async let next = try? F1API.nextRace()
+        async let calendar = try? F1API.season()
+        let (race, races) = await (next, calendar)
+        nextRace = race ?? nil
+        season = races ?? []
+        guard GameFeature.isEnabled else { ready = true; return }
+        await game.load(race: nextRace, season: season)
+        #if DEBUG
+        // -FakePicks YES: a signed-in player with three picks, for screenshots
+        if UserDefaults.standard.bool(forKey: "FakePicks"), game.drivers.count > 2 {
+            game.access = .ready
+            game.draft.pole = game.drivers[1].id
+            game.draft.p1 = game.drivers[0].id
+            game.draft.p2 = game.drivers[2].id
+        }
+        #endif
+        userId = await ChatService.currentUserId()
+        let year = nextRace?.season ?? season.last?.season ?? String(Calendar.current.component(.year, from: .now))
+        let user = userId
+        async let board = try? LeaderboardService.board(scope: .season, year: year, user: user)
+        // Warms the cache for the AI duel, which the picks card fetches itself.
+        async let duel = user == nil ? nil : LeaderboardService.history(user: user!)
+        seasonBoard = await board
+        _ = await duel
+        await loadArcadeBoards()
+        ready = true
+    }
+
+    func loadArcadeBoards() async {
+        async let wall = LeaderboardService.wall(user: userId, name: nil, score: nil)
+        async let lights = LeaderboardService.reaction(user: userId, name: nil, ms: nil)
+        (wallBoard, lightsBoard) = await (wall, lights)
+    }
+}
+
 struct GamesView: View {
-    @State private var game = GameViewModel()
-    @State private var season: [Race] = []
-    @State private var nextRace: Race?
-    @State private var userId: String?
-    @State private var seasonBoard: LeaderboardService.Board?
-    @State private var wallBoard: LeaderboardService.WallBoard?
-    @State private var lightsBoard: LeaderboardService.ReactionBoard?
+    let model: GamesModel
+    private var game: GameViewModel { model.game }
 
     @State private var showPicks = false
     @State private var showResult = false
@@ -32,6 +79,9 @@ struct GamesView: View {
             RadialGradient(colors: [Theme.violet.opacity(0.10), .clear], center: .bottomTrailing, startRadius: 0, endRadius: 460)
                 .ignoresSafeArea()
 
+            if !model.ready {
+                ProgressView().tint(Theme.accent)
+            } else {
             ScrollViewReader { proxy in
                 ScrollView {
                     TimelineView(.periodic(from: .now, by: 30)) { context in
@@ -42,7 +92,7 @@ struct GamesView: View {
                     .padding(.bottom, 32)
                 }
                 .scrollIndicators(.hidden)
-                .refreshable { await load() }
+                .refreshable { await model.load() }
                 #if DEBUG
                 .task {
                     // -GamesScroll arcade: jump down to the arcade, for screenshots
@@ -52,12 +102,14 @@ struct GamesView: View {
                 }
                 #endif
             }
+            .transition(.opacity)
+            }
         }
-        .task { await load() }
-        .fullScreenCover(isPresented: $showWall, onDismiss: { Task { await loadArcadeBoards() } }) {
+        .animation(.easeOut(duration: 0.25), value: model.ready)
+        .fullScreenCover(isPresented: $showWall, onDismiss: { Task { await model.loadArcadeBoards() } }) {
             ReactionWallView()
         }
-        .fullScreenCover(isPresented: $showLightsOut, onDismiss: { Task { await loadArcadeBoards() } }) {
+        .fullScreenCover(isPresented: $showLightsOut, onDismiss: { Task { await model.loadArcadeBoards() } }) {
             LightsOutView()
         }
         .sheet(isPresented: $showPicks) {
@@ -93,19 +145,19 @@ struct GamesView: View {
     private func content(now: Date) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             title
-            PlayerStrip(board: seasonBoard)
-            PicksHero(game: game, state: game.cardState(at: now), now: now, seasonRounds: season.count,
+            PlayerStrip(board: model.seasonBoard)
+            PicksHero(game: game, state: game.cardState(at: now), now: now, seasonRounds: model.season.count,
                       onPicks: { showPicks = true }, onResult: { showResult = true })
             SectionTitle("ARCADE")
                 .id("arcade")
             HStack(spacing: 12) {
-                ArcadeTile(kind: .wall, rank: wallBoard?.me?.rank) { showWall = true }
-                ArcadeTile(kind: .lightsOut, rank: lightsBoard?.me?.rank) { showLightsOut = true }
+                ArcadeTile(kind: .wall, rank: model.wallBoard?.me?.rank) { showWall = true }
+                ArcadeTile(kind: .lightsOut, rank: model.lightsBoard?.me?.rank) { showLightsOut = true }
             }
             SectionTitle("LEADERBOARDS")
             HStack(spacing: 10) {
                 boardButton(.global, icon: "globe.europe.africa.fill", title: "GLOBAL",
-                            sub: seasonBoard?.me.map { "P\($0.rank) of \(seasonBoard?.total ?? 0)" } ?? "Season & rounds")
+                            sub: model.seasonBoard?.me.map { "P\($0.rank) of \(model.seasonBoard?.total ?? 0)" } ?? "Season & rounds")
                 boardButton(.leagues, icon: "person.2.fill", title: "LEAGUES", sub: "Play your friends")
             }
         }
@@ -117,7 +169,7 @@ struct GamesView: View {
                 TrioSlashes(height: 26)
                 Text("GAMES").font(.f1(34).italic()).foregroundStyle(Theme.chromeText)
             }
-            Text(nextRace.map { "ROUND \($0.round) · \(PicksCard.shortName($0))" } ?? "PREDICT · PLAY · BEAT THE AI")
+            Text(model.nextRace.map { "ROUND \($0.round) · \(PicksCard.shortName($0))" } ?? "PREDICT · PLAY · BEAT THE AI")
                 .font(.f1(11, weight: .heavy))
                 .tracking(2)
                 .foregroundStyle(Theme.dimText)
@@ -141,36 +193,6 @@ struct GamesView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - Data
-
-    private func load() async {
-        async let next = try? F1API.nextRace()
-        async let calendar = try? F1API.season()
-        let (race, races) = await (next, calendar)
-        nextRace = race ?? nil
-        season = races ?? []
-        guard GameFeature.isEnabled else { return }
-        await game.load(race: nextRace, season: season)
-        #if DEBUG
-        // -FakePicks YES: a signed-in player with three picks, for screenshots
-        if UserDefaults.standard.bool(forKey: "FakePicks"), game.drivers.count > 2 {
-            game.access = .ready
-            game.draft.pole = game.drivers[1].id
-            game.draft.p1 = game.drivers[0].id
-            game.draft.p2 = game.drivers[2].id
-        }
-        #endif
-        userId = await ChatService.currentUserId()
-        let year = nextRace?.season ?? season.last?.season ?? String(Calendar.current.component(.year, from: .now))
-        seasonBoard = try? await LeaderboardService.board(scope: .season, year: year, user: userId)
-        await loadArcadeBoards()
-    }
-
-    private func loadArcadeBoards() async {
-        async let wall = LeaderboardService.wall(user: userId, name: nil, score: nil)
-        async let lights = LeaderboardService.reaction(user: userId, name: nil, ms: nil)
-        (wallBoard, lightsBoard) = await (wall, lights)
-    }
 }
 
 // MARK: - Pieces

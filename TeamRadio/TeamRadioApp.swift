@@ -54,6 +54,8 @@ struct RootView: View {
     @State private var selection = 0
     #endif
     @State private var chatBadge = ChatBadge()
+    /// Loaded at launch, so the Games tab opens ready.
+    @State private var games = GamesModel()
     @State private var showMessageToast = false
     @State private var toastDismissTask: Task<Void, Never>?
     @State private var profile: ProfileTarget?
@@ -73,7 +75,7 @@ struct RootView: View {
             ResultsHubView()
                 .tabItem { Label("Results", systemImage: "trophy.fill") }
                 .tag(Tab.results)
-            GamesView()
+            GamesView(model: games)
                 .tabItem { Label("Games", systemImage: "gamecontroller.fill") }
                 .tag(Tab.games)
             ChatView()
@@ -95,6 +97,7 @@ struct RootView: View {
                     .zIndex(1)
             }
         }
+        .task { await games.load() }
         .environment(\.openProfile, OpenProfileAction { profile = $0 })
         .sheet(item: $profile) { target in
             ProfileSheet(target: target)
