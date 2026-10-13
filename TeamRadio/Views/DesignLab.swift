@@ -32,6 +32,12 @@ struct DesignLab: View {
             case "styleSciFi": StyleSciFi()
             case "cards8": CardsDraft8()
             case "lightsOut": LightsOutView()
+            case "gamesA": GamesHubA()
+            case "gamesB": GamesHubB()
+            case "gamesC": GamesHubC()
+            case "wall1": WallDraftGrid()
+            case "wall2": WallDraftArcs()
+            case "wall3": WallDraftWheel()
             default: Text("unknown draft \(id)").foregroundStyle(.white)
             }
         }

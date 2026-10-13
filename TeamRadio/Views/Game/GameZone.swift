@@ -58,7 +58,7 @@ struct GameZone: View {
 
 // MARK: - Picks / result: the race-hero card
 
-private struct PicksHero: View {
+struct PicksHero: View {
     @Bindable var game: GameViewModel
     let state: GameViewModel.CardState
     let now: Date
@@ -759,7 +759,7 @@ private struct SeasonDuelBars: UIViewRepresentable {
 
 // MARK: - Driver of the day: bold yellow card
 
-private struct DotdBoldCard: View {
+struct DotdBoldCard: View {
     let model: DotdModel
     let now: Date
     let onVote: () -> Void
@@ -1087,7 +1087,7 @@ private struct PrismBar: View, Animatable {
 
 // MARK: - Lights Out: photo strip
 
-private struct LightsStrip: View {
+struct LightsStrip: View {
     let onPlay: () -> Void
     @AppStorage("lightsOutBest") private var best: Double = 0
     @AppStorage("lightsOutHistory") private var history = ""
@@ -1159,7 +1159,7 @@ private struct LightsStrip: View {
 
 // MARK: - Ask Emily
 
-private struct EmilyBar: View {
+struct EmilyBar: View {
     let onTap: () -> Void
 
     var body: some View {
