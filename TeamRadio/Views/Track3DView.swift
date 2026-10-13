@@ -19,11 +19,6 @@ struct Track3DView: UIViewRepresentable {
         let view = SCNView()
         view.backgroundColor = .clear
         view.allowsCameraControl = true
-        // Orbit like a turntable, never down to track level (a flat view
-        // along the asphalt where the turn numbers pile up on the horizon).
-        view.defaultCameraController.interactionMode = .orbitTurntable
-        view.defaultCameraController.minimumVerticalAngle = 18
-        view.defaultCameraController.maximumVerticalAngle = 89
         view.antialiasingMode = .multisampling4X
         view.scene = TrackSceneBuilder.build(map: map)
         context.coordinator.circuitName = map.circuitName
@@ -44,9 +39,6 @@ struct Track3DView: UIViewRepresentable {
               let cameraNode = root.childNode(withName: "camera", recursively: false),
               let target = root.childNode(withName: "focus", recursively: false),
               let spinner = root.childNode(withName: "spinner", recursively: false) else { return }
-        // A flick keeps orbiting after the finger lifts; stop it, or it
-        // turns the camera off the turn as soon as it arrives.
-        view.defaultCameraController.stopInertia()
         // Back to the scene camera if the user's gestures made a free one.
         view.pointOfView = cameraNode
         let corner = number.flatMap { root.childNode(withName: "corner-\($0)", recursively: true) }
