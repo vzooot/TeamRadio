@@ -186,7 +186,7 @@ struct Track3DView: UIViewRepresentable {
                 let d = SCNVector3(p.x - target.x, p.y - target.y, p.z - target.z)
                 let length = sqrt(d.x * d.x + d.y * d.y + d.z * d.z)
                 guard length > 0.001 else { return }
-                let newLength = min(max(length / step, 1.2), 30)
+                let newLength = min(max(length / step, 1.6), 30)
                 let k = newLength / length
                 camera.worldPosition = SCNVector3(target.x + d.x * k, target.y + d.y * k, target.z + d.z * k)
             default:
@@ -365,6 +365,9 @@ enum TrackSceneBuilder {
         camera.bloomIntensity = 0.5
         camera.bloomThreshold = 0.55
         camera.zFar = 200
+        // Close up (a pinch, a turn) the track runs right past the lens;
+        // the default 1-unit near plane sliced it off in a straight line.
+        camera.zNear = 0.02
         camera.projectionDirection = .horizontal
         camera.fieldOfView = fieldOfView
         // The camera looks at a focus point: the circuit's centre, or the
