@@ -266,7 +266,9 @@ private struct StrategistCard: View {
                     .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Theme.violet.opacity(0.35), lineWidth: 1))
             }
         }
-        .onCardVisibility(show: {
+        // Fill only once the duel is loaded, or the rings and bars would
+        // snap in full when it arrives.
+        .onCardVisibility(ready: history != nil, show: {
             guard !shown else { return }
             withAnimation(.easeOut(duration: 1.1)) { shown = true }
         }, hide: {
@@ -471,17 +473,44 @@ private struct CountingText: View, Animatable {
 }
 
 private extension View {
-    /// Calls `show` once the card is mostly on screen, and `hide` only after
-    /// it has left the screen completely (iOS 18+; on iOS 17 on appear and
-    /// disappear).
-    @ViewBuilder
-    func onCardVisibility(show: @escaping () -> Void, hide: @escaping () -> Void) -> some View {
-        if #available(iOS 18, *) {
-            self
-                .onScrollVisibilityChange(threshold: 0.5) { if $0 { show() } }
-                .onScrollVisibilityChange(threshold: 0.01) { if !$0 { hide() } }
-        } else {
-            onAppear(perform: show).onDisappear(perform: hide)
+    /// Calls `show` once the card is mostly in view, its tab is on screen
+    /// and its data is `ready`; calls `hide` when it scrolls fully away or
+    /// its tab is left, so the next visit plays the animation again.
+    func onCardVisibility(ready: Bool = true, show: @escaping () -> Void, hide: @escaping () -> Void) -> some View {
+        modifier(CardVisibility(ready: ready, show: show, hide: hide))
+    }
+}
+
+private struct CardVisibility: ViewModifier {
+    let ready: Bool
+    let show: () -> Void
+    let hide: () -> Void
+    /// Mostly inside its scroll view (unchanged by switching tabs).
+    @State private var inView = false
+    /// Its tab is the one on screen.
+    @State private var onScreen = false
+
+    func body(content: Content) -> some View {
+        Group {
+            if #available(iOS 18, *) {
+                content
+                    .onScrollVisibilityChange(threshold: 0.5) { if $0 { inView = true; reveal() } }
+                    .onScrollVisibilityChange(threshold: 0.01) { if !$0 { inView = false; hide() } }
+            } else {
+                content.onAppear { inView = true }
+            }
+        }
+        .onAppear { onScreen = true; reveal() }
+        .onDisappear { onScreen = false; hide() }
+        .onChange(of: ready) { reveal() }
+    }
+
+    private func reveal() {
+        guard inView, onScreen, ready else { return }
+        // Let the tab finish its own transition before the card moves.
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(150))
+            if inView, onScreen, ready { show() }
         }
     }
 }
