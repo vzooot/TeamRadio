@@ -68,22 +68,24 @@ struct RootView: View {
 
     var body: some View {
         TabView(selection: $selection) {
+            // Outline icons only, no titles (tab bars fill symbols unless told
+            // not to; VoiceOver still reads each name).
             ContentView()
-                .tabItem { Label("Countdown", systemImage: "flag.checkered") }
+                .tabItem { Image(systemName: "flag.checkered").environment(\.symbolVariants, .none).accessibilityLabel("Countdown") }
                 .tag(Tab.countdown)
             // Results and the standings, behind a RESULTS | STANDINGS switch.
             ResultsHubView()
-                .tabItem { Label("Results", systemImage: "trophy.fill") }
+                .tabItem { Image(systemName: "trophy").environment(\.symbolVariants, .none).accessibilityLabel("Results") }
                 .tag(Tab.results)
             GamesView(model: games)
-                .tabItem { Label("Games", systemImage: "gamecontroller.fill") }
+                .tabItem { Image(systemName: "gamecontroller").environment(\.symbolVariants, .none).accessibilityLabel("Games") }
                 .tag(Tab.games)
             ChatView()
-                .tabItem { Label("Paddock", systemImage: "bubble.left.and.bubble.right.fill") }
+                .tabItem { Image(systemName: "bubble.left.and.bubble.right").environment(\.symbolVariants, .none).accessibilityLabel("Paddock") }
                 .badge(chatBadge.unread)
                 .tag(Tab.paddock)
             NewsView()
-                .tabItem { Label("News", systemImage: "newspaper.fill") }
+                .tabItem { Image(systemName: "newspaper").environment(\.symbolVariants, .none).accessibilityLabel("News") }
                 .tag(Tab.news)
         }
         .tint(Theme.accent)
