@@ -20,6 +20,9 @@ struct Track3DView: UIViewRepresentable {
         view.backgroundColor = .clear
         view.allowsCameraControl = true
         view.antialiasingMode = .multisampling4X
+        // A slow spin and a ghost car need no more than 30 frames a second;
+        // the default (up to 120 with bloom) kept the GPU busy on the whole tab.
+        view.preferredFramesPerSecond = 30
         view.scene = TrackSceneBuilder.build(map: map)
         context.coordinator.circuitName = map.circuitName
         context.coordinator.resetToken = resetToken

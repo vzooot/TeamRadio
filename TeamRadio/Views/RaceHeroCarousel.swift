@@ -309,26 +309,37 @@ struct ShineSweep: View {
     var every: Double = 6
     var duration: Double = 1.3
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// 0 = band just left of the card, 1 = past its right edge.
+    @State private var progress: CGFloat = 1
 
     var body: some View {
         if !reduceMotion {
-            TimelineView(.animation(minimumInterval: 1 / 30)) { context in
-                let phase = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: every) / duration
-                GeometryReader { geo in
-                    if phase < 1 {
-                        LinearGradient(colors: [.clear, .white.opacity(0.16), .white.opacity(0.28), .white.opacity(0.16), .clear],
-                                       startPoint: .leading, endPoint: .trailing)
-                            .frame(width: geo.size.width * 0.4, height: geo.size.height * 1.6)
-                            .rotationEffect(.degrees(20))
-                            .offset(x: -geo.size.width * 0.5 + CGFloat(phase) * geo.size.width * 1.6,
-                                    y: -geo.size.height * 0.3)
-                            .blendMode(.plusLighter)
-                    }
-                }
+            GeometryReader { geo in
+                LinearGradient(colors: [.clear, .white.opacity(0.16), .white.opacity(0.28), .white.opacity(0.16), .clear],
+                               startPoint: .leading, endPoint: .trailing)
+                    .frame(width: geo.size.width * 0.4, height: geo.size.height * 1.6)
+                    .rotationEffect(.degrees(20))
+                    .offset(x: -geo.size.width * 0.5 + progress * geo.size.width * 1.6,
+                            y: -geo.size.height * 0.3)
+                    .blendMode(.plusLighter)
             }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
             .allowsHitTesting(false)
             .accessibilityHidden(true)
+            // One animation per sweep, idle in between (it used to redraw 30
+            // times a second on every card). Timed to the clock, so all cards
+            // still sweep together.
+            .task {
+                while !Task.isCancelled {
+                    let now = Date.now.timeIntervalSinceReferenceDate
+                    try? await Task.sleep(for: .seconds(every - now.truncatingRemainder(dividingBy: every)))
+                    guard !Task.isCancelled else { return }
+                    var reset = Transaction()
+                    reset.disablesAnimations = true
+                    withTransaction(reset) { progress = 0 }
+                    withAnimation(.linear(duration: duration)) { progress = 1 }
+                }
+            }
         }
     }
 }
