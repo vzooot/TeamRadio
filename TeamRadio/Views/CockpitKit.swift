@@ -14,6 +14,9 @@ struct CarbonFiber: View {
                 .scaledToFill()
         )
         .clipped()
+        // Decoration only: the filled image reaches past its frame, and
+        // clipping hides that but doesn't stop it catching taps.
+        .allowsHitTesting(false)
     }
 }
 

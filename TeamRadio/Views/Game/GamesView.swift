@@ -384,9 +384,13 @@ private struct ArcadeTile: View {
                     LinearGradient(colors: [.clear, Theme.background.opacity(0.92)], startPoint: .center, endPoint: .bottom)
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 20))
+                // The photo is wider than the tile: clipping hides the rest
+                // but it still caught taps over the neighbouring tile.
+                .allowsHitTesting(false)
             }
             .overlay(RoundedRectangle(cornerRadius: 20)
                 .strokeBorder(kind == .wall ? AnyShapeStyle(Theme.accent.opacity(0.6)) : AnyShapeStyle(Theme.glassStroke)))
+            .contentShape(RoundedRectangle(cornerRadius: 20))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(kind == .wall ? "Play Reaction Wall" : "Play Lights Out")
