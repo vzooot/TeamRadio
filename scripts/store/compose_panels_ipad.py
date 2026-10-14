@@ -25,7 +25,6 @@ PANELS = [
     ("chat", "THE PADDOCK,", "LIVE", "Fan chat with GIFs, photos & videos"),
     ("results", "RESULTS,", "SPOILER-SAFE", "Hidden until you say so"),
     ("standings", "EVERY POINT", "COUNTS", "Full championship tables, always live"),
-    ("news", "EVERY", "HEADLINE", "F1.com, BBC Sport & Motorsport.com, in one feed"),
 ]
 
 def gradient_bg():
