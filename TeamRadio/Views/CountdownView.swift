@@ -167,7 +167,8 @@ struct CountdownView: View {
         let days = Int(remaining) / 86400
         let hours = (Int(remaining) % 86400) / 3600
         return [
-            session.date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute()),
+            // two-digit minutes: the default printed 23:00 as "23:0"
+            session.date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)),
             session.date.formatted(.dateTime.day().month(.abbreviated)).uppercased(),
             // fits the board with a margin up to "99 DAYS"; longer gets short
             days > 99 ? "\(days) D" : days > 1 ? "\(days) DAYS" : days == 1 ? "1 DAY"

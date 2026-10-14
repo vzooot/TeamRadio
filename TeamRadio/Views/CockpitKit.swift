@@ -213,20 +213,19 @@ struct DotMatrixBoard: View {
 
     var body: some View {
         let breathing = standby && litLights == 0 && page == 0
+        let settled = transitionStart == nil
         ZStack {
-            if transitionStart == nil {
-                // Settled: sockets and dies never change, so they're drawn
-                // once; only the lamps redraw, and only while breathing (a slow
-                // 3 s breath needs no more than 20 frames a second). Redrawing
-                // the whole board 30 times a second made the tab feel heavy.
-                Canvas { ctx, size in draw(&ctx, size: size, at: .now, breathing: breathing, layers: .base) }
-                TimelineView(.animation(minimumInterval: 1 / 20, paused: !breathing)) { context in
-                    Canvas { ctx, size in draw(&ctx, size: size, at: context.date, breathing: breathing, layers: .lit) }
-                }
-            } else {
-                // the scramble between pages changes every socket each frame
-                TimelineView(.animation(minimumInterval: 1 / 30)) { context in
-                    Canvas { ctx, size in draw(&ctx, size: size, at: context.date, breathing: breathing, layers: .all) }
+            // Only what changes is redrawn (redrawing the whole board 30
+            // times a second made the tab feel heavy): the sockets never
+            // change; the dies only during a scramble; the lamps while they
+            // breathe (a slow 3 s breath needs no more than 20 frames a
+            // second) or scramble.
+            Canvas { ctx, size in
+                draw(&ctx, size: size, at: .now, breathing: breathing, layers: settled ? [.sockets, .dies] : [.sockets])
+            }
+            TimelineView(.animation(minimumInterval: settled ? 1 / 20 : 1 / 30, paused: settled && !breathing)) { context in
+                Canvas { ctx, size in
+                    draw(&ctx, size: size, at: context.date, breathing: breathing, layers: settled ? [.lit] : [.dies, .lit])
                 }
             }
         }
@@ -248,10 +247,15 @@ struct DotMatrixBoard: View {
         #endif
     }
 
-    private enum Layers { case base, lit, all }
+    private struct Layers: OptionSet {
+        let rawValue: Int
+        static let sockets = Layers(rawValue: 1)
+        static let dies = Layers(rawValue: 2)
+        static let lit = Layers(rawValue: 4)
+    }
 
-    /// Draws the board: `.base` the sockets and unlit dies, `.lit` the
-    /// glowing lamps, `.all` both (during a scramble).
+    /// Draws the chosen layers of the board: the empty sockets, the grey
+    /// dies of unlit sockets, the glowing lamps.
     private func draw(_ ctx: inout GraphicsContext, size: CGSize, at date: Date, breathing: Bool, layers: Layers) {
         let cols = Self.cols, rows = Self.rows
         // a little side margin so the outer lamps' halos aren't clipped
@@ -300,7 +304,7 @@ struct DotMatrixBoard: View {
             for (key, v) in goal { if v > 0 { lit[key] = 1 } else { armed.insert(key) } }
         }
 
-        if layers != .lit {
+        if layers.contains(.sockets) {
             // sockets, lit from above like the reference: a thin lip that brightens
             // along the bottom edge, a cavity shaded dark at the top and lighter at
             // the floor, soft shadow inside the top wall, soft light on the far wall
@@ -321,6 +325,8 @@ struct DotMatrixBoard: View {
                     layer.stroke(Path(ellipseIn: rect(CGPoint(x: p.x, y: p.y + 1.1), hole * 0.9)), with: .color(.white.opacity(0.06)), lineWidth: 1.6)
                 }
             }
+        }
+        if layers.contains(.dies) {
             // unlit: the 3×3 grey die
             for c in 0..<cols {
                 for r in 0..<rows {
@@ -337,7 +343,7 @@ struct DotMatrixBoard: View {
                 }
             }
         }
-        guard layers != .base else { return }
+        guard layers.contains(.lit) else { return }
 
         // lit LEDs, after the reference — from the centre outward: luminous
         // disc with a slightly darker edge, a thin dark gap, the cavity wall
