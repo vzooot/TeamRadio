@@ -76,6 +76,9 @@ struct ReactionWallView: View {
         }
         .onDisappear { game?.cancel() }
         .task {
+            // Start the audio engine once the screen has slid up: starting it
+            // during the presentation made the slide stutter.
+            try? await Task.sleep(for: .milliseconds(450))
             StartSounds.shared.prepare()
             #if DEBUG
             // -WallDemo YES: starts and plays itself, for screenshots and videos
@@ -443,12 +446,16 @@ struct WallPad: View {
             Circle()
                 .fill(LinearGradient(colors: [Color(white: 0.20), Color(white: 0.05)], startPoint: .top, endPoint: .bottom))
             Circle().strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
-            ForEach(0..<18, id: \.self) { i in
-                Circle()
-                    .fill(lit ? tint : Color.white.opacity(0.07))
-                    .frame(width: size * 0.06, height: size * 0.06)
-                    .offset(y: -size * 0.40)
-                    .rotationEffect(.degrees(Double(i) * 20))
+            // The LED ring in one drawing, not 18 separate views.
+            Canvas { ctx, canvas in
+                let dot = size * 0.06
+                let c = CGPoint(x: canvas.width / 2, y: canvas.height / 2)
+                for i in 0..<18 {
+                    let a = Double(i) * 20 * .pi / 180 - .pi / 2
+                    let p = CGPoint(x: c.x + cos(a) * size * 0.40, y: c.y + sin(a) * size * 0.40)
+                    ctx.fill(Path(ellipseIn: CGRect(x: p.x - dot / 2, y: p.y - dot / 2, width: dot, height: dot)),
+                             with: .color(lit ? tint : Color.white.opacity(0.07)))
+                }
             }
             Circle()
                 .fill(lit
@@ -461,6 +468,9 @@ struct WallPad: View {
                 .opacity(lit ? 0.9 : 0.25)
         }
         .frame(width: size, height: size)
+        // One flattened image per light (housing, LEDs, lens); the glow
+        // stays outside so it isn't clipped.
+        .drawingGroup()
         .shadow(color: lit ? tint.opacity(0.9) : .black.opacity(0.6), radius: lit ? 16 : 4, y: lit ? 0 : 3)
     }
 }

@@ -50,6 +50,8 @@ struct LightsOutView: View {
         }
         .onDisappear { sequence?.cancel() }
         .task {
+            // After the slide-up, which stuttered when the engine started during it.
+            try? await Task.sleep(for: .milliseconds(450))
             StartSounds.shared.prepare()
             // Clear a best saved before anticipated starts were caught.
             if best > 0, best < Self.minReaction { best = 0 }

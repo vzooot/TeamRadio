@@ -78,12 +78,7 @@ struct GamesView: View {
     @State private var showResult = false
     @State private var showLightsOut = false
     @State private var showWall = false
-    @State private var leaderboard: BoardSheet?
-
-    enum BoardSheet: String, Identifiable {
-        case global, leagues
-        var id: String { rawValue }
-    }
+    @State private var showLeaderboard = false
 
     var body: some View {
         ZStack {
@@ -140,7 +135,7 @@ struct GamesView: View {
                     .presentationBackground(Theme.background)
             }
         }
-        .sheet(item: $leaderboard) { which in
+        .sheet(isPresented: $showLeaderboard) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 8) {
                     TrioSlashes(height: 18)
@@ -148,7 +143,7 @@ struct GamesView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 22)
-                LeaderboardView(leagues: which == .leagues)
+                LeaderboardView()
             }
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
@@ -159,8 +154,7 @@ struct GamesView: View {
     private func content(now: Date) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             title
-            RankBoard(board: model.seasonBoard,
-                      onGlobal: { leaderboard = .global }, onLeagues: { leaderboard = .leagues })
+            RankBoard(board: model.seasonBoard, onOpen: { showLeaderboard = true })
             PicksHero(game: game, state: game.cardState(at: now), now: now, seasonRounds: model.season.count,
                       onPicks: { showPicks = true }, onResult: { showResult = true })
             SectionTitle("ARCADE")
@@ -192,12 +186,11 @@ struct GamesView: View {
 /// The player's season standing as the leaderboard itself (approved draft
 /// C, Marketing/drafts/2026-10-13/leaderboard-A-B-C.png): a slanted
 /// position tag, points and the score against the AI Strategist, then the
-/// players just above and below in timing-tower lines, and links to the
-/// global table and the private leagues.
+/// players just above and below in timing-tower lines, and one link to the
+/// full leaderboard (season, last round and leagues).
 private struct RankBoard: View {
     let board: LeaderboardService.Board?
-    let onGlobal: () -> Void
-    let onLeagues: () -> Void
+    let onOpen: () -> Void
 
     private var leader: Int { board?.top.first?.points ?? 0 }
 
@@ -212,21 +205,19 @@ private struct RankBoard: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Button(action: onGlobal) { summary }
+            Button(action: onOpen) { summary }
                 .buttonStyle(.plain)
             if !lines.isEmpty {
                 Divider().overlay(Color.white.opacity(0.08))
                 ForEach(lines) { entry in
-                    Button(action: onGlobal) { line(entry) }
+                    Button(action: onOpen) { line(entry) }
                         .buttonStyle(.plain)
                 }
             }
-            HStack(spacing: 0) {
-                link("globe.europe.africa.fill", (board?.total ?? 0) >= 100 ? "GLOBAL TOP 100" : "GLOBAL TABLE", action: onGlobal)
-                Rectangle().fill(Color.white.opacity(0.08)).frame(width: 1, height: 22)
-                link("person.2.fill", "LEAGUES", action: onLeagues)
-            }
-            .padding(.vertical, 12)
+            // One way in: the leaderboard switches between the season, the
+            // last round and the player's leagues itself.
+            link("list.number", "FULL LEADERBOARD", action: onOpen)
+                .padding(.vertical, 12)
         }
         .background(Theme.card)
         .clipShape(RoundedRectangle(cornerRadius: 18))
