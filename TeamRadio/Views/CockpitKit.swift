@@ -52,17 +52,35 @@ struct NeonTile: View {
     let label: String
     var tint: Color = Theme.accent
     var hot: Bool = false
+    /// Digits roll to the next value. Off for the seconds: rolling every
+    /// second kept the tile redrawing for 0.3 s of every second, which made
+    /// the whole tab stutter (measured on device).
+    var rolls = true
 
     private var rim: Color { hot ? Theme.live : tint }
+    /// Room around the tile for its outer glow (shadow radius 12).
+    private static let glowRoom: CGFloat = 26
 
     var body: some View {
+        // One flattened image per tile, redrawn only when its digit changes:
+        // otherwise the dozen glows and shadows of the four tiles were
+        // recalculated on every frame whenever anything else on screen moved
+        // (the breathing board, the turning ring). The padding gives the
+        // glow room inside the image so nothing is clipped.
+        tile
+            .padding(Self.glowRoom)
+            .drawingGroup()
+            .padding(-Self.glowRoom)
+    }
+
+    private var tile: some View {
         VStack(spacing: 2) {
             Text(String(format: "%02d", value))
                 .font(.f1Digits(38))
                 .foregroundStyle(hot ? AnyShapeStyle(Theme.liveGradient) : AnyShapeStyle(Theme.chromeText))
                 .shadow(color: (hot ? Theme.live : .white).opacity(0.55), radius: 6)
-                .contentTransition(.numericText(countsDown: true))
-                .animation(.snappy(duration: 0.3), value: value)
+                .contentTransition(rolls ? .numericText(countsDown: true) : .identity)
+                .animation(rolls ? .snappy(duration: 0.3) : nil, value: value)
             Text(label)
                 .font(.f1(11, weight: .bold))
                 .tracking(2)
@@ -70,26 +88,31 @@ struct NeonTile: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 15)
-        .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 18)
-                    .fill(LinearGradient(colors: [Color(white: 0.03), Color(white: 0.09)], startPoint: .top, endPoint: .bottom))
-                // glass sheen across the upper half
-                RoundedRectangle(cornerRadius: 18)
-                    .fill(LinearGradient(colors: [Color.white.opacity(0.10), .clear], startPoint: .top, endPoint: .center))
-                // bloom behind the rim
-                RoundedRectangle(cornerRadius: 18)
-                    .strokeBorder(rim.opacity(0.9), lineWidth: 3)
-                    .blur(radius: 5)
-                // the neon tube itself: bright core, tinted edge
-                RoundedRectangle(cornerRadius: 18)
-                    .strokeBorder(LinearGradient(colors: [Color.white.opacity(0.95), rim, rim.opacity(0.8)],
-                                                 startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 2.2)
-                RoundedRectangle(cornerRadius: 13)
-                    .inset(by: 6)
-                    .strokeBorder(rim.opacity(0.35), lineWidth: 1)
-            }
-        )
+        .background(chrome)
+    }
+
+    /// The glass, rim and bloom, with the outer glow on them alone: the glow
+    /// used to wrap the rolling digits too, so it was recalculated on every
+    /// frame of every tick.
+    private var chrome: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 18)
+                .fill(LinearGradient(colors: [Color(white: 0.03), Color(white: 0.09)], startPoint: .top, endPoint: .bottom))
+            // glass sheen across the upper half
+            RoundedRectangle(cornerRadius: 18)
+                .fill(LinearGradient(colors: [Color.white.opacity(0.10), .clear], startPoint: .top, endPoint: .center))
+            // bloom behind the rim
+            RoundedRectangle(cornerRadius: 18)
+                .strokeBorder(rim.opacity(0.9), lineWidth: 3)
+                .blur(radius: 5)
+            // the neon tube itself: bright core, tinted edge
+            RoundedRectangle(cornerRadius: 18)
+                .strokeBorder(LinearGradient(colors: [Color.white.opacity(0.95), rim, rim.opacity(0.8)],
+                                             startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 2.2)
+            RoundedRectangle(cornerRadius: 13)
+                .inset(by: 6)
+                .strokeBorder(rim.opacity(0.35), lineWidth: 1)
+        }
         .shadow(color: rim.opacity(0.5), radius: 12)
     }
 }
@@ -98,7 +121,14 @@ struct NeonTile: View {
 /// through race week), then cycles on its own through the info pages
 /// (session time, date, days to go, round) in cyan — each page arriving
 /// with a sci-fi scramble — and back to the lights. A tap skips ahead.
-struct DotMatrixBoard: View {
+struct DotMatrixBoard: View, Equatable {
+    /// Same lights and pages: nothing to redraw (the board's own state
+    /// drives its breathing and page changes).
+    static func == (a: Self, b: Self) -> Bool {
+        a.litLights == b.litLights && a.pages == b.pages && a.standby == b.standby
+            && a.lightColor == b.lightColor && a.infoColor == b.infoColor
+    }
+
     let litLights: Int
     var pages: [String] = []
     /// Before race week no light is due yet: the five lamps idle in a dim,
@@ -444,7 +474,10 @@ extension DotMatrixBoard {
         let visiblePitches = CGFloat(Self.cols) - 2 * edge
         return GeometryReader { geo in
             let pitch = geo.size.width / visiblePitches
+            // equatable: the countdown re-renders every second, but the board
+            // only redraws when its lights or pages actually change
             self
+                .equatable()
                 .frame(width: CGFloat(Self.cols) * pitch)
                 .offset(x: -edge * pitch)
         }

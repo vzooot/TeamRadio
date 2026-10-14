@@ -87,6 +87,8 @@ struct RootView: View {
                 .tag(Tab.news)
         }
         .tint(Theme.accent)
+        // No scroll bars anywhere (inherited by every scroll view and sheet).
+        .scrollIndicators(.hidden)
         #if DEBUG
         .overlay { if let id = UserDefaults.standard.string(forKey: "DesignLab") { DesignLab(id: id) } }
         #endif
