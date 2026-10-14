@@ -46,15 +46,39 @@ struct Screw: View {
     }
 }
 
+/// One countdown digit: drawn once (glow included) as a flattened image;
+/// a new digit slides in from above while the old one slides down and
+/// fades, like a counter rolling back. Moving finished images is nearly free.
+private struct RollingDigit: View {
+    let digit: Character
+    let hot: Bool
+    let rolls: Bool
+
+    var body: some View {
+        ZStack {
+            Text(String(digit))
+                .font(.f1Digits(38))
+                .foregroundStyle(hot ? AnyShapeStyle(Theme.liveGradient) : AnyShapeStyle(Theme.chromeText))
+                .shadow(color: (hot ? Theme.live : .white).opacity(0.55), radius: 6)
+                .padding(10)
+                .drawingGroup()
+                .padding(-10)
+                .id(digit)
+                .transition(rolls
+                    ? .asymmetric(insertion: .offset(y: -16).combined(with: .opacity),
+                                  removal: .offset(y: 16).combined(with: .opacity))
+                    : .identity)
+        }
+    }
+}
+
 /// Neon-edged glass tile: white digits inside a cyan (or hot orange) rim.
 struct NeonTile: View {
     let value: Int
     let label: String
     var tint: Color = Theme.accent
     var hot: Bool = false
-    /// Digits roll to the next value. Off for the seconds: rolling every
-    /// second kept the tile redrawing for 0.3 s of every second, which made
-    /// the whole tab stutter (measured on device).
+    /// Digits roll to the next value (cheap: see `RollingDigit`).
     var rolls = true
 
     private var rim: Color { hot ? Theme.live : tint }
@@ -62,25 +86,16 @@ struct NeonTile: View {
     private static let glowRoom: CGFloat = 26
 
     var body: some View {
-        // One flattened image per tile, redrawn only when its digit changes:
-        // otherwise the dozen glows and shadows of the four tiles were
-        // recalculated on every frame whenever anything else on screen moved
-        // (the breathing board, the turning ring). The padding gives the
-        // glow room inside the image so nothing is clipped.
-        tile
-            .padding(Self.glowRoom)
-            .drawingGroup()
-            .padding(-Self.glowRoom)
-    }
-
-    private var tile: some View {
         VStack(spacing: 2) {
-            Text(String(format: "%02d", value))
-                .font(.f1Digits(38))
-                .foregroundStyle(hot ? AnyShapeStyle(Theme.liveGradient) : AnyShapeStyle(Theme.chromeText))
-                .shadow(color: (hot ? Theme.live : .white).opacity(0.55), radius: 6)
-                .contentTransition(rolls ? .numericText(countsDown: true) : .identity)
-                .animation(rolls ? .snappy(duration: 0.3) : nil, value: value)
+            // Each digit is its own flattened image that slides and fades:
+            // the system's numeric roll blurs every glyph on every frame and
+            // made the tab stutter once a second (measured on device).
+            HStack(spacing: 0) {
+                ForEach(Array(String(format: "%02d", value).enumerated()), id: \.offset) { _, digit in
+                    RollingDigit(digit: digit, hot: hot, rolls: rolls)
+                }
+            }
+            .animation(rolls ? .snappy(duration: 0.3) : nil, value: value)
             Text(label)
                 .font(.f1(11, weight: .bold))
                 .tracking(2)
@@ -91,10 +106,18 @@ struct NeonTile: View {
         .background(chrome)
     }
 
-    /// The glass, rim and bloom, with the outer glow on them alone: the glow
-    /// used to wrap the rolling digits too, so it was recalculated on every
-    /// frame of every tick.
+    /// The glass, rim, bloom and outer glow as one flattened image that never
+    /// changes, so the rolling digit on top only redraws itself (the tile's
+    /// dozen glows used to be recalculated on every frame of every roll).
+    /// The padding gives the glow room inside the image so nothing is clipped.
     private var chrome: some View {
+        chromeLayers
+            .padding(Self.glowRoom)
+            .drawingGroup()
+            .padding(-Self.glowRoom)
+    }
+
+    private var chromeLayers: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 18)
                 .fill(LinearGradient(colors: [Color(white: 0.03), Color(white: 0.09)], startPoint: .top, endPoint: .bottom))

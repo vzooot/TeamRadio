@@ -57,7 +57,7 @@ struct CountdownView: View {
                         NeonTile(value: parts.days, label: "DAYS")
                         NeonTile(value: parts.hours, label: "HRS")
                         NeonTile(value: parts.minutes, label: "MIN")
-                        NeonTile(value: parts.seconds, label: "SEC", hot: true, rolls: false)
+                        NeonTile(value: parts.seconds, label: "SEC", hot: true)
                     }
                     .padding(.top, 4)
                     .overlay(alignment: .bottom) {
