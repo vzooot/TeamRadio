@@ -123,6 +123,7 @@ struct ContentView: View {
                     .id("hero")
 
                     CountdownView(race: race)
+                    emilyBar
 
                     // The weekend's sessions always right under the countdown.
                     VStack {
@@ -150,15 +151,12 @@ struct ContentView: View {
                         GameZoneDraft(variant: UserDefaults.standard.string(forKey: "GameZoneDraft") ?? "").id("gameZone")
                     }
                     #endif
-                    // The fan vote and the AI race engineer; the games
+                    // The fan vote (Ask Emily sits under the countdown); the games
                     // themselves live in the Games tab.
                     if GameFeature.isEnabled, !model.isBrowsing {
                         TimelineView(.periodic(from: .now, by: 30)) { context in
-                            VStack(spacing: 14) {
-                                if dotd.race != nil {
-                                    DotdBoldCard(model: dotd, now: context.date, onVote: { showDotd = true })
-                                }
-                                EmilyBar(onTap: { showEmily = true })
+                            if dotd.race != nil {
+                                DotdBoldCard(model: dotd, now: context.date, onVote: { showDotd = true })
                             }
                         }
                         .transaction(value: model.isBrowsing) { $0.animation = nil }
@@ -234,6 +232,14 @@ struct ContentView: View {
             withAnimation(.easeInOut(duration: step.duration)) { proxy.scrollTo(id, anchor: step.anchor) }
         }
         #endif
+        }
+    }
+
+    /// Ask Emily, the AI race engineer, right by the countdown.
+    @ViewBuilder
+    private var emilyBar: some View {
+        if GameFeature.isEnabled {
+            EmilyBar(onTap: { showEmily = true })
         }
     }
 
