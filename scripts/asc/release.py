@@ -173,7 +173,10 @@ def cmd_submit(a):
     if not vid:
         sys.exit(f"version {a.version} not found — run prepare first")
     for _ in range(80):
-        b = call("GET", f"/v1/builds?filter[app]={APP}&filter[version]={a.build}&fields[builds]=version,processingState")["data"]
+        # Build numbers repeat across versions (Xcode Cloud run numbers vs
+        # old local uploads), so match the version too.
+        b = call("GET", f"/v1/builds?filter[app]={APP}&filter[version]={a.build}"
+                        f"&filter[preReleaseVersion.version]={a.version}&fields[builds]=version,processingState")["data"]
         st = b[0]["attributes"]["processingState"] if b else "NOT_YET"
         log("build", a.build, st)
         if st == "VALID":
