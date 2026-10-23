@@ -20,8 +20,7 @@ enum GameReminders {
 
         var items: [(id: String, date: Date, title: String, body: String)] = []
         if !saved.contains(.quali), let quali = GameRules.lockDate(for: race, group: .quali) {
-            items.append(("open", quali.addingTimeInterval(-2 * 86400),
-                          "\(flag) Picks are open", "Call pole, the podium and fastest lap for the \(name). Can you beat the AI Strategist?"))
+            // "Picks are open" comes from the server (automatic announcement).
             items.append(("quali-3h", quali.addingTimeInterval(-3 * 3600),
                           "\(flag) 3 hours to lock your pole pick", "Pole locks when qualifying starts. Make your picks for the \(name)."))
         }

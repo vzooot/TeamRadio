@@ -80,8 +80,13 @@ export default {
 
   async scheduled(_event, env, ctx) {
     ctx.waitUntil(checkAndPush(env));
-    ctx.waitUntil(runGame(env).then((r) => r?.length && console.log("game", JSON.stringify(r)))
+    ctx.waitUntil(runGame(env, { onScored: (race) => announceOnce(env, `results:${race.season}-${race.round}`, {
+      title: `🏁 Results are in for the ${race.raceName}`,
+      body: "See your points and whether you beat the AI Strategist.",
+      link: "teamradio://games",
+    }) }).then((r) => r?.length && console.log("game", JSON.stringify(r)))
       .catch((e) => console.log("game", e)));
+    ctx.waitUntil(autoAnnouncements(env).catch((e) => console.log("auto", String(e))));
   },
 };
 
@@ -255,6 +260,34 @@ async function announce(env, { title, body, link, onlyEnv }) {
 }
 
 const APP_TOPIC = "com.woqomoqo.OneF";
+
+/// Sends an announcement once per `id`, however often it's called.
+async function announceOnce(env, id, message) {
+  const key = `ann:${id}`;
+  if (await env.TOKENS.get(key)) return;
+  await env.TOKENS.put(key, "1", { expirationTtl: 86400 * 14 });
+  const counts = await announce(env, message);
+  console.log("announced", id, JSON.stringify(counts));
+}
+
+/// Scheduled messages each race weekend (the results one comes from the
+/// game scorer): picks open two days before qualifying.
+async function autoAnnouncements(env) {
+  const race = await nextRace();
+  if (!race) return;
+  const quali = race.sessions.find((s) => s.short === "QUALI");
+  if (!quali) return;
+  const openAt = quali.date.getTime() - 2 * 86400_000;
+  const now = Date.now();
+  // within an hour of the moment (cron runs every 5 minutes)
+  if (now < openAt || now > openAt + 3600_000) return;
+  const flag = FLAGS[race.country] || "🏁";
+  await announceOnce(env, `open:${quali.date.toISOString()}`, {
+    title: `${flag} Picks are open for the ${race.raceName}`,
+    body: "Call pole, the podium and fastest lap. Can you beat the AI Strategist?",
+    link: "teamradio://games",
+  });
+}
 
 // ES256 JWT for APNs, signed with the .p8 key via WebCrypto.
 async function apnsJWT(env) {
