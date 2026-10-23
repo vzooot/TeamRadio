@@ -475,7 +475,7 @@ export async function makeStrategistPicks(env, race) {
 
 /// Called from the 5-minute cron: strategist picks in race week, scoring
 /// once results are out.
-export async function runGame(env) {
+export async function runGame(env, { onScored } = {}) {
   if (!env.CK_KEY_ID || !env.CK_PRIVATE_KEY) return;
   const races = await season();
   const now = Date.now();
@@ -503,7 +503,11 @@ export async function runGame(env) {
         report.push({ ckEnv, ...r });
         // Scored once per environment; POST /game/run after deleting the
         // flag rescores (e.g. after a results correction).
-        if (!r.skipped) await env.TOKENS.put(flag, "1", { expirationTtl: 86400 * 30 });
+        if (!r.skipped) {
+          await env.TOKENS.put(flag, "1", { expirationTtl: 86400 * 30 });
+          // Tell the players once the live round is scored.
+          if (ckEnv === "production" && onScored) await onScored(last).catch((e) => console.log("onScored", String(e)));
+        }
       } catch (e) {
         report.push({ ckEnv, id, error: String(e) });
       }

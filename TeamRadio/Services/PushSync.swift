@@ -38,6 +38,23 @@ enum PushSync {
         }
     }
 
+    /// The regular APNs token, for the server's announcements. Sent once per
+    /// token (it rarely changes).
+    static func uploadDeviceToken(_ token: String) async {
+        let key = "deviceTokenSent"
+        guard UserDefaults.standard.string(forKey: key) != token else { return }
+        var request = URLRequest(url: URL(string: "https://teamradio-push.eam-adio.workers.dev/register-device")!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "token": token, "env": BuildSigning.isDevelopment ? "sandbox" : "production",
+        ])
+        if let (_, response) = try? await URLSession.shared.data(for: request),
+           (response as? HTTPURLResponse)?.statusCode == 200 {
+            UserDefaults.standard.set(token, forKey: key)
+        }
+    }
+
     private static func upload(_ token: String) async {
         // Development-signed builds get sandbox APNs tokens; TestFlight/App
         // Store get production ones. The worker needs to know which gate to knock on.

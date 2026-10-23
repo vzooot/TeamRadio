@@ -53,8 +53,13 @@ struct ContentView: View {
         }
         .task {
             await model.load()
+            await NotificationManager.adoptDefault()
             // Keep scheduled alerts in sync with any calendar changes.
             await NotificationManager.reschedule(season: model.season)
+        }
+        // switched on by the first-launch prompt
+        .onReceive(NotificationCenter.default.publisher(for: NotificationManager.didEnable)) { _ in
+            Task { await NotificationManager.reschedule(season: model.season) }
         }
         .sheet(isPresented: $showAbout) {
             AboutView()
@@ -489,6 +494,9 @@ struct SessionAlertsCard: View {
             if let on { withAnimation { enabled = on } }
         }
         #endif
+        .onReceive(NotificationCenter.default.publisher(for: NotificationManager.didEnable)) { _ in
+            enabled = true
+        }
         .onChange(of: enabled) { old, wantsOn in
             guard old != wantsOn else { return }
             #if DEBUG

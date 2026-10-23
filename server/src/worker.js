@@ -41,6 +41,26 @@ export default {
       await env.TOKENS.put("t:" + token, `${apnsEnv}|${lead}`);
       return new Response("ok");
     }
+    // Devices register their regular APNs token here, for announcements.
+    if (request.method === "POST" && url.pathname === "/register-device") {
+      let body;
+      try { body = await request.json(); } catch { return new Response("bad json", { status: 400 }); }
+      const token = (body.token || "").toLowerCase();
+      if (!/^[0-9a-f]{32,200}$/.test(token)) return new Response("bad token", { status: 400 });
+      await env.TOKENS.put("d:" + token, body.env === "sandbox" ? "sandbox" : "production");
+      return new Response("ok");
+    }
+    // Announcement to every device: {title, body, link?, env?}. Guarded by
+    // the ADMIN_KEY secret; scripts/push/announce.sh sends one.
+    if (request.method === "POST" && url.pathname === "/announce") {
+      if (!env.ADMIN_KEY || request.headers.get("x-admin-key") !== env.ADMIN_KEY) {
+        return new Response("no", { status: 403 });
+      }
+      let body;
+      try { body = await request.json(); } catch { return new Response("bad json", { status: 400 }); }
+      if (!body.title || !body.body) return new Response("title and body required", { status: 400 });
+      return Response.json(await announce(env, body));
+    }
     if (url.pathname === "/health") return new Response("ok");
     // Manual test fire: pushes a fake "session in 15 min" to all tokens.
     // Guarded by the TEST_KEY secret.
@@ -60,8 +80,13 @@ export default {
 
   async scheduled(_event, env, ctx) {
     ctx.waitUntil(checkAndPush(env));
-    ctx.waitUntil(runGame(env).then((r) => r?.length && console.log("game", JSON.stringify(r)))
+    ctx.waitUntil(runGame(env, { onScored: (race) => announceOnce(env, `results:${race.season}-${race.round}`, {
+      title: `🏁 Results are in for the ${race.raceName}`,
+      body: "See your points and whether you beat the AI Strategist.",
+      link: "teamradio://games",
+    }) }).then((r) => r?.length && console.log("game", JSON.stringify(r)))
       .catch((e) => console.log("game", e)));
+    ctx.waitUntil(autoAnnouncements(env).catch((e) => console.log("auto", String(e))));
   },
 };
 
@@ -69,20 +94,25 @@ async function checkAndPush(env) {
   const race = await nextRace();
   if (!race) return;
 
+  // Rolling countdown: each session's Lock Screen countdown starts 8 hours
+  // ahead (Apple's limit for a Live Activity), or when the previous session
+  // ends if that's later, so the next session is always there all weekend.
   const now = Date.now();
-  for (const s of race.sessions) {
-    const left = s.date.getTime() - now;
-    // Each device picks its lead time; fire once per lead inside a ±5 min
-    // window around it (cron period is 5 min).
-    for (const lead of LEADS) {
-      if (left < (lead - 5) * 60_000 || left > (lead + 5) * 60_000) continue;
-      const dedupeKey = `sent:${lead}:${s.short}:${s.date.toISOString()}`;
-      if (await env.TOKENS.get(dedupeKey)) continue;
-      await env.TOKENS.put(dedupeKey, "1", { expirationTtl: 86400 });
-      await pushSessionStart(env, race, s, lead);
-    }
+  const sessions = [...race.sessions].sort((a, b) => a.date - b.date);
+  let previousEnd = 0;
+  for (const s of sessions) {
+    const start = s.date.getTime();
+    const startAt = Math.max(start - ROLLING_LEAD_MS, previousEnd);
+    previousEnd = start + s.duration * 1000;
+    if (now < startAt || now >= start) continue;
+    const dedupeKey = `sent:roll:${s.short}:${s.date.toISOString()}`;
+    if (await env.TOKENS.get(dedupeKey)) continue;
+    await env.TOKENS.put(dedupeKey, "1", { expirationTtl: 86400 * 2 });
+    await pushSessionStart(env, race, s, start - now);
   }
 }
+
+const ROLLING_LEAD_MS = 8 * 3600_000;
 
 async function nextRace() {
   const res = await fetch("https://api.jolpi.ca/ergast/f1/current/next.json", {
@@ -115,17 +145,23 @@ async function nextRace() {
   };
 }
 
-const LEADS = [15, 60, 180];
-
 /// "env|lead" since 1.2.0; older devices stored just the env (1 hour lead).
+/// Lead 0 means the player turned automatic countdowns off; any other
+/// value now gets the rolling countdown.
 function parseToken(value) {
   const [apnsEnv, lead] = (value || "production").split("|");
   return { apnsEnv: apnsEnv === "sandbox" ? "sandbox" : "production", lead: lead === undefined ? 60 : Number(lead) };
 }
 
-const leadText = (lead) => (lead === 15 ? "15 minutes" : lead === 180 ? "3 hours" : "1 hour");
+/// "8 hours", "1 hour", "40 minutes": the time left, rounded for an alert.
+const leftText = (ms) => {
+  const minutes = Math.round(ms / 60_000);
+  if (minutes < 60) return `${minutes} minutes`;
+  const hours = Math.round(minutes / 60);
+  return hours === 1 ? "1 hour" : `${hours} hours`;
+};
 
-async function pushSessionStart(env, race, session, lead) {
+async function pushSessionStart(env, race, session, leftMs) {
   const jwt = await apnsJWT(env);
   const start = session.date.getTime() / 1000;
   const end = start + session.duration;
@@ -151,7 +187,7 @@ async function pushSessionStart(env, race, session, lead) {
       },
       alert: {
         title: `${FLAGS[race.country] || "🏁"} ${session.name} soon`,
-        body: `${race.raceName}: ${session.short} starts in ${leadText(lead)}.`,
+        body: `${race.raceName}: ${session.short} starts in ${leftText(leftMs)}.`,
       },
     },
   });
@@ -159,8 +195,8 @@ async function pushSessionStart(env, race, session, lead) {
   const list = await env.TOKENS.list({ prefix: "t:" });
   for (const key of list.keys) {
     const token = key.name.slice(2);
-    const { apnsEnv, lead: wanted } = parseToken(await env.TOKENS.get(key.name));
-    if (wanted !== lead) continue;
+    const { apnsEnv, lead } = parseToken(await env.TOKENS.get(key.name));
+    if (lead === 0) continue;   // turned off in the app
     const res = await fetch(`${HOSTS[apnsEnv]}/3/device/${token}`, {
       method: "POST",
       headers: {
@@ -181,6 +217,76 @@ async function pushSessionStart(env, race, session, lead) {
       console.log("apns reject", res.status, reason);
     }
   }
+}
+
+/// A normal notification to every registered device (or only `onlyEnv`:
+/// "sandbox" to test on development builds first). `link` opens a tab,
+/// e.g. "teamradio://games". Dead tokens are dropped.
+async function announce(env, { title, body, link, onlyEnv }) {
+  const jwt = await apnsJWT(env);
+  const payload = JSON.stringify({
+    aps: { alert: { title, body }, sound: "default" },
+    ...(link ? { link } : {}),
+  });
+  const counts = { sent: 0, failed: 0, removed: 0 };
+  let cursor;
+  do {
+    const page = await env.TOKENS.list({ prefix: "d:", cursor });
+    for (const key of page.keys) {
+      const apnsEnv = (await env.TOKENS.get(key.name)) === "sandbox" ? "sandbox" : "production";
+      if (onlyEnv && apnsEnv !== onlyEnv) continue;
+      const res = await fetch(`${HOSTS[apnsEnv]}/3/device/${key.name.slice(2)}`, {
+        method: "POST",
+        headers: {
+          authorization: `bearer ${jwt}`,
+          "apns-topic": APP_TOPIC,
+          "apns-push-type": "alert",
+          "apns-priority": "10",
+        },
+        body: payload,
+      });
+      if (res.ok) { counts.sent++; continue; }
+      counts.failed++;
+      const reason = await res.text();
+      if (reason.includes("BadDeviceToken") || reason.includes("Unregistered")) {
+        await env.TOKENS.delete(key.name);
+        counts.removed++;
+      }
+      console.log("announce reject", res.status, reason);
+    }
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+  return counts;
+}
+
+const APP_TOPIC = "com.woqomoqo.OneF";
+
+/// Sends an announcement once per `id`, however often it's called.
+async function announceOnce(env, id, message) {
+  const key = `ann:${id}`;
+  if (await env.TOKENS.get(key)) return;
+  await env.TOKENS.put(key, "1", { expirationTtl: 86400 * 14 });
+  const counts = await announce(env, message);
+  console.log("announced", id, JSON.stringify(counts));
+}
+
+/// Scheduled messages each race weekend (the results one comes from the
+/// game scorer): picks open two days before qualifying.
+async function autoAnnouncements(env) {
+  const race = await nextRace();
+  if (!race) return;
+  const quali = race.sessions.find((s) => s.short === "QUALI");
+  if (!quali) return;
+  const openAt = quali.date.getTime() - 2 * 86400_000;
+  const now = Date.now();
+  // within an hour of the moment (cron runs every 5 minutes)
+  if (now < openAt || now > openAt + 3600_000) return;
+  const flag = FLAGS[race.country] || "🏁";
+  await announceOnce(env, `open:${quali.date.toISOString()}`, {
+    title: `${flag} Picks are open for the ${race.raceName}`,
+    body: "Call pole, the podium and fastest lap. Can you beat the AI Strategist?",
+    link: "teamradio://games",
+  });
 }
 
 // ES256 JWT for APNs, signed with the .p8 key via WebCrypto.

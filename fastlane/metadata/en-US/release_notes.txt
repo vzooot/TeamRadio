@@ -1,9 +1,5 @@
-Games get their own tab:
+Never miss lights out:
 
-• New Games tab: your season rank as a live leaderboard with the players around you, the duel with the AI Strategist, your picks and the arcade
-• New game, Reaction Wall: hit the lights the moment they flash, for 60 seconds, like the reflex trainers drivers use. Weekly leaderboard included
-• Lights Out: the brake pedal now reacts the instant you press it
-• Results and standings together in one tab, both with spoiler hiding
-• Circuit map: tapping a turn number now always flies to the right turn, pinch zooms into the middle, and the track fades away under the stats
-• Hold the race card and slide to run through the whole season without lifting your finger
-• Smoother switching between races in Results
+• The Lock Screen countdown now runs all race weekend: each session's countdown starts hours ahead and the next one takes over as soon as a session ends
+• Session alerts are on from the start: one tap when you open the app, and you get a heads-up before every session and before your picks lock
+• Picks open and results are in: get notified when it's time to play and when the race has been scored
