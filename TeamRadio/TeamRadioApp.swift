@@ -20,8 +20,21 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         return subscription.hasPrefix("room-") ? [] : [.banner, .sound, .badge]
     }
 
+    /// The device's APNs token goes to our server, so it can send
+    /// announcements ("Picks are open for Austin").
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        let token = deviceToken.map { String(format: "%02x", $0) }.joined()
+        Task.detached(priority: .utility) { await PushSync.uploadDeviceToken(token) }
+    }
+
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
-        let ck = response.notification.request.content.userInfo["ck"] as? [String: Any]
+        let info = response.notification.request.content.userInfo
+        // A server announcement can point at a tab: teamradio://games etc.
+        if let link = info["link"] as? String, let url = URL(string: link), url.scheme == "teamradio" {
+            await UIApplication.shared.open(url)
+            return
+        }
+        let ck = info["ck"] as? [String: Any]
         guard ck != nil else { return }
         let subscription = (ck?["qry"] as? [String: Any])?["sid"] as? String ?? ""
         NotificationCenter.default.post(name: subscription.hasPrefix("room-") ? .openPaddockRoom : .openPaddockMessages, object: nil)
@@ -59,6 +72,7 @@ struct RootView: View {
     @State private var showMessageToast = false
     @State private var toastDismissTask: Task<Void, Never>?
     @State private var profile: ProfileTarget?
+    @State private var showNotificationPrompt = false
     @State private var showIntro = false   // the lights intro is out; a designed clip replaces it
     #if DEBUG
     private static let designLabOpen = UserDefaults.standard.string(forKey: "DesignLab") != nil
@@ -107,11 +121,22 @@ struct RootView: View {
             ProfileSheet(target: target)
                 .environment(\.openProfile, OpenProfileAction { profile = $0 })
         }
+        .sheet(isPresented: $showNotificationPrompt) {
+            NotificationPrompt { showNotificationPrompt = false }
+                .presentationDetents([.medium])
+                .presentationBackground(Theme.background)
+        }
+        .task {
+            // First launch: ask for notifications once the app has settled.
+            guard !Self.designLabOpen, await NotificationManager.shouldPrompt() else { return }
+            try? await Task.sleep(for: .seconds(2.5))
+            showNotificationPrompt = true
+        }
         .onAppear {
             chatBadge.start()
             PushSync.start()
-            // CloudKit delivers private-message notifications through APNs;
-            // registering is all it needs (the token stays with Apple).
+            // APNs: CloudKit's chat pushes, and our server's announcements
+            // (the device token goes to the server in the app delegate).
             UIApplication.shared.registerForRemoteNotifications()
         }
         // teamradio://countdown|results|games|standings|paddock|news

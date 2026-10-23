@@ -1,8 +1,8 @@
 import Foundation
 import UserNotifications
 
-/// Schedules local notifications ahead of every upcoming session.
-/// Everything happens on-device — no server, no push infrastructure.
+/// Schedules local notifications ahead of every upcoming session, and
+/// owns the first-launch notification prompt.
 @MainActor
 enum NotificationManager {
     static let enabledKey = "sessionAlertsEnabled"
@@ -14,6 +14,46 @@ enum NotificationManager {
 
     static var isEnabled: Bool {
         UserDefaults.standard.bool(forKey: enabledKey)
+    }
+
+    /// Posted when alerts get switched on outside the settings card (the
+    /// first-launch prompt), so the Countdown tab schedules them.
+    static let didEnable = Notification.Name("sessionAlertsDidEnable")
+    private static let promptedKey = "notificationPromptShown"
+
+    /// Show the first-launch prompt: never shown before and the player
+    /// hasn't answered the system's notification question yet.
+    static func shouldPrompt() async -> Bool {
+        guard !UserDefaults.standard.bool(forKey: promptedKey) else { return false }
+        return await UNUserNotificationCenter.current().notificationSettings().authorizationStatus == .notDetermined
+    }
+
+    /// The prompt's "Turn on alerts": asks iOS, and on yes switches session
+    /// alerts on. Either way the prompt never comes back.
+    static func acceptPrompt() async -> Bool {
+        UserDefaults.standard.set(true, forKey: promptedKey)
+        let granted = (try? await UNUserNotificationCenter.current()
+            .requestAuthorization(options: [.alert, .sound, .badge])) ?? false
+        if granted { enableByDefault() }
+        return granted
+    }
+
+    static func declinePrompt() {
+        UserDefaults.standard.set(true, forKey: promptedKey)
+    }
+
+    /// Session alerts are on by default once notifications are allowed;
+    /// only an explicit "off" in the settings card keeps them off.
+    static func adoptDefault() async {
+        guard UserDefaults.standard.object(forKey: enabledKey) == nil,
+              await UNUserNotificationCenter.current().notificationSettings().authorizationStatus == .authorized
+        else { return }
+        enableByDefault()
+    }
+
+    private static func enableByDefault() {
+        UserDefaults.standard.set(true, forKey: enabledKey)
+        NotificationCenter.default.post(name: didEnable, object: nil)
     }
 
     /// Turns alerts on (requesting permission first) or off.
