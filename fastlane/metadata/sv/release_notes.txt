@@ -1,9 +1,5 @@
-Spelen får en egen flik:
+Missa aldrig starten:
 
-• Ny Spel-flik: din säsongsplacering som en levande topplista med spelarna runt dig, duellen mot AI-strategen, dina tips och arkaden
-• Nytt spel, Reaction Wall: träffa lamporna i samma stund som de tänds, i 60 sekunder, som reflexträningen förarna använder. Med veckans topplista
-• Lights Out: bromspedalen reagerar nu direkt när du trycker
-• Resultat och ställning samlade i en flik, båda med spoilerskydd
-• Banguiden: ett tryck på ett kurvnummer flyger nu alltid till rätt kurva, nyp-zoom zoomar in mot mitten och banan tonar ut under statistiken
-• Håll inne racekortet och dra för att bläddra genom hela säsongen utan att lyfta fingret
-• Smidigare byte mellan race under Resultat
+• Nedräkningen på låsskärmen pågår nu hela racehelgen: varje pass nedräkning startar flera timmar innan och nästa tar över så fort ett pass är slut
+• Passaviseringar är på från början: ett tryck när du öppnar appen, så får du en påminnelse före varje pass och innan dina tips låses
+• Tipsen öppnar och resultaten är klara: få en avisering när det är dags att spela och när racet har räknats
