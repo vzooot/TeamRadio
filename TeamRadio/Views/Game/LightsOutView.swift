@@ -569,95 +569,28 @@ struct RunOutcome: Equatable {
     var climb: Int?
 }
 
-/// The card after every run (approved draft B, build/mockups/
-/// result-drafts.png): gold with a trophy for a personal best, cyan for a
-/// better week with the places gained, plain for any other run with the gap
-/// to your best. Stays until you tap it or start the next run.
+/// Lights Out's card after every run (approved draft B,
+/// build/mockups/result-drafts.png): what the run says, in times.
 private struct RunCard: View {
     let seconds: Double
     let outcome: RunOutcome
     let verdict: String
     let week: (rank: Int, total: Int)?
     let close: () -> Void
-    @State private var shown = false
-
-    private enum Tier { case best, week, run }
-    private var tier: Tier { outcome.personalBest ? .best : outcome.weekBest ? .week : .run }
-
-    private var tint: AnyShapeStyle {
-        switch tier {
-        case .best: AnyShapeStyle(Medal.goldGradient)
-        case .week: AnyShapeStyle(Theme.accentGradient)
-        case .run: AnyShapeStyle(Theme.chromeText)
-        }
-    }
-
-    private var glow: Color {
-        switch tier {
-        case .best: Medal.gold
-        case .week: Theme.accent
-        case .run: .white.opacity(0.25)
-        }
-    }
 
     var body: some View {
-        ZStack {
-            Color.black.opacity(0.6)
-                .frame(width: 3000, height: 4000)
-                .onTapGesture { close() }
-            VStack(spacing: 10) {
-                Image(systemName: tier == .best ? "trophy.fill" : tier == .week ? "arrow.up.circle.fill" : "stopwatch")
-                    .font(.system(size: tier == .best ? 46 : 38))
-                    .foregroundStyle(tint)
-                    .shadow(color: glow.opacity(0.9), radius: 14)
-                Text(tier == .best ? "NEW PERSONAL BEST" : tier == .week ? "BEST THIS WEEK" : verdict.uppercased())
-                    .font(.f1(14, weight: .heavy)).tracking(2)
-                    .foregroundStyle(tier == .best ? Medal.goldLight : tier == .week ? Theme.accent : .white)
-                Text(String(format: "%.3f", seconds))
-                    .font(.f1Digits(64))
-                    .foregroundStyle(tint)
-                    .shadow(color: glow.opacity(0.8), radius: 12)
-                Text(detail)
-                    .font(.system(size: 14))
-                    .foregroundStyle(Theme.dimText)
-                if let place {
-                    Text(place)
-                        .font(.f1(12, weight: .heavy)).tracking(1.5)
-                        .foregroundStyle(tier == .run ? .white.opacity(0.75) : Theme.accent)
-                        .padding(.top, 4)
-                }
-                Text("TAP TO CLOSE")
-                    .font(.f1(9, weight: .heavy)).tracking(2)
-                    .foregroundStyle(Theme.faintText)
-                    .padding(.top, 8)
-            }
-            .padding(.horizontal, 34)
-            .padding(.vertical, 28)
-            .background(RoundedRectangle(cornerRadius: 26).fill(Theme.card))
-            .overlay(RoundedRectangle(cornerRadius: 26).strokeBorder(tint, lineWidth: tier == .run ? 1 : 2))
-            .shadow(color: glow.opacity(tier == .run ? 0.3 : 0.5), radius: 30)
-            .scaleEffect(shown ? 1 : 0.6)
-            .opacity(shown ? 1 : 0)
-            .onTapGesture { close() }
-            .animation(.easeOut(duration: 0.25), value: outcome)
-        }
-        .onAppear { withAnimation(.spring(response: 0.4, dampingFraction: 0.65)) { shown = true } }
-    }
-
-    private var detail: String {
-        switch tier {
-        case .best:
-            outcome.previousBest > 0 ? String(format: "%.3f faster than your old best", outcome.previousBest - seconds)
-                                     : "Your first time on the clock"
-        case .week: verdict
-        case .run: String(format: "+%.3f off your best %.3f", seconds - outcome.previousBest, outcome.previousBest)
-        }
-    }
-
-    /// Places gained this week, or where you stand.
-    private var place: String? {
-        if let climb = outcome.climb, climb > 0 { return "▲ UP \(climb) \(climb == 1 ? "PLACE" : "PLACES") THIS WEEK" }
-        guard let week, week.total > 0 else { return nil }
-        return "P\(week.rank) OF \(week.total) THIS WEEK"
+        let tier: ArcadeResultCard.Tier = outcome.personalBest ? .best : outcome.weekBest ? .week : .run
+        ArcadeResultCard(
+            tier: tier,
+            title: tier == .best ? "NEW PERSONAL BEST" : tier == .week ? "BEST THIS WEEK" : verdict.uppercased(),
+            value: String(format: "%.3f", seconds), unit: nil,
+            detail: tier == .best
+                ? (outcome.previousBest > 0 ? String(format: "%.3f faster than your old best", outcome.previousBest - seconds)
+                                            : "Your first time on the clock")
+                : tier == .week ? verdict
+                : String(format: "+%.3f off your best %.3f", seconds - outcome.previousBest, outcome.previousBest),
+            extra: nil,
+            place: ArcadeResultCard.place(climb: outcome.climb, week: week),
+            close: close)
     }
 }

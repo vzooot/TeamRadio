@@ -54,7 +54,9 @@ struct ReactionWallView: View {
     @State private var boardLoaded = false
     @State private var showFullBoard = false
     @State private var userId: String?
-    @State private var newBest = false
+    /// How the last run went, and its card over the screen.
+    @State private var outcome: RunOutcome?
+    @State private var showCard = false
 
     var body: some View {
         ZStack {
@@ -63,12 +65,28 @@ struct ReactionWallView: View {
                            center: .top, startRadius: 0, endRadius: 520)
                 .ignoresSafeArea()
 
-            VStack(spacing: 18) {
-                header
-                wall
-                status
+            // Nothing moves or disappears during a run: the wall, one status
+            // line, the week's board (also after a run), the button.
+            VStack(spacing: 14) {
+                VStack(spacing: 14) {
+                    header
+                    wall
+                    status
+                        .frame(height: 58)
+                    weeklyBoard
+                }
+                // After every run, its card; the button (drawn after it)
+                // stays above the dim to go again.
+                .overlay {
+                    if showCard, case .finished(let result) = phase, let outcome {
+                        resultCard(result, outcome)
+                            .transition(.opacity)
+                    }
+                }
+                .zIndex(1)
                 Spacer(minLength: 0)
                 controls
+                    .zIndex(2)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
@@ -76,6 +94,7 @@ struct ReactionWallView: View {
             // instead of scattering over a board the width of the screen.
             .frame(maxWidth: 520)
         }
+        .animation(.easeOut(duration: 0.2), value: showCard)
         .onDisappear { game?.cancel() }
         .task {
             // Start the audio engine once the screen has slid up: starting it
@@ -85,9 +104,20 @@ struct ReactionWallView: View {
             #if DEBUG
             // -WallDemo YES: starts and plays itself, for screenshots and videos
             if UserDefaults.standard.bool(forKey: "WallDemo") { autoplay() }
+            // -WallPhase <points> (-DemoOutcome pb|week|normal): that finished run, for screenshots
+            if let points = Int(UserDefaults.standard.string(forKey: "WallPhase") ?? "") {
+                run = Run(score: points, hits: points - 4, misses: 3, reactions: [0.41, 0.38, 0.44])
+                phase = .finished(run)
+                switch UserDefaults.standard.string(forKey: "DemoOutcome") {
+                case "pb"?: outcome = RunOutcome(personalBest: true, previousBest: 54, weekBest: true, climb: 6)
+                case "week"?: outcome = RunOutcome(personalBest: false, previousBest: 71, weekBest: true, climb: 2)
+                default: outcome = RunOutcome(personalBest: false, previousBest: 71)
+                }
+                showCard = true
+            }
             #endif
             userId = await ChatService.currentUserId()
-            if let userId { await LeaderboardService.syncBests(user: userId) }
+            if let userId { Task { await LeaderboardService.syncBests(user: userId) } }
             board = await LeaderboardService.wall(user: userId, name: nil, score: nil)
             boardLoaded = true
         }
@@ -235,12 +265,14 @@ struct ReactionWallView: View {
     private var status: some View {
         switch phase {
         case .ready:
-            VStack(spacing: 16) {
-                Text("Hit each light the moment it comes on. Cyan: 1 point. Red: 2 points, but gone in under a second.")
+            VStack(spacing: 6) {
+                Text("HIT THE LIGHTS")
+                    .font(.f1(22).italic())
+                    .foregroundStyle(.white)
+                Text("Cyan: 1 point. Red: 2 points, gone in under a second.")
                     .font(.system(size: 14))
                     .foregroundStyle(Theme.dimText)
                     .multilineTextAlignment(.center)
-                weeklyBoard
             }
         case .countdown, .running:
             HStack(spacing: 18) {
@@ -249,27 +281,48 @@ struct ReactionWallView: View {
                 stat(run.averageReaction.map { String(format: "%.3f", $0) } ?? "-.---", "AVG REACTION")
             }
         case .finished(let result):
-            VStack(spacing: 8) {
-                Text(newBest ? "NEW PERSONAL BEST" : Self.verdict(result.score))
-                    .font(.f1(18).italic())
-                    .foregroundStyle(newBest ? Color(red: 1, green: 0.75, blue: 0.2) : .white)
-                Text("\(result.hits) hits · \(result.misses) misses" + (result.averageReaction.map { String(format: " · avg %.3f s", $0) } ?? ""))
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Theme.dimText)
-                if let me = board?.me, let total = board?.total {
-                    Text("THIS WEEK: #\(me.rank) OF \(total) · BEST \(me.score)")
-                        .font(.f1(11, weight: .bold))
-                        .tracking(1.5)
-                        .foregroundStyle(Theme.accent)
+            VStack(spacing: 6) {
+                if outcome?.personalBest == true {
+                    Text("NEW PERSONAL BEST")
+                        .font(.f1(24).italic())
+                        .foregroundStyle(Medal.goldGradient)
+                        .shadow(color: Medal.gold.opacity(0.8), radius: 10)
+                } else {
+                    Text(Self.verdict(result.score))
+                        .font(.f1(22).italic())
+                        .foregroundStyle(.white)
                 }
+                Text(Self.stats(result))
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.75))
             }
         }
     }
 
+    static func stats(_ result: Run) -> String {
+        "\(result.hits) hits · \(result.misses) misses" + (result.averageReaction.map { String(format: " · avg %.3f s", $0) } ?? "")
+    }
+
+    private func resultCard(_ result: Run, _ outcome: RunOutcome) -> some View {
+        let tier: ArcadeResultCard.Tier = outcome.personalBest ? .best : outcome.weekBest ? .week : .run
+        let previous = Int(outcome.previousBest)
+        return ArcadeResultCard(
+            tier: tier,
+            title: tier == .best ? "NEW PERSONAL BEST" : tier == .week ? "BEST THIS WEEK" : Self.verdict(result.score).uppercased(),
+            value: "\(result.score)", unit: "POINTS",
+            detail: tier == .best
+                ? (previous > 0 ? "+\(result.score - previous) on your old best" : "Your first score on the wall")
+                : tier == .week ? Self.verdict(result.score)
+                : "\(previous - result.score) short of your best \(previous)",
+            extra: Self.stats(result),
+            place: ArcadeResultCard.place(climb: outcome.climb, week: board?.me.map { (rank: $0.rank, total: board?.total ?? 0) }),
+            close: { showCard = false })
+    }
+
     private func stat(_ value: String, _ label: String) -> some View {
         VStack(spacing: 2) {
-            Text(value).font(.f1Digits(20)).foregroundStyle(.white)
-            Text(label).font(.f1(9, weight: .heavy)).tracking(1.5).foregroundStyle(Theme.dimText)
+            Text(value).font(.f1Digits(24)).foregroundStyle(.white)
+            Text(label).font(.f1(10, weight: .heavy)).tracking(1.5).foregroundStyle(Theme.dimText)
         }
         .frame(maxWidth: .infinity)
     }
@@ -303,7 +356,13 @@ struct ReactionWallView: View {
     /// This week's podium and your place; the full board behind it.
     private var weeklyBoard: some View {
         ArcadeBoardCard(game: .wall, standing: board.map(ArcadeGame.from), loaded: boardLoaded,
+                        celebrate: isFinished && outcome?.weekBest == true, climb: isFinished ? outcome?.climb : nil,
                         hasName: !nickname.isEmpty) { showFullBoard = true }
+    }
+
+    private var isFinished: Bool {
+        if case .finished = phase { return true }
+        return false
     }
 
     // MARK: - Game
@@ -312,7 +371,8 @@ struct ReactionWallView: View {
         game?.cancel()
         run = Run()
         target = nil
-        newBest = false
+        outcome = nil
+        showCard = false
         game = Task { @MainActor in
             for n in stride(from: 3, through: 1, by: -1) {
                 phase = .countdown(n)
@@ -339,14 +399,24 @@ struct ReactionWallView: View {
         target = nil
         StartSounds.shared.radioClick()
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        if run.score > best {
-            newBest = best > 0
-            best = run.score
-        }
+        let previous = best
+        let personalBest = run.score > 0 && run.score > previous
+        if personalBest { best = run.score }
+        outcome = RunOutcome(personalBest: personalBest, previousBest: Double(previous))
         phase = .finished(run)
+        showCard = true
         guard let userId, !nickname.isEmpty, run.score > 0 else { return }
         let score = run.score
-        Task { if let updated = await LeaderboardService.wall(user: userId, name: nickname, score: score) { board = updated } }
+        let before = board?.me
+        Task {
+            guard let updated = await LeaderboardService.wall(user: userId, name: nickname, score: score) else { return }
+            board = updated
+            // A better score this week, and how many places it gained.
+            if let me = updated.me, me.score == score, before.map({ score > $0.score }) ?? true {
+                outcome?.weekBest = true
+                outcome?.climb = before.map { $0.rank - me.rank }
+            }
+        }
     }
 
     /// Light the next pad: never the one just hit; after the first five

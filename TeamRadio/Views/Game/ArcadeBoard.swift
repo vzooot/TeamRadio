@@ -359,3 +359,100 @@ private struct FullyVisible: ViewModifier {
         }
     }
 }
+
+/// The card over an arcade game after every run: gold with a trophy for a
+/// personal best, cyan for a better week, plain otherwise. Stays until you
+/// tap it or start the next run.
+struct ArcadeResultCard: View {
+    enum Tier { case best, week, run }
+    let tier: Tier
+    let title: String
+    /// "0.212" or "62".
+    let value: String
+    /// "POINTS" under the number, or nil.
+    let unit: String?
+    let detail: String
+    /// A line of stats, e.g. hits and misses.
+    let extra: String?
+    let place: String?
+    let close: () -> Void
+    @State private var shown = false
+
+    private var tint: AnyShapeStyle {
+        switch tier {
+        case .best: AnyShapeStyle(Medal.goldGradient)
+        case .week: AnyShapeStyle(Theme.accentGradient)
+        case .run: AnyShapeStyle(Theme.chromeText)
+        }
+    }
+
+    private var glow: Color {
+        switch tier {
+        case .best: Medal.gold
+        case .week: Theme.accent
+        case .run: .white.opacity(0.25)
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.6)
+                .frame(width: 3000, height: 4000)
+                .onTapGesture { close() }
+            VStack(spacing: 10) {
+                Image(systemName: tier == .best ? "trophy.fill" : tier == .week ? "arrow.up.circle.fill" : "stopwatch")
+                    .font(.system(size: tier == .best ? 46 : 38))
+                    .foregroundStyle(tint)
+                    .shadow(color: glow.opacity(0.9), radius: 14)
+                Text(title)
+                    .font(.f1(14, weight: .heavy)).tracking(2)
+                    .foregroundStyle(tier == .best ? Medal.goldLight : tier == .week ? Theme.accent : .white)
+                VStack(spacing: 0) {
+                    Text(value)
+                        .font(.f1Digits(64))
+                        .foregroundStyle(tint)
+                        .shadow(color: glow.opacity(0.8), radius: 12)
+                    if let unit {
+                        Text(unit).font(.f1(11, weight: .heavy)).tracking(2).foregroundStyle(Theme.dimText)
+                    }
+                }
+                Text(detail)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.75))
+                if let extra {
+                    Text(extra)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Theme.dimText)
+                }
+                if let place {
+                    Text(place)
+                        .font(.f1(12, weight: .heavy)).tracking(1.5)
+                        .foregroundStyle(tier == .run ? .white.opacity(0.75) : Theme.accent)
+                        .padding(.top, 4)
+                }
+                Text("TAP TO CLOSE")
+                    .font(.f1(9, weight: .heavy)).tracking(2)
+                    .foregroundStyle(Theme.faintText)
+                    .padding(.top, 8)
+            }
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 30)
+            .padding(.vertical, 28)
+            .background(RoundedRectangle(cornerRadius: 26).fill(Theme.card))
+            .overlay(RoundedRectangle(cornerRadius: 26).strokeBorder(tint, lineWidth: tier == .run ? 1 : 2))
+            .shadow(color: glow.opacity(tier == .run ? 0.3 : 0.5), radius: 30)
+            .scaleEffect(shown ? 1 : 0.6)
+            .opacity(shown ? 1 : 0)
+            .onTapGesture { close() }
+            .animation(.easeOut(duration: 0.25), value: place)
+        }
+        .onAppear { withAnimation(.spring(response: 0.4, dampingFraction: 0.65)) { shown = true } }
+    }
+
+    /// Places gained this week, or where you stand.
+    static func place(climb: Int?, week: (rank: Int, total: Int)?) -> String? {
+        if let climb, climb > 0 { return "▲ UP \(climb) \(climb == 1 ? "PLACE" : "PLACES") THIS WEEK" }
+        guard let week, week.total > 0 else { return nil }
+        return "P\(week.rank) OF \(week.total) THIS WEEK"
+    }
+}

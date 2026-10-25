@@ -117,6 +117,13 @@ final class GameViewModel {
             return
         }
         userId = id
+        // Reinstall or new phone: restore the Paddock name this iCloud
+        // identity already registered, here too (not only when the Paddock
+        // tab opens), so picks and arcade times count straight away.
+        if nickname.isEmpty, let profile = await ChatService.registeredProfile() {
+            UserDefaults.standard.set(profile.name, forKey: "chatNickname")
+            UserDefaults.standard.set(true, forKey: "chatRulesAgreed")
+        }
         access = nickname.isEmpty ? .needsName : .ready
 
         // This round's picks and last round's score at the same time.
