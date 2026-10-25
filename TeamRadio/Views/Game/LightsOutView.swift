@@ -325,7 +325,7 @@ struct LightsOutView: View {
             history = Self.appending(seconds, to: history)
             submit(seconds)
             if personalBest {
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                ArcadeHaptics.finished(personalBest: true)
             } else {
                 UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
             }
