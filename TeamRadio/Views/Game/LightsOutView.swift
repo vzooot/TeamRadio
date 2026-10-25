@@ -572,7 +572,7 @@ struct RunOutcome: Equatable {
 /// The card after every run (approved draft B, build/mockups/
 /// result-drafts.png): gold with a trophy for a personal best, cyan for a
 /// better week with the places gained, plain for any other run with the gap
-/// to your best. Closes by itself, on a tap, or when the next run starts.
+/// to your best. Stays until you tap it or start the next run.
 private struct RunCard: View {
     let seconds: Double
     let outcome: RunOutcome
@@ -626,6 +626,10 @@ private struct RunCard: View {
                         .foregroundStyle(tier == .run ? .white.opacity(0.75) : Theme.accent)
                         .padding(.top, 4)
                 }
+                Text("TAP TO CLOSE")
+                    .font(.f1(9, weight: .heavy)).tracking(2)
+                    .foregroundStyle(Theme.faintText)
+                    .padding(.top, 8)
             }
             .padding(.horizontal, 34)
             .padding(.vertical, 28)
@@ -638,13 +642,6 @@ private struct RunCard: View {
             .animation(.easeOut(duration: 0.25), value: outcome)
         }
         .onAppear { withAnimation(.spring(response: 0.4, dampingFraction: 0.65)) { shown = true } }
-        .task {
-            #if DEBUG
-            if UserDefaults.standard.string(forKey: "LightsOutPhase") != nil { return }
-            #endif
-            try? await Task.sleep(for: .seconds(tier == .best ? 3 : tier == .week ? 2.4 : 2))
-            close()
-        }
     }
 
     private var detail: String {

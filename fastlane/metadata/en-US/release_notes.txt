@@ -1,5 +1,8 @@
-Never miss lights out:
+React, compete, keep every record:
 
-• The Lock Screen countdown now runs all race weekend: each session's countdown starts hours ahead and the next one takes over as soon as a session ends
-• Session alerts are on from the start: one tap when you open the app, and you get a heads-up before every session and before your picks lock
-• Picks open and results are in: get notified when it's time to play and when the race has been scored
+• React to any message with an emoji: hold a message in the Paddock or in a private chat
+• Lights Out and Reaction Wall get a glowing podium for the week's top three, your place, and a full board with all-time bests and last week
+• Lights Out has a big new start button and a result card after every run, gold for a personal best
+• Your personal bests now follow you to a new phone, and weekly winners are kept for good
+• Long private conversations show their older messages
+• The Games tab opens faster
