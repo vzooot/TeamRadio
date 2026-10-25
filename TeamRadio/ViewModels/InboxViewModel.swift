@@ -1,3 +1,4 @@
+import CloudKit
 import CryptoKit
 import Foundation
 import Observation
@@ -69,7 +70,14 @@ final class ThreadViewModel {
     var messages: [DirectMessage] = []
     var isSending = false
     var errorText: String?
+    var canLoadOlder: Bool { olderCursor != nil }
+    var isLoadingOlder = false
 
+    /// Emoji reactions in this conversation, sealed with the thread key.
+    let reactions = ReactionStore()
+
+    private var olderCursor: CKQueryOperation.Cursor?
+    private var hasPaginated = false
     private var pollTask: Task<Void, Never>?
     var thread: String { DirectMessageService.threadId(me, otherId) }
 
@@ -78,6 +86,7 @@ final class ThreadViewModel {
         self.myName = myName
         self.otherId = otherId
         self.otherName = otherName
+        reactions.me = me
     }
 
     func start() {
@@ -97,7 +106,8 @@ final class ThreadViewModel {
 
     func refresh() async {
         do {
-            let fetched = try await DirectMessageService.thread(me: me, other: otherId)
+            let (fetched, cursor) = try await DirectMessageService.thread(me: me, other: otherId)
+            if !hasPaginated { olderCursor = cursor }
             let ids = Set(fetched.map(\.id))
             let known = Set(messages.map(\.id))
             let arrived = !messages.isEmpty && fetched.contains { !known.contains($0.id) && $0.fromId != me }
@@ -106,9 +116,26 @@ final class ThreadViewModel {
             NotificationCenter.default.post(name: .chatPushReceived, object: nil)   // recount badges now
             if arrived { MessageSounds.playReceived() }
             errorText = nil
+            await loadReactions()
         } catch is CancellationError {
         } catch {
             errorText = "Couldn't load the conversation: \(error.localizedDescription)"
+        }
+    }
+
+    /// Pages one batch further back into the conversation.
+    func loadOlder() async {
+        guard let cursor = olderCursor, !isLoadingOlder else { return }
+        isLoadingOlder = true
+        defer { isLoadingOlder = false }
+        do {
+            let (older, next) = try await DirectMessageService.olderThread(me: me, from: cursor)
+            hasPaginated = true
+            olderCursor = next
+            let known = Set(messages.map(\.id))
+            messages = (older.filter { !known.contains($0.id) } + messages).sorted { $0.date < $1.date }
+        } catch {
+            errorText = "Couldn't load earlier messages: \(error.localizedDescription)"
         }
     }
 
@@ -135,9 +162,33 @@ final class ThreadViewModel {
     /// Turns a stored (encrypted) attachment into its real bytes.
     private var key: SymmetricKey?
     func decryptor() async -> (@Sendable (Data) -> Data?)? {
-        if key == nil { key = await DirectMessageService.threadKey(me: me, other: otherId) }
-        guard let key else { return nil }
+        guard let key = await threadKey() else { return nil }
         return { DMKeys.openData($0, with: key) }
+    }
+
+    private func threadKey() async -> SymmetricKey? {
+        if key == nil { key = await DirectMessageService.threadKey(me: me, other: otherId) }
+        return key
+    }
+
+    private func loadReactions() async {
+        guard let key = await threadKey(),
+              let fetched = try? await ReactionService.thread(thread, key: key) else { return }
+        reactions.replace(with: fetched)
+    }
+
+    /// Adds, changes or (same emoji again) removes my reaction.
+    func react(_ emoji: String, to messageId: String) {
+        let new = reactions.toggle(emoji, on: messageId)
+        Task {
+            do {
+                guard let key = await threadKey() else { throw DMError.noKey }
+                try await ReactionService.set(new, on: messageId, me: me, thread: thread, key: key)
+            } catch {
+                reactions.revert(messageId)
+                errorText = "Reaction not saved: \(error.localizedDescription)"
+            }
+        }
     }
 
     func report(_ message: DirectMessage) {

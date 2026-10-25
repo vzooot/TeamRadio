@@ -26,6 +26,8 @@ final class ChatViewModel {
 
     private var olderCursor: CKQueryOperation.Cursor?
     private var hasPaginated = false
+    /// Emoji reactions on the loaded messages.
+    let reactions = ReactionStore()
 
     private var currentUserId: String?
     private var pollTask: Task<Void, Never>?
@@ -36,6 +38,7 @@ final class ChatViewModel {
             return
         }
         currentUserId = await ChatService.currentUserId()
+        reactions.me = currentUserId
         state = .ready
 
         // Reinstall / new device: restore the name this iCloud identity
@@ -123,6 +126,7 @@ final class ChatViewModel {
                 ChatBadge.lastReadAt = newest
             }
             errorText = nil
+            await loadReactions()
         } catch is CancellationError {
             // A poll interrupted by navigation — not worth reporting.
         } catch let error as CKError where error.code == .operationCancelled {
@@ -145,8 +149,28 @@ final class ChatViewModel {
             let existingIds = Set(messages.map(\.id))
             let fresh = older.filter { !existingIds.contains($0.id) && !blocked.contains($0.senderId) }
             messages = (fresh + messages).sorted { $0.date < $1.date }
+            await loadReactions()
         } catch {
             errorText = "Couldn't load earlier messages: \(error.localizedDescription)"
+        }
+    }
+
+    private func loadReactions() async {
+        guard let fetched = try? await ReactionService.room(for: messages.map(\.id.recordName)) else { return }
+        reactions.replace(with: fetched)
+    }
+
+    /// Adds, changes or (same emoji again) removes my reaction.
+    func react(_ emoji: String, to messageId: String) {
+        guard let me = currentUserId else { return }
+        let new = reactions.toggle(emoji, on: messageId)
+        Task {
+            do {
+                try await ReactionService.set(new, on: messageId, me: me)
+            } catch {
+                reactions.revert(messageId)
+                errorText = "Reaction not saved: \(error.localizedDescription)"
+            }
         }
     }
 

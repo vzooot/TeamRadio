@@ -242,7 +242,8 @@ async function dotdTally(env, ckEnv, race) {
   const id = `${race.season}-${race.round}`;
   const key = `game:${ckEnv}:dotd:${id}`;
   const cached = await env.TOKENS.get(key, "json");
-  if (cached && Date.now() - cached.at < 20_000) return cached;
+  // A tally counted after voting closed is final and kept for good.
+  if (cached && (Date.now() - cached.at < 20_000 || cached.at > cached.closes)) return cached;
   const { opens, closes } = dotdWindow(race);
   const counts = {};
   let total = 0, marker;
@@ -264,7 +265,7 @@ async function dotdTally(env, ckEnv, race) {
   const votes = Object.entries(counts).sort((a, b) => b[1] - a[1])
     .map(([driverId, count]) => ({ driverId, count, pct: Math.round((count / total) * 100) }));
   const result = { round: id, total, votes, at: Date.now(), closes };
-  await env.TOKENS.put(key, JSON.stringify(result), { expirationTtl: 86400 * 30 });
+  await env.TOKENS.put(key, JSON.stringify(result));
   return result;
 }
 
@@ -501,10 +502,11 @@ export async function runGame(env, { onScored } = {}) {
       try {
         const r = await scoreRound(env, ckEnv, last);
         report.push({ ckEnv, ...r });
-        // Scored once per environment; POST /game/run after deleting the
-        // flag rescores (e.g. after a results correction).
+        // Scored once per environment, for good (an expiring flag would
+        // rescore the last race and resend "Results are in" over the winter
+        // break); POST /game/run after deleting the flag rescores.
         if (!r.skipped) {
-          await env.TOKENS.put(flag, "1", { expirationTtl: 86400 * 30 });
+          await env.TOKENS.put(flag, "1");
           // Tell the players once the live round is scored.
           if (ckEnv === "production" && onScored) await onScored(last).catch((e) => console.log("onScored", String(e)));
         }
@@ -527,6 +529,10 @@ export async function handleGame(request, env) {
   if (request.method === "POST" && url.pathname === "/game/run") {
     if (request.headers.get("x-test-key") !== env.TEST_KEY) return new Response("no", { status: 403 });
     return json(await runGame(env));
+  }
+  if (request.method === "POST" && (url.pathname === "/game/migrate" || url.pathname === "/game/backup")) {
+    if (request.headers.get("x-test-key") !== env.TEST_KEY) return new Response("no", { status: 403 });
+    return json(url.pathname === "/game/migrate" ? await migrateToD1(env) : await backupKV(env));
   }
 
   if (url.pathname === "/game/board") {
@@ -558,8 +564,9 @@ export async function handleGame(request, env) {
     return json({ players: ids.map((id) => data?.players?.[id] && { userId: id, name: data.players[id].name, points: data.players[id].points, exact: data.players[id].exact }).filter(Boolean) });
   }
 
-  // Private leagues: a 6-character code, a name and a member list; the
-  // standings come from the season table, so leagues cost nothing to score.
+  // Private leagues: a 6-character code, a name and a member list (D1, one
+  // row per member, so joins never overwrite each other); the standings
+  // come from the season table, so leagues cost nothing to score.
   if (url.pathname.startsWith("/game/league")) {
     let body = {};
     if (request.method === "POST") {
@@ -567,7 +574,9 @@ export async function handleGame(request, env) {
     }
     const user = String(body.user || q.get("user") || "").slice(0, 120);
     const name = String(body.name || "").trim().slice(0, 24);
-    const leagueKey = (code) => `game:${ckEnv}:league:${code}`;
+    const findLeague = (code) => env.DB.prepare("SELECT code, title FROM league WHERE env = ?1 AND code = ?2").bind(ckEnv, code).first();
+    const addMember = (code) => env.DB.prepare(`INSERT INTO league_member (env, code, user, name, joined_at) VALUES (?1, ?2, ?3, ?4, ?5)
+      ON CONFLICT (env, code, user) DO UPDATE SET name = excluded.name`).bind(ckEnv, code, user, name, Date.now()).run();
 
     if (url.pathname === "/game/league/create" && request.method === "POST") {
       const title = String(body.title || "").trim().slice(0, 30);
@@ -575,36 +584,41 @@ export async function handleGame(request, env) {
       let code;
       for (let i = 0; i < 8 && !code; i++) {
         const c = Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[b % 32]).join("");
-        if (!(await env.TOKENS.get(leagueKey(c)))) code = c;
+        const r = await env.DB.prepare("INSERT OR IGNORE INTO league (env, code, title, owner, created_at) VALUES (?1, ?2, ?3, ?4, ?5)")
+          .bind(ckEnv, c, title, user, Date.now()).run();
+        if (r.meta.changes) code = c;
       }
-      const league = { code, title, owner: user, members: { [user]: name }, createdAt: Date.now() };
-      await env.TOKENS.put(leagueKey(code), JSON.stringify(league));
+      if (!code) return json({ error: "try again" });
+      await addMember(code);
       return json({ code, title });
     }
 
     if ((url.pathname === "/game/league/join" || url.pathname === "/game/league/leave") && request.method === "POST") {
       const code = String(body.code || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-      const league = await env.TOKENS.get(leagueKey(code), "json");
+      const league = await findLeague(code);
       if (!league) return json({ error: "no league with that code" });
       if (!user) return json({ error: "bad request" });
       if (url.pathname.endsWith("/join")) {
-        if (Object.keys(league.members).length >= 200 && !league.members[user]) return json({ error: "league is full" });
         if (!name) return json({ error: "bad request" });
-        league.members[user] = name;
+        const { n, mine } = await env.DB.prepare("SELECT COUNT(*) AS n, SUM(user = ?3) AS mine FROM league_member WHERE env = ?1 AND code = ?2")
+          .bind(ckEnv, code, user).first();
+        if (n >= 200 && !mine) return json({ error: "league is full" });
+        await addMember(code);
       } else {
-        delete league.members[user];
+        await env.DB.prepare("DELETE FROM league_member WHERE env = ?1 AND code = ?2 AND user = ?3").bind(ckEnv, code, user).run();
       }
-      await env.TOKENS.put(leagueKey(code), JSON.stringify(league));
       return json({ code, title: league.title });
     }
 
     if (url.pathname === "/game/league") {
       const code = String(q.get("code") || "").toUpperCase();
-      const league = await env.TOKENS.get(leagueKey(code), "json");
+      const league = await findLeague(code);
       if (!league) return json({ error: "no league with that code" });
       const year = q.get("year") || new Date().getUTCFullYear();
       const seasonTable = await env.TOKENS.get(`game:${ckEnv}:season:${year}`, "json");
-      const rows = Object.entries(league.members).map(([userId, memberName]) => {
+      const { results: members } = await env.DB.prepare("SELECT user, name FROM league_member WHERE env = ?1 AND code = ?2")
+        .bind(ckEnv, code).all();
+      const rows = members.map(({ user: userId, name: memberName }) => {
         const p = seasonTable?.players?.[userId];
         return { userId, name: p?.name || memberName, points: p?.points || 0, exact: p?.exact || 0 };
       }).sort((a, b) => b.points - a.points || b.exact - a.exact || a.name.localeCompare(b.name));
@@ -635,75 +649,50 @@ export async function handleGame(request, env) {
   // scored round of the season (null where someone didn't play).
   if (url.pathname === "/game/history") {
     const user = q.get("user") || "";
-    const rounds = [];
-    for (const r of await season()) {
-      const round = await env.TOKENS.get(`game:${ckEnv}:round:${r.season}-${r.round}`, "json");
-      if (!round) continue;
-      rounds.push({ round: Number(r.round), name: r.raceName,
-                    you: round.players?.[user]?.points ?? null, ai: round.strategist?.points ?? null });
-    }
+    // every round at once: one by one took over a second
+    const races = await season();
+    const tables = await Promise.all(races.map((r) => env.TOKENS.get(`game:${ckEnv}:round:${r.season}-${r.round}`, "json")));
+    const rounds = races.flatMap((r, i) => tables[i]
+      ? [{ round: Number(r.round), name: r.raceName,
+           you: tables[i].players?.[user]?.points ?? null, ai: tables[i].strategist?.points ?? null }]
+      : []);
     return json({ rounds }, 120);
   }
 
-  // Lights Out reaction leaderboard, per week (Monday-based, UTC).
-  if (url.pathname === "/game/reaction") {
-    const week = reactionWeek();
-    const key = `game:${ckEnv}:reaction:${week}`;
-    const board = (await env.TOKENS.get(key, "json")) || {};
-    if (request.method === "POST") {
-      let body;
-      try { body = await request.json(); } catch { return new Response("bad json", { status: 400 }); }
-      const user = String(body.user || "").slice(0, 120);
-      const name = String(body.name || "").trim().slice(0, 24);
-      const ms = Math.round(Number(body.ms));
-      // Human limit: anything under 100 ms is a guess, not a reaction.
-      if (!user || !name || !(ms >= 100 && ms <= 2000)) return json({ error: "rejected" });
-      const day = new Date().toISOString().slice(0, 10);
-      const rateKey = `rx:${day}:${user}`;
-      const tries = Number((await env.TOKENS.get(rateKey)) || 0);
-      if (tries >= 200) return json({ error: "limit" });
-      await env.TOKENS.put(rateKey, String(tries + 1), { expirationTtl: 90000 });
-      if (!board[user] || ms < board[user].ms) {
-        board[user] = { name, ms, at: Date.now() };
-        await env.TOKENS.put(key, JSON.stringify(board), { expirationTtl: 86400 * 21 });
-      }
-    }
-    const list = Object.entries(board).map(([userId, v]) => ({ userId, ...v })).sort((a, b) => a.ms - b.ms);
-    list.forEach((e, i) => { e.rank = i + 1; });
-    const me = q.get("user") ? list.find((e) => e.userId === q.get("user")) : null;
-    return json({ week, total: list.length, top: list.slice(0, 20).map(({ userId, name, ms, rank }) => ({ userId, name, ms, rank })),
-                  me: me ? { name: me.name, ms: me.ms, rank: me.rank } : null });
+  // Weekly arcade boards (Monday-based, UTC), every week kept for good:
+  // ?week=2026-10-12 reads a past one. POST submits a run to this week.
+  if (url.pathname === "/game/reaction") return arcade(request, env, ckEnv, q, ARCADE.reaction);
+  if (url.pathname === "/game/wall") return arcade(request, env, ckEnv, q, ARCADE.wall);
+
+  // Past weeks' winners, newest first: ?game=wall|reaction.
+  if (url.pathname === "/game/weeks") {
+    const a = q.get("game") === "reaction" ? ARCADE.reaction : ARCADE.wall;
+    const pick = a.better === "<" ? "MIN" : "MAX";
+    const { results } = await env.DB.prepare(`SELECT week, user AS userId, name, ${pick}(${a.field}) AS ${a.field}, COUNT(*) AS players
+      FROM ${a.table} WHERE env = ?1 GROUP BY week ORDER BY week DESC LIMIT 104`).bind(ckEnv).all();
+    return json({ weeks: results }, 60);
   }
 
-  // Reaction Wall leaderboard, per week: points in one 60-second run,
-  // highest wins.
-  if (url.pathname === "/game/wall") {
-    const week = reactionWeek();
-    const key = `game:${ckEnv}:wall:${week}`;
-    const board = (await env.TOKENS.get(key, "json")) || {};
+  // All-time personal bests. POST {user, name, lights?, wall?} adds bests
+  // the phone kept from before the server stored them.
+  if (url.pathname === "/game/best") {
+    const user = String(q.get("user") || "").slice(0, 120);
     if (request.method === "POST") {
       let body;
       try { body = await request.json(); } catch { return new Response("bad json", { status: 400 }); }
-      const user = String(body.user || "").slice(0, 120);
+      const poster = String(body.user || "").slice(0, 120);
       const name = String(body.name || "").trim().slice(0, 24);
-      const score = Math.round(Number(body.score));
-      // A light every ~0.25 s, doubles included, is beyond human for 60 s.
-      if (!user || !name || !(score >= 1 && score <= 300)) return json({ error: "rejected" });
-      const day = new Date().toISOString().slice(0, 10);
-      const rateKey = `wx:${day}:${user}`;
-      const tries = Number((await env.TOKENS.get(rateKey)) || 0);
-      if (tries >= 200) return json({ error: "limit" });
-      await env.TOKENS.put(rateKey, String(tries + 1), { expirationTtl: 90000 });
-      if (!board[user] || score > board[user].score) {
-        board[user] = { name, score, at: Date.now() };
-        await env.TOKENS.put(key, JSON.stringify(board), { expirationTtl: 86400 * 21 });
+      if (!poster) return json({ error: "rejected" });
+      if (!(await allow(env, "bx", poster, 100))) return json({ error: "limit" });
+      const writes = [];
+      for (const a of [ARCADE.reaction, ARCADE.wall]) {
+        const value = Math.round(Number(body[a.game]));
+        if (a.valid(value)) writes.push(bestUpsert(env, ckEnv, a, poster, name, value, Date.now()));
       }
+      if (writes.length) await env.DB.batch(writes);
+      return json(await bests(env, ckEnv, poster));
     }
-    const list = Object.entries(board).map(([userId, v]) => ({ userId, ...v })).sort((a, b) => b.score - a.score);
-    list.forEach((e, i) => { e.rank = i + 1; });
-    const me = q.get("user") ? list.find((e) => e.userId === q.get("user")) : null;
-    return json({ week, total: list.length, top: list.slice(0, 20).map(({ userId, name, score, rank }) => ({ userId, name, score, rank })),
-                  me: me ? { name: me.name, score: me.score, rank: me.rank } : null });
+    return json(user ? await bests(env, ckEnv, user) : {});
   }
 
   if (url.pathname === "/game/dotd") {
@@ -733,11 +722,159 @@ export async function handleGame(request, env) {
   return new Response("not found", { status: 404 });
 }
 
+// ---------------------------------------------------------------- arcade
+
+// The two arcade games. `game` names the personal best (and the field the
+// app posts to /game/best); `better` compares a new run with the old one.
+const ARCADE = {
+  // Human limit: anything under 100 ms is a guess, not a reaction.
+  reaction: { table: "reaction", field: "ms", game: "lights", rate: "rx", better: "<", order: "ASC", valid: (v) => v >= 100 && v <= 2000 },
+  // A light every ~0.25 s, doubles included, is beyond human for 60 s.
+  wall: { table: "wall", field: "score", game: "wall", rate: "wx", better: ">", order: "DESC", valid: (v) => v >= 1 && v <= 300 },
+};
+
+/// A week's board (this week unless ?week=2026-10-12 or ?week=last; ?week=all
+/// ranks everyone's all-time best), and with POST a new run. One row per
+/// player, kept only if it beats their week: a single statement, so runs
+/// saved at the same moment never overwrite each other. ?limit= up to 500.
+async function arcade(request, env, ckEnv, q, a) {
+  const asked = q.get("week") || "";
+  const limit = Math.min(Math.max(Number(q.get("limit")) || 20, 1), 500);
+  const week = /^\d{4}-\d{2}-\d{2}$/.test(asked) ? asked
+    : asked === "last" ? reactionWeek(Date.now() - 7 * 86400_000)
+    : asked === "all" ? "all" : reactionWeek();
+  if (request.method === "POST") {
+    let body;
+    try { body = await request.json(); } catch { return new Response("bad json", { status: 400 }); }
+    const user = String(body.user || "").slice(0, 120);
+    const name = String(body.name || "").trim().slice(0, 24);
+    const value = Math.round(Number(body[a.field]));
+    if (!user || !name || !a.valid(value)) return json({ error: "rejected" });
+    if (!(await allow(env, a.rate, user))) return json({ error: "limit" });
+    const f = a.field, now = Date.now();
+    await env.DB.batch([
+      env.DB.prepare(`INSERT INTO ${a.table} (env, week, user, name, ${f}, at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+        ON CONFLICT (env, week, user) DO UPDATE SET name = excluded.name,
+          at = CASE WHEN excluded.${f} ${a.better} ${f} THEN excluded.at ELSE at END,
+          ${f} = CASE WHEN excluded.${f} ${a.better} ${f} THEN excluded.${f} ELSE ${f} END`)
+        .bind(ckEnv, reactionWeek(), user, name, value, now),
+      bestUpsert(env, ckEnv, a, user, name, value, now),
+    ]);
+  }
+  const { results: list } = week === "all"
+    ? await env.DB.prepare(`SELECT user AS userId, name, value AS ${a.field} FROM best
+        WHERE env = ?1 AND game = ?2 AND name <> '' ORDER BY value ${a.order}, at ASC`).bind(ckEnv, a.game).all()
+    : await env.DB.prepare(`SELECT user AS userId, name, ${a.field} FROM ${a.table}
+        WHERE env = ?1 AND week = ?2 ORDER BY ${a.field} ${a.order}, at ASC`).bind(ckEnv, week).all();
+  list.forEach((e, i) => { e.rank = i + 1; });
+  const user = q.get("user");
+  const me = user ? list.find((e) => e.userId === user) : null;
+  return json({
+    week, total: list.length, top: list.slice(0, limit),
+    me: me ? { name: me.name, [a.field]: me[a.field], rank: me.rank } : null,
+    best: user ? (await bests(env, ckEnv, user))[a.game] : null,
+  });
+}
+
+function bestUpsert(env, ckEnv, a, user, name, value, now) {
+  return env.DB.prepare(`INSERT INTO best (env, game, user, name, value, at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+    ON CONFLICT (env, game, user) DO UPDATE SET
+      name = CASE WHEN excluded.name <> '' THEN excluded.name ELSE name END,
+      at = CASE WHEN excluded.value ${a.better} value THEN excluded.at ELSE at END,
+      value = CASE WHEN excluded.value ${a.better} value THEN excluded.value ELSE value END`)
+    .bind(ckEnv, a.game, user, name, value, now);
+}
+
+/// { lights: ms | null, wall: points | null }
+async function bests(env, ckEnv, user) {
+  const { results } = await env.DB.prepare("SELECT game, value FROM best WHERE env = ?1 AND user = ?2").bind(ckEnv, user).all();
+  const out = { lights: null, wall: null };
+  for (const r of results) out[r.game] = r.value;
+  return out;
+}
+
+/// Counts today's submissions of `kind` by `user`; false once over `max`.
+async function allow(env, kind, user, max = 200) {
+  const day = new Date().toISOString().slice(0, 10);
+  const row = await env.DB.prepare(`INSERT INTO rate (day, kind, user, n) VALUES (?1, ?2, ?3, 1)
+    ON CONFLICT (day, kind, user) DO UPDATE SET n = n + 1 RETURNING n`).bind(day, kind, user).first();
+  return (row?.n ?? 1) <= max;
+}
+
+// ---------------------------------------------------------------- backup
+
+/// Nightly: copies every game key in KV (round and season tables, AI
+/// picks, vote tallies, the old boards and leagues) into D1, whose
+/// point-in-time restore then covers them, and clears old rate counters.
+export async function backupKV(env) {
+  let cursor, copied = 0;
+  do {
+    const page = await env.TOKENS.list({ prefix: "game:", cursor });
+    const writes = [];
+    for (const { name } of page.keys) {
+      const value = await env.TOKENS.get(name);
+      if (value == null) continue;
+      writes.push(env.DB.prepare(`INSERT INTO kv_backup (key, value, updated) VALUES (?1, ?2, ?3)
+        ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated = excluded.updated WHERE kv_backup.value <> excluded.value`)
+        .bind(name, value, Date.now()));
+    }
+    for (let i = 0; i < writes.length; i += 50) await env.DB.batch(writes.slice(i, i + 50));
+    copied += writes.length;
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+  const old = new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10);
+  await env.DB.prepare("DELETE FROM rate WHERE day < ?1").bind(old).run();
+  return { copied };
+}
+
+/// One-off move of the KV boards and leagues into D1 (POST /game/migrate).
+/// Safe to rerun: better runs win, existing members stay.
+export async function migrateToD1(env) {
+  const counts = { reaction: 0, wall: 0, leagues: 0, members: 0 };
+  let cursor;
+  do {
+    const page = await env.TOKENS.list({ prefix: "game:", cursor });
+    for (const { name: key } of page.keys) {
+      const m = key.match(/^game:(development|production):(reaction|wall|league):(.+)$/);
+      if (!m) continue;
+      const [, ckEnv, kind, id] = m;
+      const data = await env.TOKENS.get(key, "json");
+      if (!data) continue;
+      const writes = [];
+      if (kind === "league") {
+        writes.push(env.DB.prepare("INSERT OR IGNORE INTO league (env, code, title, owner, created_at) VALUES (?1, ?2, ?3, ?4, ?5)")
+          .bind(ckEnv, id, data.title, data.owner, data.createdAt || Date.now()));
+        for (const [user, name] of Object.entries(data.members || {})) {
+          writes.push(env.DB.prepare("INSERT OR IGNORE INTO league_member (env, code, user, name, joined_at) VALUES (?1, ?2, ?3, ?4, ?5)")
+            .bind(ckEnv, id, user, name, data.createdAt || Date.now()));
+          counts.members++;
+        }
+        counts.leagues++;
+      } else {
+        const a = ARCADE[kind], f = a.field;
+        for (const [user, v] of Object.entries(data)) {
+          if (!a.valid(v[f])) continue;
+          writes.push(env.DB.prepare(`INSERT INTO ${a.table} (env, week, user, name, ${f}, at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+            ON CONFLICT (env, week, user) DO UPDATE SET
+              at = CASE WHEN excluded.${f} ${a.better} ${f} THEN excluded.at ELSE at END,
+              ${f} = CASE WHEN excluded.${f} ${a.better} ${f} THEN excluded.${f} ELSE ${f} END`)
+            .bind(ckEnv, id, user, v.name || "Player", v[f], v.at || Date.now()));
+          writes.push(bestUpsert(env, ckEnv, a, user, v.name || "", v[f], v.at || Date.now()));
+          counts[kind]++;
+        }
+      }
+      for (let i = 0; i < writes.length; i += 50) await env.DB.batch(writes.slice(i, i + 50));
+    }
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+  return counts;
+}
+
 // --------------------------------------------------------------- helpers
 
-/// "2026-10-12": the Monday that starts the current UTC week.
-function reactionWeek() {
-  const d = new Date();
+/// "2026-10-12": the Monday that starts the UTC week (this one by default).
+function reactionWeek(at = Date.now()) {
+  const d = new Date(at);
   d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
   return d.toISOString().slice(0, 10);
 }

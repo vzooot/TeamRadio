@@ -75,7 +75,7 @@ final class ChatBadge {
                 : newest.text
         }
         var dms: [DirectMessage] = []
-        if let userId, let inbox = try? await DirectMessageService.inbox(me: userId, limit: 40) {
+        if let userId, let inbox = try? await DirectMessageService.inbox(me: userId, limit: 40, pages: 1) {
             dms = DMReadState.unread(in: inbox, me: userId)
         }
         latestIsPrivate = false

@@ -187,28 +187,50 @@ enum DirectMessageService {
 
     /// Everything sent to or by me, newest first. Two queries: CloudKit's OR
     /// support is not something to build an inbox on.
-    static func inbox(me: String, limit: Int = 100) async throws -> [DirectMessage] {
-        async let incoming = fetch(NSPredicate(format: "toId == %@", me), limit: limit)
-        async let outgoing = fetch(NSPredicate(format: "fromId == %@", me), limit: limit)
+    /// `limit` is per direction and pages through CloudKit, so older
+    /// conversations stay in the list (`pages` caps a badge count's cost).
+    static func inbox(me: String, limit: Int = 100, pages: Int = 10) async throws -> [DirectMessage] {
+        async let incoming = fetchAll(NSPredicate(format: "toId == %@", me), limit: limit, pages: pages)
+        async let outgoing = fetchAll(NSPredicate(format: "fromId == %@", me), limit: limit, pages: pages)
         return await decrypt(try await incoming + outgoing, me: me)
     }
 
-    static func thread(me: String, other: String, limit: Int = 150) async throws -> [DirectMessage] {
-        await decrypt(try await fetch(NSPredicate(format: "thread == %@", threadId(me, other)), limit: limit), me: me)
+    /// The newest messages of a conversation, and a cursor to older ones.
+    static func thread(me: String, other: String, limit: Int = 150) async throws -> (messages: [DirectMessage], older: CKQueryOperation.Cursor?) {
+        let (records, cursor) = try await fetch(NSPredicate(format: "thread == %@", threadId(me, other)), limit: limit)
+        return (await decrypt(records, me: me), cursor)
     }
 
-    private static func fetch(_ predicate: NSPredicate, limit: Int) async throws -> [CKRecord] {
+    /// Continues a conversation further back in time.
+    static func olderThread(me: String, from cursor: CKQueryOperation.Cursor, limit: Int = 150) async throws -> (messages: [DirectMessage], older: CKQueryOperation.Cursor?) {
+        let (results, next) = try await database.records(continuingMatchFrom: cursor, desiredKeys: listKeys, resultsLimit: limit)
+        return (await decrypt(results.compactMap { try? $0.1.get() }, me: me), next)
+    }
+
+    // attachments are fetched lazily by the bubble, never with the list
+    private static let listKeys = ["thread", "fromId", "toId", "fromName", "toName", "created", "payload", "mediaType"]
+
+    private static func fetch(_ predicate: NSPredicate, limit: Int) async throws -> ([CKRecord], CKQueryOperation.Cursor?) {
         let query = CKQuery(recordType: "DirectMessage", predicate: predicate)
         query.sortDescriptors = [NSSortDescriptor(key: "created", ascending: false)]
         do {
-            // attachments are fetched lazily by the bubble, never with the list
-            let (results, _) = try await database.records(
-                matching: query, desiredKeys: ["thread", "fromId", "toId", "fromName", "toName", "created", "payload", "mediaType"],
-                resultsLimit: limit)
-            return results.compactMap { try? $0.1.get() }
+            let (results, cursor) = try await database.records(matching: query, desiredKeys: listKeys, resultsLimit: limit)
+            return (results.compactMap { try? $0.1.get() }, cursor)
         } catch let error as CKError where error.code == .unknownItem {
-            return []   // record type not created yet — nobody has written a DM; other errors surface
+            return ([], nil)   // record type not created yet — nobody has written a DM; other errors surface
         }
+    }
+
+    private static func fetchAll(_ predicate: NSPredicate, limit: Int, pages: Int) async throws -> [CKRecord] {
+        var (records, cursor) = try await fetch(predicate, limit: limit)
+        var page = 1
+        while let next = cursor, page < pages {
+            let (results, more) = try await database.records(continuingMatchFrom: next, desiredKeys: listKeys, resultsLimit: limit)
+            records += results.compactMap { try? $0.1.get() }
+            cursor = more
+            page += 1
+        }
+        return records
     }
 
     private static func decrypt(_ records: [CKRecord], me: String) async -> [DirectMessage] {

@@ -19,12 +19,17 @@ struct LightsOutView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var phase: Phase = .ready
+    /// How the last run went: a personal best, a better week, a climb.
+    @State private var outcome: RunOutcome?
+    @State private var showCelebration = false
     @State private var sequence: Task<Void, Never>?
     @State private var fingerDown = false
     @AppStorage("lightsOutBest") private var best: Double = 0
     @AppStorage("lightsOutHistory") private var history = ""
     @AppStorage("chatNickname") private var nickname = ""
     @State private var board: LeaderboardService.ReactionBoard?
+    @State private var boardLoaded = false
+    @State private var showFullBoard = false
     @State private var userId: String?
 
     private static let appStore = URL(string: "https://apps.apple.com/app/id6804406860")!
@@ -37,17 +42,36 @@ struct LightsOutView: View {
                 .ignoresSafeArea()
                 .animation(.easeOut(duration: 0.15), value: litCount)
 
-            VStack(spacing: 22) {
-                header
-                Spacer(minLength: 0)
-                gantry
-                status
+            // Nothing moves or disappears during a run: the lights at their
+            // full size, one status line, the week's board (also after a
+            // jump start), the start button.
+            VStack(spacing: 14) {
+                VStack(spacing: 14) {
+                    header
+                    gantry
+                        .fixedSize(horizontal: false, vertical: true)
+                    status
+                        .frame(height: 64)
+                    weeklyBoard
+                }
+                // After every run, its card over the screen; the start button
+                // (drawn after it) stays lit above the dim to go again.
+                .overlay {
+                    if showCelebration, case .result(let seconds) = phase, let outcome {
+                        RunCard(seconds: seconds, outcome: outcome, verdict: Self.verdict(seconds),
+                                week: board?.me.map { (rank: $0.rank, total: board?.total ?? 0) }) { showCelebration = false }
+                            .transition(.opacity)
+                    }
+                }
+                .zIndex(1)
                 Spacer(minLength: 0)
                 controls
+                    .zIndex(2)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
         }
+        .animation(.easeOut(duration: 0.2), value: showCelebration)
         .onDisappear { sequence?.cancel() }
         .task {
             // After the slide-up, which stuttered when the engine started during it.
@@ -57,9 +81,35 @@ struct LightsOutView: View {
             if best > 0, best < Self.minReaction { best = 0 }
             #if DEBUG
             if UserDefaults.standard.bool(forKey: "LightsOutAutoStart") { start() }
+            // -ShowFullBoard YES: opens the full board, for screenshots
+            if UserDefaults.standard.bool(forKey: "ShowFullBoard") { showFullBoard = true }
+            // -LightsOutPhase jump|0.234: shows that end of a run, for screenshots
+            switch UserDefaults.standard.string(forKey: "LightsOutPhase") {
+            case "jump"?: phase = .jumpStart
+            case let value?:
+                if let seconds = Double(value) {
+                    phase = .result(seconds)
+                    // -DemoOutcome pb|week|normal: how that run went
+                    switch UserDefaults.standard.string(forKey: "DemoOutcome") {
+                    case "pb"?: outcome = RunOutcome(personalBest: true, previousBest: 0.246, weekBest: true, climb: 8)
+                    case "week"?: outcome = RunOutcome(personalBest: false, previousBest: 0.150, weekBest: true, climb: 3)
+                    default: outcome = RunOutcome(personalBest: false, previousBest: 0.150)
+                    }
+                    showCelebration = true
+                }
+            case nil: break
+            }
             #endif
             userId = await ChatService.currentUserId()
+            if let userId { await LeaderboardService.syncBests(user: userId) }
             board = await LeaderboardService.reaction(user: userId, name: nil, ms: nil)
+            boardLoaded = true
+        }
+        .sheet(isPresented: $showFullBoard) {
+            ArcadeFullBoard(game: .lightsOut, userId: userId)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.background)
         }
     }
 
@@ -121,90 +171,120 @@ struct LightsOutView: View {
     private var status: some View {
         switch phase {
         case .ready:
-            VStack(spacing: 18) {
-                prompt("HOLD THE BRAKE", sub: "The lights come on while you hold. Let go the moment they go out.")
-                weeklyBoard
-            }
+            prompt("HOLD TO START", sub: "Let go the moment the lights go out.")
         case .lighting, .holding:
             prompt("HOLD IT…", sub: "Don't let go before lights out.")
         case .go:
             prompt("LET GO!", sub: " ", color: Theme.accent)
         case .jumpStart:
-            prompt("JUMP START", sub: "You let go too early. Drive-through penalty.", color: Theme.live)
+            prompt("JUMP START", sub: "You let go too early. Hold to try again.", color: Theme.live)
         case .result(let seconds):
-            VStack(spacing: 8) {
+            resultStatus(seconds)
+        }
+    }
+
+    private var isResult: Bool {
+        if case .result = phase { return true }
+        return false
+    }
+
+    private var celebrating: Bool { isResult && outcome?.personalBest == true }
+
+    /// A personal best gets the gold treatment; a better week says so and
+    /// how many places it gained; any other run shows the gap to your best.
+    @ViewBuilder
+    private func resultStatus(_ seconds: Double) -> some View {
+        let gain = (outcome?.previousBest ?? 0) - seconds
+        if celebrating {
+            let sub = (outcome?.previousBest ?? 0) > 0 ? String(format: "%.3f FASTER THAN YOUR OLD BEST", gain) : "YOUR FIRST TIME ON THE CLOCK"
+            VStack(spacing: 6) {
+                Text("NEW PERSONAL BEST")
+                    .font(.f1(26).italic())
+                    .foregroundStyle(Medal.goldGradient)
+                    .shadow(color: Medal.gold.opacity(0.8), radius: 10)
+                Text(sub).font(.f1(11, weight: .bold)).tracking(1.5).foregroundStyle(Medal.goldLight)
+            }
+        } else {
+            VStack(spacing: 6) {
                 Text(Self.verdict(seconds))
-                    .font(.f1(18).italic())
+                    .font(.f1(22).italic())
                     .foregroundStyle(.white)
-                Text(seconds <= best ? "NEW PERSONAL BEST" : String(format: "Personal best %.3f · F1 drivers ≈ 0.200", best))
-                    .font(.f1(11, weight: .bold))
-                    .tracking(1.5)
-                    .foregroundStyle(seconds <= best ? Color(red: 1, green: 0.75, blue: 0.2) : Theme.dimText)
-                if let me = board?.me, let total = board?.total {
-                    Text("THIS WEEK: #\(me.rank) OF \(total) · BEST \(String(format: "%.3f", Double(me.ms) / 1000))")
-                        .font(.f1(11, weight: .bold))
-                        .tracking(1.5)
+                if outcome?.weekBest == true {
+                    Text("BEST THIS WEEK" + ((outcome?.climb ?? 0) > 0 ? " · UP \(outcome!.climb!) \(outcome!.climb == 1 ? "PLACE" : "PLACES")" : ""))
+                        .font(.f1(12, weight: .heavy)).tracking(1.5)
                         .foregroundStyle(Theme.accent)
+                        .shadow(color: Theme.accent.opacity(0.6), radius: 6)
+                } else {
+                    Text(String(format: "+%.3f OFF YOUR BEST %.3f", -gain, outcome?.previousBest ?? best))
+                        .font(.f1(12, weight: .heavy)).tracking(1.5)
+                        .foregroundStyle(.white.opacity(0.75))
                 }
             }
         }
     }
 
     private func prompt(_ title: String, sub: String, color: Color = .white) -> some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 6) {
             Text(title)
-                .font(.f1(30).italic())
+                .font(.f1(24).italic())
                 .foregroundStyle(color)
             Text(sub)
                 .font(.system(size: 14))
                 .foregroundStyle(Theme.dimText)
                 .multilineTextAlignment(.center)
         }
-        .frame(minHeight: 90)
     }
 
-    /// The brake pedal while a start is possible; after a run, START AGAIN
-    /// (and sharing a good time). Only the pedal reacts to holding, so a
-    /// stray touch elsewhere can't launch or end a run.
+    /// The start button: hold to start, and after a run hold START AGAIN
+    /// (sharing a good time beside it). Only the button reacts to holding,
+    /// so a stray touch elsewhere can't launch or end a run.
     @ViewBuilder
     private var controls: some View {
-        switch phase {
-        case .ready, .lighting, .holding, .go:
-            BrakePedal(pressed: fingerDown)
-                // Down the instant the finger lands, up the instant it lifts
-                // (a drag gesture waited to be recognised, so the pedal lagged).
-                .onLongPressGesture(minimumDuration: .infinity, maximumDistance: .infinity, pressing: { down in
-                    if down {
-                        guard !fingerDown else { return }
-                        fingerDown = true
-                        press()
-                    } else {
-                        fingerDown = false
-                        release()
+        StartButton(title: startTitle, pressed: fingerDown)
+            // Down the instant the finger lands, up the instant it lifts
+            // (a drag gesture waited to be recognised, so the button lagged).
+            .onLongPressGesture(minimumDuration: .infinity, maximumDistance: .infinity, pressing: { down in
+                if down {
+                    guard !fingerDown else { return }
+                    // After a run, holding the button starts the next one.
+                    switch phase {
+                    case .result, .jumpStart: restart()
+                    default: break
                     }
-                }, perform: {})
-                .accessibilityElement()
-                .accessibilityLabel("Brake pedal")
-                .accessibilityHint("Hold to start the lights, release when they go out")
-                .accessibilityAction(named: "Hold") { press() }
-                .accessibilityAction(named: "Release") { release() }
-        case .result(let seconds):
-            HStack(spacing: 10) {
-                Button { restart() } label: { Text("START AGAIN") }
-                    .buttonStyle(GamePrimaryButtonStyle())
-                ShareLink(item: Self.appStore,
-                          message: Text(String(format: "Lights out in %.3f s 🏁 Beat my reaction time on Team Radio:", seconds))) {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundStyle(Theme.accent)
-                        .frame(width: 50, height: 46)
-                        .background(RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.accent.opacity(0.5)))
+                    fingerDown = true
+                    press()
+                } else {
+                    fingerDown = false
+                    release()
                 }
-                .accessibilityLabel("Share your time")
+            }, perform: {})
+            .accessibilityElement()
+            .accessibilityLabel(startTitle.0 + " " + startTitle.1)
+            .accessibilityHint("Hold to start the lights, release when they go out")
+            .accessibilityAction(named: "Hold") { press() }
+            .accessibilityAction(named: "Release") { release() }
+            .frame(maxWidth: .infinity)
+            .overlay(alignment: .trailing) {
+                if case .result(let seconds) = phase {
+                    ShareLink(item: Self.appStore,
+                              message: Text(String(format: "Lights out in %.3f s 🏁 Beat my reaction time on Team Radio:", seconds))) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(Theme.accent)
+                            .frame(width: 52, height: 52)
+                            .background(Circle().strokeBorder(Theme.accent.opacity(0.5)))
+                    }
+                    .accessibilityLabel("Share your time")
+                }
             }
-        case .jumpStart:
-            Button { restart() } label: { Text("START AGAIN") }
-                .buttonStyle(GamePrimaryButtonStyle())
+    }
+
+    /// The big word and the small one on the start button.
+    private var startTitle: (String, String) {
+        switch phase {
+        case .ready: ("HOLD", "TO START")
+        case .lighting, .holding, .go: ("HOLD", "LET GO ON LIGHTS OUT")
+        case .result, .jumpStart: ("START", "AGAIN")
         }
     }
 
@@ -213,6 +293,8 @@ struct LightsOutView: View {
     /// Back to the grid: lights off, waiting for the pedal.
     private func restart() {
         sequence?.cancel()
+        outcome = nil
+        showCelebration = false
         fingerDown = false
         phase = .ready
     }
@@ -236,12 +318,20 @@ struct LightsOutView: View {
             // Nobody reacts in under 0.1 s: that's anticipation, a jump
             // start (the server ignores such times too).
             guard seconds >= Self.minReaction else { return jumpStart() }
-            if best == 0 || seconds < best { best = seconds }
+            let previous = best
+            let personalBest = previous == 0 || seconds < previous
+            if personalBest { best = seconds }
+            outcome = RunOutcome(personalBest: personalBest, previousBest: previous)
             history = Self.appending(seconds, to: history)
             submit(seconds)
-            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+            if personalBest {
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            } else {
+                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+            }
             StartSounds.shared.radioClick()
             phase = .result(seconds)
+            showCelebration = true
         }
     }
 
@@ -287,36 +377,23 @@ struct LightsOutView: View {
     private func submit(_ seconds: Double) {
         guard let userId, !nickname.isEmpty else { return }
         let ms = Int((seconds * 1000).rounded())
-        Task { if let updated = await LeaderboardService.reaction(user: userId, name: nickname, ms: ms) { board = updated } }
+        let before = board?.me
+        Task {
+            guard let updated = await LeaderboardService.reaction(user: userId, name: nickname, ms: ms) else { return }
+            board = updated
+            // A better time this week, and how many places it gained.
+            if let me = updated.me, me.ms == ms, before.map({ ms < $0.ms }) ?? true, case .result(let s) = phase, s == seconds {
+                outcome?.weekBest = true
+                outcome?.climb = before.map { $0.rank - me.rank }
+            }
+        }
     }
 
-    /// Top five this week, under the start prompt.
-    @ViewBuilder
+    /// This week's podium and your place; the full board behind it.
     private var weeklyBoard: some View {
-        if let top = board?.top, !top.isEmpty {
-            VStack(spacing: 6) {
-                Text("FASTEST THIS WEEK")
-                    .font(.f1(11, weight: .bold))
-                    .tracking(2)
-                    .foregroundStyle(Color(red: 1, green: 0.75, blue: 0.2))
-                ForEach(top.prefix(3)) { e in
-                    HStack {
-                        Text("\(e.rank)").font(.f1(14)).foregroundStyle(Theme.dimText).frame(width: 24, alignment: .leading)
-                        Text(e.name).font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(e.userId == userId ? Theme.accent : .white).lineLimit(1)
-                        Spacer()
-                        Text(String(format: "%.3f", Double(e.ms) / 1000)).font(.f1Digits(14)).foregroundStyle(.white)
-                    }
-                }
-            }
-            .padding(14)
-            .frame(maxWidth: 320)
-            .background(RoundedRectangle(cornerRadius: 14).fill(Theme.card))
-        } else if nickname.isEmpty {
-            Text("Pick a Paddock name to get on the weekly leaderboard.")
-                .font(.system(size: 12))
-                .foregroundStyle(Theme.faintText)
-        }
+        ArcadeBoardCard(game: .lightsOut, standing: board.map(ArcadeGame.from), loaded: boardLoaded,
+                        celebrate: isResult && outcome?.weekBest == true, climb: isResult ? outcome?.climb : nil,
+                        hasName: !nickname.isEmpty) { showFullBoard = true }
     }
 
     static func verdict(_ s: Double) -> String {
@@ -331,42 +408,39 @@ struct LightsOutView: View {
     }
 }
 
-/// A brake pedal: ridged aluminium on a dark mount, tilting down and
-/// glowing red while it's held.
-private struct BrakePedal: View {
+/// The big round start button (approved draft A, build/mockups/
+/// start-button.png): a dark glass disc in a neon ring, cyan at rest and
+/// red while held. Hold it, the lights come on; let go when they go out.
+private struct StartButton: View {
+    let title: (String, String)
     let pressed: Bool
 
     var body: some View {
-        VStack(spacing: 10) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(LinearGradient(colors: [Color(white: pressed ? 0.30 : 0.42), Color(white: 0.16)],
-                                         startPoint: .top, endPoint: .bottom))
-                // grip ridges
-                VStack(spacing: 8) {
-                    ForEach(0..<6, id: \.self) { _ in
-                        Capsule()
-                            .fill(Color.black.opacity(0.55))
-                            .frame(height: 6)
-                            .overlay(alignment: .top) { Capsule().fill(Color.white.opacity(0.18)).frame(height: 1) }
-                    }
-                }
-                .padding(.horizontal, 18)
-                RoundedRectangle(cornerRadius: 20)
-                    .strokeBorder(pressed ? Theme.live : Color.white.opacity(0.18), lineWidth: pressed ? 2.5 : 1)
+        ZStack {
+            ring
+            VStack(spacing: 2) {
+                Text(title.0).font(.f1(26).italic())
+                Text(title.1).font(.f1(9, weight: .heavy)).tracking(1.5).multilineTextAlignment(.center)
             }
-            .frame(width: 112, height: 132)
-            .rotation3DEffect(.degrees(pressed ? 22 : 0), axis: (x: 1, y: 0, z: 0), anchor: .bottom, perspective: 0.5)
-            .scaleEffect(pressed ? 0.96 : 1)
-            .shadow(color: pressed ? Theme.live.opacity(0.7) : .black.opacity(0.6), radius: pressed ? 18 : 10, y: pressed ? 2 : 10)
-            .animation(.spring(response: 0.12, dampingFraction: 0.8), value: pressed)
-            Text(pressed ? "HOLDING…" : "HOLD THE BRAKE")
-                .font(.f1(11, weight: .heavy))
-                .tracking(2)
-                .foregroundStyle(pressed ? Theme.live : Theme.dimText)
+            .foregroundStyle(.white)
+            .shadow(color: .black.opacity(0.5), radius: 2, y: 1)
+            .frame(width: 120)
         }
-        .frame(maxWidth: .infinity)
-        .contentShape(Rectangle())
+        .frame(width: 158, height: 158)
+        .scaleEffect(pressed ? 0.94 : 1)
+        .animation(.spring(response: 0.14, dampingFraction: 0.75), value: pressed)
+        .contentShape(Circle())
+    }
+
+    private var ring: some View {
+        let tint = pressed ? Theme.live : Theme.accent
+        return ZStack {
+            Circle().fill(RadialGradient(colors: [Color(white: 0.16), Color(white: 0.04)], center: .top, startRadius: 0, endRadius: 160))
+            Circle().strokeBorder(tint, lineWidth: 5)
+                .shadow(color: tint.opacity(0.9), radius: 6)
+                .shadow(color: tint.opacity(0.6), radius: pressed ? 26 : 16)
+            Circle().strokeBorder(.white.opacity(0.08), lineWidth: 1).padding(10)
+        }
     }
 }
 
@@ -481,5 +555,109 @@ private struct ReactionTimer: View {
         case .ready:
             return ("0.000", Theme.accent)
         }
+    }
+}
+
+/// How a finished run went.
+struct RunOutcome: Equatable {
+    var personalBest: Bool
+    /// The best before this run (0 if there was none).
+    var previousBest: Double
+    /// A better time on this week's board than before.
+    var weekBest = false
+    /// Places gained on this week's board.
+    var climb: Int?
+}
+
+/// The card after every run (approved draft B, build/mockups/
+/// result-drafts.png): gold with a trophy for a personal best, cyan for a
+/// better week with the places gained, plain for any other run with the gap
+/// to your best. Stays until you tap it or start the next run.
+private struct RunCard: View {
+    let seconds: Double
+    let outcome: RunOutcome
+    let verdict: String
+    let week: (rank: Int, total: Int)?
+    let close: () -> Void
+    @State private var shown = false
+
+    private enum Tier { case best, week, run }
+    private var tier: Tier { outcome.personalBest ? .best : outcome.weekBest ? .week : .run }
+
+    private var tint: AnyShapeStyle {
+        switch tier {
+        case .best: AnyShapeStyle(Medal.goldGradient)
+        case .week: AnyShapeStyle(Theme.accentGradient)
+        case .run: AnyShapeStyle(Theme.chromeText)
+        }
+    }
+
+    private var glow: Color {
+        switch tier {
+        case .best: Medal.gold
+        case .week: Theme.accent
+        case .run: .white.opacity(0.25)
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.6)
+                .frame(width: 3000, height: 4000)
+                .onTapGesture { close() }
+            VStack(spacing: 10) {
+                Image(systemName: tier == .best ? "trophy.fill" : tier == .week ? "arrow.up.circle.fill" : "stopwatch")
+                    .font(.system(size: tier == .best ? 46 : 38))
+                    .foregroundStyle(tint)
+                    .shadow(color: glow.opacity(0.9), radius: 14)
+                Text(tier == .best ? "NEW PERSONAL BEST" : tier == .week ? "BEST THIS WEEK" : verdict.uppercased())
+                    .font(.f1(14, weight: .heavy)).tracking(2)
+                    .foregroundStyle(tier == .best ? Medal.goldLight : tier == .week ? Theme.accent : .white)
+                Text(String(format: "%.3f", seconds))
+                    .font(.f1Digits(64))
+                    .foregroundStyle(tint)
+                    .shadow(color: glow.opacity(0.8), radius: 12)
+                Text(detail)
+                    .font(.system(size: 14))
+                    .foregroundStyle(Theme.dimText)
+                if let place {
+                    Text(place)
+                        .font(.f1(12, weight: .heavy)).tracking(1.5)
+                        .foregroundStyle(tier == .run ? .white.opacity(0.75) : Theme.accent)
+                        .padding(.top, 4)
+                }
+                Text("TAP TO CLOSE")
+                    .font(.f1(9, weight: .heavy)).tracking(2)
+                    .foregroundStyle(Theme.faintText)
+                    .padding(.top, 8)
+            }
+            .padding(.horizontal, 34)
+            .padding(.vertical, 28)
+            .background(RoundedRectangle(cornerRadius: 26).fill(Theme.card))
+            .overlay(RoundedRectangle(cornerRadius: 26).strokeBorder(tint, lineWidth: tier == .run ? 1 : 2))
+            .shadow(color: glow.opacity(tier == .run ? 0.3 : 0.5), radius: 30)
+            .scaleEffect(shown ? 1 : 0.6)
+            .opacity(shown ? 1 : 0)
+            .onTapGesture { close() }
+            .animation(.easeOut(duration: 0.25), value: outcome)
+        }
+        .onAppear { withAnimation(.spring(response: 0.4, dampingFraction: 0.65)) { shown = true } }
+    }
+
+    private var detail: String {
+        switch tier {
+        case .best:
+            outcome.previousBest > 0 ? String(format: "%.3f faster than your old best", outcome.previousBest - seconds)
+                                     : "Your first time on the clock"
+        case .week: verdict
+        case .run: String(format: "+%.3f off your best %.3f", seconds - outcome.previousBest, outcome.previousBest)
+        }
+    }
+
+    /// Places gained this week, or where you stand.
+    private var place: String? {
+        if let climb = outcome.climb, climb > 0 { return "▲ UP \(climb) \(climb == 1 ? "PLACE" : "PLACES") THIS WEEK" }
+        guard let week, week.total > 0 else { return nil }
+        return "P\(week.rank) OF \(week.total) THIS WEEK"
     }
 }

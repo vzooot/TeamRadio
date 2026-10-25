@@ -51,6 +51,8 @@ struct ReactionWallView: View {
     @AppStorage("wallBest") private var best = 0
     @AppStorage("chatNickname") private var nickname = ""
     @State private var board: LeaderboardService.WallBoard?
+    @State private var boardLoaded = false
+    @State private var showFullBoard = false
     @State private var userId: String?
     @State private var newBest = false
 
@@ -85,7 +87,15 @@ struct ReactionWallView: View {
             if UserDefaults.standard.bool(forKey: "WallDemo") { autoplay() }
             #endif
             userId = await ChatService.currentUserId()
+            if let userId { await LeaderboardService.syncBests(user: userId) }
             board = await LeaderboardService.wall(user: userId, name: nil, score: nil)
+            boardLoaded = true
+        }
+        .sheet(isPresented: $showFullBoard) {
+            ArcadeFullBoard(game: .wall, userId: userId)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.background)
         }
     }
 
@@ -290,33 +300,10 @@ struct ReactionWallView: View {
         }
     }
 
-    /// Top three this week, under the rules.
-    @ViewBuilder
+    /// This week's podium and your place; the full board behind it.
     private var weeklyBoard: some View {
-        if let top = board?.top, !top.isEmpty {
-            VStack(spacing: 6) {
-                Text("MOST POINTS THIS WEEK")
-                    .font(.f1(11, weight: .bold))
-                    .tracking(2)
-                    .foregroundStyle(Color(red: 1, green: 0.75, blue: 0.2))
-                ForEach(top.prefix(3)) { e in
-                    HStack {
-                        Text("\(e.rank)").font(.f1(14)).foregroundStyle(Theme.dimText).frame(width: 24, alignment: .leading)
-                        Text(e.name).font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(e.userId == userId ? Theme.accent : .white).lineLimit(1)
-                        Spacer()
-                        Text("\(e.score)").font(.f1Digits(14)).foregroundStyle(.white)
-                    }
-                }
-            }
-            .padding(14)
-            .frame(maxWidth: 320)
-            .background(RoundedRectangle(cornerRadius: 14).fill(Theme.card))
-        } else if nickname.isEmpty {
-            Text("Pick a Paddock name to get on the weekly leaderboard.")
-                .font(.system(size: 12))
-                .foregroundStyle(Theme.faintText)
-        }
+        ArcadeBoardCard(game: .wall, standing: board.map(ArcadeGame.from), loaded: boardLoaded,
+                        hasName: !nickname.isEmpty) { showFullBoard = true }
     }
 
     // MARK: - Game

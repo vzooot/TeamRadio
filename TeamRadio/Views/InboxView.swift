@@ -154,6 +154,8 @@ struct DMThreadView: View {
     @State private var isLoadingMedia = false
     @State private var showGiphy = false
     @State private var decrypt: (@Sendable (Data) -> Data?)?
+    /// The long-pressed message, with the reaction picker open.
+    @State private var pressed: PressedMessage?
     @FocusState private var focused: Bool
 
     private var canSend: Bool {
@@ -170,24 +172,38 @@ struct DMThreadView: View {
                             .foregroundStyle(Theme.faintText)
                             .multilineTextAlignment(.center)
                             .padding(.vertical, 8)
-                        ForEach(model.messages) { message in
-                            bubble(message)
-                                .id(message.id)
-                                .contextMenu {
-                                    if message.fromId != model.me {
-                                        Button(role: .destructive) {
-                                            model.report(message)
-                                        } label: {
-                                            Label("Report message", systemImage: "exclamationmark.bubble")
-                                        }
-                                        Button(role: .destructive) {
-                                            ChatModeration.block(model.otherId)
-                                            model.messages.removeAll()
-                                        } label: {
-                                            Label("Block \(model.otherName)", systemImage: "hand.raised")
-                                        }
+                        if model.canLoadOlder {
+                            Button {
+                                Task { await model.loadOlder() }
+                            } label: {
+                                HStack(spacing: 6) {
+                                    if model.isLoadingOlder {
+                                        ProgressView().tint(Theme.dimText)
                                     }
+                                    Text("LOAD EARLIER MESSAGES")
+                                        .font(.f1(11, weight: .bold))
+                                        .tracking(1)
                                 }
+                                .foregroundStyle(Theme.dimText)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(model.isLoadingOlder)
+                        }
+                        ForEach(model.messages) { message in
+                            let mine = message.fromId == model.me
+                            VStack(alignment: mine ? .trailing : .leading, spacing: 4) {
+                                bubble(message)
+                                    .onLongPressToReact { frame in press(message, at: frame) }
+                                ReactionChips(chips: model.reactions.chips(for: message.id.recordName)) {
+                                    model.react($0, to: message.id.recordName)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: mine ? .trailing : .leading)
+                            // the lifted copy stands in for it while pressed
+                            .opacity(pressed?.id == message.id.recordName ? 0 : 1)
+                            .id(message.id)
                         }
                     }
                     .padding(.horizontal, 16)
@@ -220,6 +236,27 @@ struct DMThreadView: View {
         .onAppear { model.start() }
         .onDisappear { model.stop() }
         .task { decrypt = await model.decryptor() }
+        .messageMenu($pressed, mine: { model.reactions.mine(on: $0) }) { emoji, id in model.react(emoji, to: id) }
+    }
+
+    private func press(_ message: DirectMessage, at frame: CGRect) {
+        let mine = message.fromId == model.me
+        var actions: [MessageAction] = []
+        if !mine {
+            actions = [
+                MessageAction(title: "Report message", systemImage: "exclamationmark.bubble", destructive: true) {
+                    model.report(message)
+                },
+                MessageAction(title: "Block \(model.otherName)", systemImage: "hand.raised", destructive: true) {
+                    ChatModeration.block(model.otherId)
+                    model.messages.removeAll()
+                },
+            ]
+        }
+        focused = false
+        presentWithoutSlide($pressed, PressedMessage(
+            id: message.id.recordName, frame: frame, isMine: mine,
+            content: AnyView(bubble(message)), actions: actions))
     }
 
     private var inputBar: some View {

@@ -93,7 +93,11 @@ final class GameViewModel {
         guard let race else { return }
         if draft.round != race.id { draft = Prediction(round: race.id, hasSprint: race.isSprintWeekend) }
 
-        if let standings = try? await F1API.driverStandings(limit: 30) {
+        // The driver list and the iCloud identity load side by side.
+        async let fetchedStandings = try? F1API.driverStandings(limit: 30)
+        async let available = ChatService.accountAvailable()
+        async let currentUser = ChatService.currentUserId()
+        if let standings = await fetchedStandings {
             drivers = standings.map {
                 GameDriver(id: $0.driver.driverId, code: $0.driver.shortCode, familyName: $0.driver.familyName,
                            number: $0.driver.permanentNumber, teamId: $0.teamId)
@@ -108,13 +112,15 @@ final class GameViewModel {
         }
         #endif
 
-        guard await ChatService.accountAvailable(), let id = await ChatService.currentUserId() else {
+        guard await available, let id = await currentUser else {
             access = .needsICloud
             return
         }
         userId = id
         access = nickname.isEmpty ? .needsName : .ready
 
+        // This round's picks and last round's score at the same time.
+        async let lastScore: Void = loadLastScore(before: race, season: season, userId: id)
         let current = await Result.async { try await PredictionService.mine(round: race.id, userId: id) }
         // A failed fetch keeps what we had; a successful one replaces it,
         // "never picked" included.
@@ -125,8 +131,9 @@ final class GameViewModel {
                 draft = picks
             }
         }
-        await GameReminders.reschedule(race: race, saved: saved?.groups ?? [])
-        await loadLastScore(before: race, season: season, userId: id)
+        let groups = saved?.groups ?? []
+        Task { await GameReminders.reschedule(race: race, saved: groups) }
+        await lastScore
     }
 
     private func loadLastScore(before race: Race, season: [Race], userId: String) async {

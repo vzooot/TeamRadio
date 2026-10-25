@@ -35,8 +35,32 @@ struct ChatView: View {
     }
     @FocusState private var nicknameFocused: Bool
     @FocusState private var draftFocused: Bool
+    /// The long-pressed message, with the reaction picker open.
+    @State private var pressed: PressedMessage?
 
     typealias PendingMedia = StagedMedia
+
+    private func press(_ message: ChatMessage, at frame: CGRect) {
+        let mine = model.isMine(message)
+        var actions: [MessageAction] = []
+        if !mine {
+            actions = [
+                MessageAction(title: "Message \(message.sender) privately", systemImage: "envelope") {
+                    openThread(id: message.senderId, name: message.sender)
+                },
+                MessageAction(title: "Report message", systemImage: "exclamationmark.bubble", destructive: true) {
+                    model.report(message)
+                },
+                MessageAction(title: "Block this user", systemImage: "hand.raised", destructive: true) {
+                    model.block(message)
+                },
+            ]
+        }
+        draftFocused = false
+        presentWithoutSlide($pressed, PressedMessage(
+            id: message.id.recordName, frame: frame, isMine: mine, leading: mine ? 0 : 38,
+            content: AnyView(ChatBubble(message: message, isMine: mine)), actions: actions))
+    }
 
     var body: some View {
         ZStack {
@@ -76,6 +100,7 @@ struct ChatView: View {
             }
         }
         .task { await model.start() }
+        .messageMenu($pressed, mine: { model.reactions.mine(on: $0) }) { emoji, id in model.react(emoji, to: id) }
         // Keep the MESSAGES chip honest while the Paddock is open: a private
         // message may land without a push (same device, muted, or none yet).
         .task {
@@ -390,31 +415,23 @@ struct ChatView: View {
                                 .padding(.top, 40)
                         }
                         ForEach(model.messages) { message in
-                            ChatBubble(message: message, isMine: model.isMine(message)) {
-                                memberCard = Member(id: message.senderId, name: message.sender)
-                            }
-                                .id(message.id)
-                                // New arrivals spring in from the bottom edge.
-                                .transition(.move(edge: .bottom).combined(with: .opacity))
-                                .contextMenu {
-                                    if !model.isMine(message) {
-                                        Button {
-                                            openThread(id: message.senderId, name: message.sender)
-                                        } label: {
-                                            Label("Message \(message.sender) privately", systemImage: "envelope")
-                                        }
-                                        Button(role: .destructive) {
-                                            model.report(message)
-                                        } label: {
-                                            Label("Report message", systemImage: "exclamationmark.bubble")
-                                        }
-                                        Button(role: .destructive) {
-                                            model.block(message)
-                                        } label: {
-                                            Label("Block this user", systemImage: "hand.raised")
-                                        }
-                                    }
+                            let mine = model.isMine(message)
+                            VStack(alignment: mine ? .trailing : .leading, spacing: 4) {
+                                ChatBubble(message: message, isMine: mine) {
+                                    memberCard = Member(id: message.senderId, name: message.sender)
                                 }
+                                .onLongPressToReact { frame in press(message, at: frame) }
+                                ReactionChips(chips: model.reactions.chips(for: message.id.recordName)) {
+                                    model.react($0, to: message.id.recordName)
+                                }
+                                .padding(.leading, mine ? 0 : 38)
+                            }
+                            .frame(maxWidth: .infinity, alignment: mine ? .trailing : .leading)
+                            // the lifted copy stands in for it while pressed
+                            .opacity(pressed?.id == message.id.recordName ? 0 : 1)
+                            .id(message.id)
+                            // New arrivals spring in from the bottom edge.
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
                         }
                     }
                     .padding(.horizontal, 16)

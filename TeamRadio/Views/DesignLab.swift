@@ -42,6 +42,12 @@ struct DesignLab: View {
             case "boardA": BoardDraftA()
             case "boardB": BoardDraftB()
             case "boardC": BoardDraftC()
+            case "reactA": ReactionsDraft(style: .corner)
+            case "reactB": ReactionsDraft(style: .pill)
+            case "reactC": ReactionsDraft(style: .chips)
+            case "reactMenu": ReactionsDraft(style: .pill, pressed: true)
+            case "reactLive": ReactionsLive()
+            case "arcadeFull": BoardDraftFull()
             default: Text("unknown draft \(id)").foregroundStyle(.white)
             }
         }

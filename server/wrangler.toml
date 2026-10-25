@@ -2,13 +2,20 @@ name = "teamradio-push"
 main = "src/worker.js"
 compatibility_date = "2026-09-01"
 
-# Every 5 minutes: is any session starting in the 55–65 minute window?
+# Every 5 minutes: countdowns, announcements, scoring.
+# 03:17 UTC daily: copies the KV game data into D1 (backup).
 [triggers]
-crons = ["*/5 * * * *"]
+crons = ["*/5 * * * *", "17 3 * * *"]
 
 [[kv_namespaces]]
 binding = "TOKENS"
 id = "cbcf7ede1a484ac8b35cd12d5b830367"
+
+# Player-written game data (boards, bests, leagues): server/schema.sql.
+[[d1_databases]]
+binding = "DB"
+database_name = "teamradio"
+database_id = "c2e645e9-cdab-40b1-b673-1cbe7ee19ee4"
 
 [vars]
 # CloudKit environments the prediction-game scorer reads picks from.

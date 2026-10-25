@@ -1,5 +1,8 @@
-Missa aldrig starten:
+Reagera, tävla, spara varje rekord:
 
-• Nedräkningen på låsskärmen pågår nu hela racehelgen: varje pass nedräkning startar flera timmar innan och nästa tar över så fort ett pass är slut
-• Passaviseringar är på från början: ett tryck när du öppnar appen, så får du en påminnelse före varje pass och innan dina tips låses
-• Tipsen öppnar och resultaten är klara: få en avisering när det är dags att spela och när racet har räknats
+• Reagera på meddelanden med en emoji: håll in ett meddelande i Paddock eller i en privat chatt
+• Lights Out och Reaction Wall får en lysande prispall för veckans topp tre, din placering och en hel topplista med bästa tider genom tiderna och förra veckan
+• Lights Out har en ny stor startknapp och ett resultatkort efter varje försök, i guld när du slår ditt personbästa
+• Dina personbästan följer nu med till en ny telefon, och veckans vinnare sparas för alltid
+• Långa privata konversationer visar äldre meddelanden
+• Spel-fliken öppnas snabbare
