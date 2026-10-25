@@ -455,7 +455,7 @@ struct ReactionWallView: View {
             run.score += lit.double ? 2 : 1
             run.reactions.append(CACurrentMediaTime() - lit.litAt)
             ArcadeHaptics.hit(double: lit.double)
-            StartSounds.shared.tap()
+            StartSounds.shared.tap(red: lit.double)
             flash = pad
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(120))

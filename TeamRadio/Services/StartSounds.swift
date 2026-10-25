@@ -19,7 +19,17 @@ final class StartSounds {
     /// delay, and a new tap cuts the last one off.
     private let tapPlayer = AVAudioPlayerNode()
     private var tapBuffer: AVAudioPCMBuffer?
+    private var tapRedBuffer: AVAudioPCMBuffer?
     private var started = false
+
+    /// A bundled .caf, read into a buffer for the engine.
+    private func load(_ name: String) -> AVAudioPCMBuffer? {
+        guard let url = Bundle.main.url(forResource: name, withExtension: "caf"),
+              let file = try? AVAudioFile(forReading: url),
+              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(file.length)),
+              (try? file.read(into: buffer)) != nil else { return nil }
+        return buffer
+    }
 
     private func start() {
         guard !started else { return }
@@ -29,12 +39,8 @@ final class StartSounds {
         engine.connect(player, to: engine.mainMixerNode, format: format)
         engine.attach(tapPlayer)
         engine.connect(tapPlayer, to: engine.mainMixerNode, format: format)
-        if let url = Bundle.main.url(forResource: "tap", withExtension: "caf"),
-           let file = try? AVAudioFile(forReading: url),
-           let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(file.length)),
-           (try? file.read(into: buffer)) != nil {
-            tapBuffer = buffer
-        }
+        tapBuffer = load("tap")
+        tapRedBuffer = load("tap-red")
         try? engine.start()
         if let url = Bundle.main.url(forResource: "radio-key", withExtension: "caf") {
             click = try? AVAudioPlayer(contentsOf: url)
@@ -84,17 +90,17 @@ final class StartSounds {
     }
 
     /// A Reaction Wall hit: a soft little bubble pop, like a rubber button
-    /// (approved, build/mockups/sounds/wall/tap-soft-2-bubble.wav).
-    func tap() {
+    /// (build/mockups/sounds/wall/tap-soft-2-bubble.wav); a red light, two
+    /// bubbles at once, a soft "pling" (red-C-pling.wav).
+    func tap(red: Bool = false) {
         start()
-        guard let tapBuffer else { return }
-        tapPlayer.scheduleBuffer(tapBuffer, at: nil, options: .interrupts, completionHandler: nil)
+        guard let buffer = red ? tapRedBuffer : tapBuffer else { return }
+        tapPlayer.scheduleBuffer(buffer, at: nil, options: .interrupts, completionHandler: nil)
         if !tapPlayer.isPlaying { tapPlayer.play() }
     }
 
-    /// A run that beat neither your best nor your week: a cute "oh-oh", two
-    /// kalimba notes, the second bending down (approved,
-    /// build/mockups/sounds/wall/oh-oh-cute-1-kalimba.wav).
+    /// A run that beat neither your best nor your week: a soft, muffled
+    /// "bwomp" (approved, build/mockups/sounds/wall/worse-2-bwomp.wav).
     func ohOh() {
         start()
         ohOhSound?.currentTime = 0
