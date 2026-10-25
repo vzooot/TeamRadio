@@ -324,12 +324,19 @@ struct LightsOutView: View {
             outcome = RunOutcome(personalBest: personalBest, previousBest: previous)
             history = Self.appending(seconds, to: history)
             submit(seconds)
+            // Fanfare for a best, the radio click for a better week, oh-oh
+            // for a worse run.
+            let ms = Int((seconds * 1000).rounded())
+            let betterWeek = board?.me.map { ms < $0.ms } ?? true
             if personalBest {
                 ArcadeHaptics.finished(personalBest: true)
                 StartSounds.shared.personalBest()
-            } else {
+            } else if betterWeek {
                 UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                 StartSounds.shared.radioClick()
+            } else {
+                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                StartSounds.shared.ohOh()
             }
             phase = .result(seconds)
             showCelebration = true

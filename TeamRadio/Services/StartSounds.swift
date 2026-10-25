@@ -1,7 +1,9 @@
 import AVFoundation
 
-/// Short synthesized tones for Lights Out: a beep for each light, a soft
-/// two-note "uh-oh" for a jump start, and the app's radio key click on a good start.
+/// The arcade games' sounds: a beep for each light, a soft "uh-oh" for a
+/// jump start, a button click for each Reaction Wall hit, the radio key click
+/// on a better run, "oh-oh" on a worse one, and the five-lights fanfare on a
+/// personal best.
 /// Ambient session, so the silent switch mutes them like any game sound.
 @MainActor
 final class StartSounds {
@@ -12,6 +14,11 @@ final class StartSounds {
     private let format = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1)!
     private var click: AVAudioPlayer?
     private var fanfare: AVAudioPlayer?
+    private var ohOhSound: AVAudioPlayer?
+    /// Taps go through the engine on their own node: no player start-up
+    /// delay, and a new tap cuts the last one off.
+    private let tapPlayer = AVAudioPlayerNode()
+    private var tapBuffer: AVAudioPCMBuffer?
     private var started = false
 
     private func start() {
@@ -20,6 +27,14 @@ final class StartSounds {
         try? AVAudioSession.sharedInstance().setActive(true)
         engine.attach(player)
         engine.connect(player, to: engine.mainMixerNode, format: format)
+        engine.attach(tapPlayer)
+        engine.connect(tapPlayer, to: engine.mainMixerNode, format: format)
+        if let url = Bundle.main.url(forResource: "tap", withExtension: "caf"),
+           let file = try? AVAudioFile(forReading: url),
+           let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(file.length)),
+           (try? file.read(into: buffer)) != nil {
+            tapBuffer = buffer
+        }
         try? engine.start()
         if let url = Bundle.main.url(forResource: "radio-key", withExtension: "caf") {
             click = try? AVAudioPlayer(contentsOf: url)
@@ -28,6 +43,10 @@ final class StartSounds {
         if let url = Bundle.main.url(forResource: "personal-best", withExtension: "caf") {
             fanfare = try? AVAudioPlayer(contentsOf: url)
             fanfare?.prepareToPlay()
+        }
+        if let url = Bundle.main.url(forResource: "oh-oh", withExtension: "caf") {
+            ohOhSound = try? AVAudioPlayer(contentsOf: url)
+            ohOhSound?.prepareToPlay()
         }
         started = true
     }
@@ -62,6 +81,23 @@ final class StartSounds {
         for i in 0..<fade { data[total - 1 - i] *= Float(i) / Float(fade) }
         player.scheduleBuffer(buffer, completionHandler: nil)
         if !player.isPlaying { player.play() }
+    }
+
+    /// A Reaction Wall hit: one short arcade-button click (approved take 2,
+    /// build/mockups/sounds/wall/click-2-arcade.wav).
+    func tap() {
+        start()
+        guard let tapBuffer else { return }
+        tapPlayer.scheduleBuffer(tapBuffer, at: nil, options: .interrupts, completionHandler: nil)
+        if !tapPlayer.isPlaying { tapPlayer.play() }
+    }
+
+    /// A run that beat neither your best nor your week: "oh-oh", two falling
+    /// notes in the light-beep tone (approved take 2, build/mockups/sounds/wall/oh-oh-2-notes.wav).
+    func ohOh() {
+        start()
+        ohOhSound?.currentTime = 0
+        ohOhSound?.play()
     }
 
     /// A personal best, in either game: the five start lights as five

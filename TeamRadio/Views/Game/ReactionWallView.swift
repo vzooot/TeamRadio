@@ -401,7 +401,15 @@ struct ReactionWallView: View {
         let previous = best
         let personalBest = run.score > 0 && run.score > previous
         ArcadeHaptics.finished(personalBest: personalBest)
-        if personalBest { StartSounds.shared.personalBest() } else { StartSounds.shared.radioClick() }
+        // Fanfare for a best, the radio click for a better week, oh-oh for a worse run.
+        let betterWeek = board?.me.map { run.score > $0.score } ?? (run.score > 0)
+        if personalBest {
+            StartSounds.shared.personalBest()
+        } else if betterWeek {
+            StartSounds.shared.radioClick()
+        } else {
+            StartSounds.shared.ohOh()
+        }
         if personalBest { best = run.score }
         outcome = RunOutcome(personalBest: personalBest, previousBest: Double(previous))
         phase = .finished(run)
@@ -447,6 +455,7 @@ struct ReactionWallView: View {
             run.score += lit.double ? 2 : 1
             run.reactions.append(CACurrentMediaTime() - lit.litAt)
             ArcadeHaptics.hit(double: lit.double)
+            StartSounds.shared.tap()
             flash = pad
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(120))
