@@ -649,13 +649,13 @@ export async function handleGame(request, env) {
   // scored round of the season (null where someone didn't play).
   if (url.pathname === "/game/history") {
     const user = q.get("user") || "";
-    const rounds = [];
-    for (const r of await season()) {
-      const round = await env.TOKENS.get(`game:${ckEnv}:round:${r.season}-${r.round}`, "json");
-      if (!round) continue;
-      rounds.push({ round: Number(r.round), name: r.raceName,
-                    you: round.players?.[user]?.points ?? null, ai: round.strategist?.points ?? null });
-    }
+    // every round at once: one by one took over a second
+    const races = await season();
+    const tables = await Promise.all(races.map((r) => env.TOKENS.get(`game:${ckEnv}:round:${r.season}-${r.round}`, "json")));
+    const rounds = races.flatMap((r, i) => tables[i]
+      ? [{ round: Number(r.round), name: r.raceName,
+           you: tables[i].players?.[user]?.points ?? null, ai: tables[i].strategist?.points ?? null }]
+      : []);
     return json({ rounds }, 120);
   }
 

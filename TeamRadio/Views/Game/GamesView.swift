@@ -23,11 +23,25 @@ final class GamesModel {
     func load() async {
         async let next = try? F1API.nextRace()
         async let calendar = try? F1API.season()
+        async let user = ChatService.currentUserId()
         let (race, races) = await (next, calendar)
         nextRace = race ?? nil
         season = races ?? []
         guard GameFeature.isEnabled else { ready = true; return }
-        await game.load(race: nextRace, season: season)
+        // The picks, the season table, the AI duel and the arcade boards all
+        // load at once; one after another they kept the page waiting.
+        userId = await user
+        let year = nextRace?.season ?? season.last?.season ?? String(Calendar.current.component(.year, from: .now))
+        let uid = userId
+        async let picks: Void = game.load(race: nextRace, season: season)
+        async let board = try? LeaderboardService.board(scope: .season, year: year, user: uid)
+        // Warms the cache for the AI duel, which the picks card fetches itself.
+        async let duel = uid == nil ? nil : LeaderboardService.history(user: uid!)
+        async let arcade: Void = loadArcadeBoards()
+        await picks
+        seasonBoard = await board
+        _ = await duel
+        await arcade
         #if DEBUG
         // -FakePicks YES: a signed-in player with three picks, for screenshots
         if UserDefaults.standard.bool(forKey: "FakePicks"), game.drivers.count > 2 {
@@ -37,15 +51,6 @@ final class GamesModel {
             game.draft.p2 = game.drivers[2].id
         }
         #endif
-        userId = await ChatService.currentUserId()
-        let year = nextRace?.season ?? season.last?.season ?? String(Calendar.current.component(.year, from: .now))
-        let user = userId
-        async let board = try? LeaderboardService.board(scope: .season, year: year, user: user)
-        // Warms the cache for the AI duel, which the picks card fetches itself.
-        async let duel = user == nil ? nil : LeaderboardService.history(user: user!)
-        seasonBoard = await board
-        _ = await duel
-        await loadArcadeBoards()
         #if DEBUG
         // -DemoGame YES: a made-up season table for store screenshots
         if UserDefaults.standard.string(forKey: "DemoGame") != nil {
@@ -64,7 +69,8 @@ final class GamesModel {
     }
 
     func loadArcadeBoards() async {
-        if let userId { await LeaderboardService.syncBests(user: userId) }
+        // Bests sync in the background; the tiles follow when they change.
+        if let userId { Task { await LeaderboardService.syncBests(user: userId) } }
         async let wall = LeaderboardService.wall(user: userId, name: nil, score: nil)
         async let lights = LeaderboardService.reaction(user: userId, name: nil, ms: nil)
         (wallBoard, lightsBoard) = await (wall, lights)
