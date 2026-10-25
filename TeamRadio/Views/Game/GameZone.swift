@@ -1188,31 +1188,34 @@ struct LightsStrip: View {
 
 // MARK: - Ask Emily
 
+/// Ask Emily (approved draft C, build/mockups/emily-bigger.png): a tall
+/// bar with her photo big in a glowing ring, the radio wave and the mic.
 struct EmilyBar: View {
     let onTap: () -> Void
 
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 12) {
+            HStack(spacing: 14) {
                 Color.clear
                     .overlay(Image("EmilyAvatar").resizable().scaledToFill())
-                    .frame(width: 44, height: 44)
+                    .frame(width: 66, height: 66)
                     .clipShape(Circle())
-                    .shadow(color: Theme.accent.opacity(0.7), radius: 6)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("ASK EMILY").font(.f1(16).italic()).foregroundStyle(Theme.chromeText)
-                    Text("AI race engineer").font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.dimText)
+                    .padding(3)
+                    .overlay(Circle().strokeBorder(Theme.accentGradient, lineWidth: 2.5))
+                    .shadow(color: Theme.accent.opacity(0.7), radius: 10)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("ASK EMILY").font(.f1(18).italic()).foregroundStyle(Theme.chromeText)
+                    Text("AI race engineer").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.dimText)
+                    RadioWave().frame(height: 18)
                 }
-                RadioWave()
-                    .frame(height: 26)
                 Image(systemName: "mic.fill")
-                    .font(.system(size: 15, weight: .bold))
+                    .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(Theme.onAccent)
-                    .frame(width: 42, height: 42)
+                    .frame(width: 50, height: 50)
                     .background(Circle().fill(Theme.accentGradient))
             }
-            .padding(8)
-            .padding(.leading, 2)
+            .padding(9)
+            .padding(.trailing, 4)
             .zoneGlass(Capsule(), light: Theme.violet, offset: CGSize(width: 0, height: 10))
         }
         .buttonStyle(.plain)
@@ -1368,3 +1371,4 @@ enum LEDFont {
         "?": [".###.", "#...#", "....#", "...#.", "..#..", ".....", "..#.."],
     ]
 }
+
