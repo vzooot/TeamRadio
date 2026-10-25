@@ -1,7 +1,7 @@
 import AVFoundation
 
 /// The arcade games' sounds: a beep for each light, a soft "uh-oh" for a
-/// jump start, a button click for each Reaction Wall hit, the radio key click
+/// jump start, a soft pop for each Reaction Wall hit, the radio key click
 /// on a better run, "oh-oh" on a worse one, and the five-lights fanfare on a
 /// personal best.
 /// Ambient session, so the silent switch mutes them like any game sound.
@@ -83,8 +83,8 @@ final class StartSounds {
         if !player.isPlaying { player.play() }
     }
 
-    /// A Reaction Wall hit: one short arcade-button click (approved take 2,
-    /// build/mockups/sounds/wall/click-2-arcade.wav).
+    /// A Reaction Wall hit: a soft little bubble pop, like a rubber button
+    /// (approved, build/mockups/sounds/wall/tap-soft-2-bubble.wav).
     func tap() {
         start()
         guard let tapBuffer else { return }
@@ -92,8 +92,9 @@ final class StartSounds {
         if !tapPlayer.isPlaying { tapPlayer.play() }
     }
 
-    /// A run that beat neither your best nor your week: "oh-oh", two falling
-    /// notes in the light-beep tone (approved take 2, build/mockups/sounds/wall/oh-oh-2-notes.wav).
+    /// A run that beat neither your best nor your week: a cute "oh-oh", two
+    /// kalimba notes, the second bending down (approved,
+    /// build/mockups/sounds/wall/oh-oh-cute-1-kalimba.wav).
     func ohOh() {
         start()
         ohOhSound?.currentTime = 0
