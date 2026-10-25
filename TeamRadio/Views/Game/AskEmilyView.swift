@@ -59,7 +59,7 @@ struct AskEmilyView: View {
             Image("EmilyAvatar")
                 .resizable()
                 .scaledToFill()
-                .frame(width: 46, height: 46)
+                .frame(width: 64, height: 64)
                 .clipShape(Circle())
                 .overlay(Circle().strokeBorder(Theme.accent, lineWidth: 2))
                 .shadow(color: Theme.accent.opacity(0.5), radius: 6)

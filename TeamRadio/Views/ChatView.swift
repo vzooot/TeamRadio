@@ -312,7 +312,7 @@ struct ChatView: View {
                         Image("EmilyAvatar")
                             .resizable()
                             .scaledToFill()
-                            .frame(width: 30, height: 30)
+                            .frame(width: 36, height: 36)
                             .clipShape(Circle())
                             .overlay(Circle().strokeBorder(Theme.accent, lineWidth: 1.5))
                     }
