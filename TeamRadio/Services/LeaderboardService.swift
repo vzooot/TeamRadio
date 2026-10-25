@@ -68,8 +68,11 @@ enum LeaderboardService {
         // -DemoArcade YES: a made-up week of 48 players, for screenshots
         if UserDefaults.standard.bool(forKey: "DemoArcade") {
             let rows = BoardDraftData.rows.prefix(limit ?? 20)
+            // with -LightsOutPhase <seconds>, that run is the player's week
+            let run = Double(UserDefaults.standard.string(forKey: "LightsOutPhase") ?? "").map { Int($0 * 1000) }
+            let mine = run.flatMap { ms in BoardDraftData.rows.first { $0.ms >= ms }?.rank } ?? 17
             return ReactionBoard(total: 48, top: rows.map { .init(userId: $0.me ? (user ?? "me") : $0.name, name: $0.name, ms: $0.ms, rank: $0.rank) },
-                                 me: .init(name: "You", ms: BoardDraftData.me.ms, rank: 17))
+                                 me: .init(name: "You", ms: run ?? BoardDraftData.me.ms, rank: mine))
         }
         #endif
         var components = URLComponents(url: base.appending(path: "reaction"), resolvingAgainstBaseURL: false)!

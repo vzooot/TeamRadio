@@ -54,12 +54,17 @@ private let gold = Color(red: 1, green: 0.8, blue: 0.25)
 
 /// Metallic gold, silver and bronze: a bright top, a deeper base and a
 /// glow of the same colour.
-private struct Medal {
+struct Medal {
     let light: Color
     let deep: Color
     let glow: Color
 
     var gradient: LinearGradient { LinearGradient(colors: [light, deep], startPoint: .top, endPoint: .bottom) }
+
+    static let gold = Color(red: 1, green: 0.75, blue: 0.15)
+    static let goldLight = Color(red: 1, green: 0.88, blue: 0.5)
+    static let goldGradient = LinearGradient(colors: [Color(red: 1, green: 0.95, blue: 0.6), Color(red: 1, green: 0.68, blue: 0.1)],
+                                             startPoint: .top, endPoint: .bottom)
 
     static func of(_ rank: Int) -> Medal? {
         switch rank {
@@ -100,6 +105,10 @@ struct ArcadeBoardCard: View {
     /// nil while loading.
     let standing: ArcadeStanding?
     let loaded: Bool
+    /// A better time this week: your line lights up gold.
+    var celebrate = false
+    /// Places just gained this week.
+    var climb: Int? = nil
     let hasName: Bool
     let onOpen: () -> Void
 
@@ -207,6 +216,13 @@ struct ArcadeBoardCard: View {
             Text("YOU").font(.f1(12).italic()).foregroundStyle(Theme.accent)
             if let me = standing?.me, let total = standing?.total {
                 Text("P\(me.rank) OF \(total)").font(.f1(11, weight: .heavy)).tracking(1).foregroundStyle(.white)
+                if let climb, climb > 0 {
+                    Text("▲ \(climb)")
+                        .font(.f1(10, weight: .heavy))
+                        .foregroundStyle(Theme.onAccent)
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(Capsule().fill(Medal.goldGradient))
+                }
                 Spacer()
                 Text(me.value).font(.f1Digits(15)).foregroundStyle(.white)
             } else {
@@ -217,8 +233,11 @@ struct ArcadeBoardCard: View {
         }
         .padding(.horizontal, 12)
         .frame(height: 32)
-        .background(Capsule().fill(Theme.accent.opacity(0.14)))
-        .overlay(Capsule().strokeBorder(Theme.accent.opacity(0.5)))
+        .background(Capsule().fill(celebrate ? Medal.gold.opacity(0.18) : Theme.accent.opacity(0.14)))
+        .overlay(Capsule().strokeBorder(celebrate ? AnyShapeStyle(Medal.goldGradient) : AnyShapeStyle(Theme.accent.opacity(0.5)),
+                                        lineWidth: celebrate ? 1.5 : 1))
+        .shadow(color: celebrate ? Medal.gold.opacity(0.6) : .clear, radius: 10)
+        .animation(.easeOut(duration: 0.3), value: celebrate)
         .padding(.horizontal, 14)
     }
 }
