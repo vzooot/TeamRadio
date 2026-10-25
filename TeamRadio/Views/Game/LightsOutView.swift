@@ -45,7 +45,9 @@ struct LightsOutView: View {
             VStack(spacing: 22) {
                 header
                 Spacer(minLength: 0)
+                // the lights keep their full size; the rest makes room
                 gantry
+                    .layoutPriority(1)
                 status
                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { if case .ready = phase { statusHeight = $0 } }
                     .frame(minHeight: statusHeight, alignment: .top)
@@ -139,7 +141,7 @@ struct LightsOutView: View {
         switch phase {
         case .ready:
             VStack(spacing: 18) {
-                prompt("HOLD THE BRAKE", sub: "The lights come on while you hold. Let go the moment they go out.")
+                prompt("HOLD TO START", sub: "The lights come on while you hold. Let go the moment they go out.")
                 weeklyBoard
             }
         case .lighting, .holding:
@@ -185,43 +187,51 @@ struct LightsOutView: View {
     /// stray touch elsewhere can't launch or end a run.
     @ViewBuilder
     private var controls: some View {
-        switch phase {
-        case .ready, .lighting, .holding, .go:
-            BrakePedal(pressed: fingerDown)
-                // Down the instant the finger lands, up the instant it lifts
-                // (a drag gesture waited to be recognised, so the pedal lagged).
-                .onLongPressGesture(minimumDuration: .infinity, maximumDistance: .infinity, pressing: { down in
-                    if down {
-                        guard !fingerDown else { return }
-                        fingerDown = true
-                        press()
-                    } else {
-                        fingerDown = false
-                        release()
+        StartButton(title: startTitle, pressed: fingerDown)
+            // Down the instant the finger lands, up the instant it lifts
+            // (a drag gesture waited to be recognised, so the button lagged).
+            .onLongPressGesture(minimumDuration: .infinity, maximumDistance: .infinity, pressing: { down in
+                if down {
+                    guard !fingerDown else { return }
+                    // After a run, holding the button starts the next one.
+                    switch phase {
+                    case .result, .jumpStart: restart()
+                    default: break
                     }
-                }, perform: {})
-                .accessibilityElement()
-                .accessibilityLabel("Brake pedal")
-                .accessibilityHint("Hold to start the lights, release when they go out")
-                .accessibilityAction(named: "Hold") { press() }
-                .accessibilityAction(named: "Release") { release() }
-        case .result(let seconds):
-            HStack(spacing: 10) {
-                Button { restart() } label: { Text("START AGAIN") }
-                    .buttonStyle(GamePrimaryButtonStyle())
-                ShareLink(item: Self.appStore,
-                          message: Text(String(format: "Lights out in %.3f s 🏁 Beat my reaction time on Team Radio:", seconds))) {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundStyle(Theme.accent)
-                        .frame(width: 50, height: 46)
-                        .background(RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.accent.opacity(0.5)))
+                    fingerDown = true
+                    press()
+                } else {
+                    fingerDown = false
+                    release()
                 }
-                .accessibilityLabel("Share your time")
+            }, perform: {})
+            .accessibilityElement()
+            .accessibilityLabel(startTitle.0 + " " + startTitle.1)
+            .accessibilityHint("Hold to start the lights, release when they go out")
+            .accessibilityAction(named: "Hold") { press() }
+            .accessibilityAction(named: "Release") { release() }
+            .frame(maxWidth: .infinity)
+            .overlay(alignment: .trailing) {
+                if case .result(let seconds) = phase {
+                    ShareLink(item: Self.appStore,
+                              message: Text(String(format: "Lights out in %.3f s 🏁 Beat my reaction time on Team Radio:", seconds))) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(Theme.accent)
+                            .frame(width: 52, height: 52)
+                            .background(Circle().strokeBorder(Theme.accent.opacity(0.5)))
+                    }
+                    .accessibilityLabel("Share your time")
+                }
             }
-        case .jumpStart:
-            Button { restart() } label: { Text("START AGAIN") }
-                .buttonStyle(GamePrimaryButtonStyle())
+    }
+
+    /// The big word and the small one on the start button.
+    private var startTitle: (String, String) {
+        switch phase {
+        case .ready: ("HOLD", "TO START")
+        case .lighting, .holding, .go: ("HOLD", "LET GO ON LIGHTS OUT")
+        case .result, .jumpStart: ("START", "AGAIN")
         }
     }
 
@@ -325,42 +335,39 @@ struct LightsOutView: View {
     }
 }
 
-/// A brake pedal: ridged aluminium on a dark mount, tilting down and
-/// glowing red while it's held.
-private struct BrakePedal: View {
+/// The big round start button (approved draft A, build/mockups/
+/// start-button.png): a dark glass disc in a neon ring, cyan at rest and
+/// red while held. Hold it, the lights come on; let go when they go out.
+private struct StartButton: View {
+    let title: (String, String)
     let pressed: Bool
 
     var body: some View {
-        VStack(spacing: 10) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(LinearGradient(colors: [Color(white: pressed ? 0.30 : 0.42), Color(white: 0.16)],
-                                         startPoint: .top, endPoint: .bottom))
-                // grip ridges
-                VStack(spacing: 8) {
-                    ForEach(0..<6, id: \.self) { _ in
-                        Capsule()
-                            .fill(Color.black.opacity(0.55))
-                            .frame(height: 6)
-                            .overlay(alignment: .top) { Capsule().fill(Color.white.opacity(0.18)).frame(height: 1) }
-                    }
-                }
-                .padding(.horizontal, 18)
-                RoundedRectangle(cornerRadius: 20)
-                    .strokeBorder(pressed ? Theme.live : Color.white.opacity(0.18), lineWidth: pressed ? 2.5 : 1)
+        ZStack {
+            ring
+            VStack(spacing: 2) {
+                Text(title.0).font(.f1(26).italic())
+                Text(title.1).font(.f1(9, weight: .heavy)).tracking(1.5).multilineTextAlignment(.center)
             }
-            .frame(width: 112, height: 132)
-            .rotation3DEffect(.degrees(pressed ? 22 : 0), axis: (x: 1, y: 0, z: 0), anchor: .bottom, perspective: 0.5)
-            .scaleEffect(pressed ? 0.96 : 1)
-            .shadow(color: pressed ? Theme.live.opacity(0.7) : .black.opacity(0.6), radius: pressed ? 18 : 10, y: pressed ? 2 : 10)
-            .animation(.spring(response: 0.12, dampingFraction: 0.8), value: pressed)
-            Text(pressed ? "HOLDING…" : "HOLD THE BRAKE")
-                .font(.f1(11, weight: .heavy))
-                .tracking(2)
-                .foregroundStyle(pressed ? Theme.live : Theme.dimText)
+            .foregroundStyle(.white)
+            .shadow(color: .black.opacity(0.5), radius: 2, y: 1)
+            .frame(width: 120)
         }
-        .frame(maxWidth: .infinity)
-        .contentShape(Rectangle())
+        .frame(width: 158, height: 158)
+        .scaleEffect(pressed ? 0.94 : 1)
+        .animation(.spring(response: 0.14, dampingFraction: 0.75), value: pressed)
+        .contentShape(Circle())
+    }
+
+    private var ring: some View {
+        let tint = pressed ? Theme.live : Theme.accent
+        return ZStack {
+            Circle().fill(RadialGradient(colors: [Color(white: 0.16), Color(white: 0.04)], center: .top, startRadius: 0, endRadius: 160))
+            Circle().strokeBorder(tint, lineWidth: 5)
+                .shadow(color: tint.opacity(0.9), radius: 6)
+                .shadow(color: tint.opacity(0.6), radius: pressed ? 26 : 16)
+            Circle().strokeBorder(.white.opacity(0.08), lineWidth: 1).padding(10)
+        }
     }
 }
 

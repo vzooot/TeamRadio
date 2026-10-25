@@ -109,10 +109,11 @@ struct ArcadeBoardCard: View {
                 HStack {
                     Text(game.weekTitle).font(.f1(11, weight: .bold)).tracking(2).foregroundStyle(gold)
                     Spacer()
-                    if let total = standing?.total, total > 0 {
-                        Text("\(total) \(total == 1 ? "PLAYER" : "PLAYERS")")
-                            .font(.f1(10, weight: .heavy)).tracking(1.5).foregroundStyle(Theme.faintText)
+                    HStack(spacing: 4) {
+                        Text("FULL BOARD").font(.f1(10, weight: .heavy)).tracking(1)
+                        Image(systemName: "chevron.right").font(.system(size: 9, weight: .bold))
                     }
+                    .foregroundStyle(Theme.accent)
                 }
                 .padding(.horizontal, 14)
                 .padding(.top, 12)
@@ -138,17 +139,9 @@ struct ArcadeBoardCard: View {
                     .redacted(reason: standing == nil ? .placeholder : [])
                     Spacer(minLength: 0)
                 }
-
-                HStack(spacing: 6) {
-                    Image(systemName: "list.number").font(.system(size: 11, weight: .bold))
-                    Text("FULL BOARD").font(.f1(11, weight: .heavy)).tracking(1)
-                    Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold))
-                }
-                .foregroundStyle(Theme.accent)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
             }
-            .frame(height: 206)
+            .padding(.bottom, 12)
+            .frame(height: 172)
             .frame(maxWidth: 360)
             .background(RoundedRectangle(cornerRadius: 16).fill(Theme.card))
             .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.glassStroke))
