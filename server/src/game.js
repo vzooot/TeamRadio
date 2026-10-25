@@ -733,12 +733,16 @@ const ARCADE = {
   wall: { table: "wall", field: "score", game: "wall", rate: "wx", better: ">", order: "DESC", valid: (v) => v >= 1 && v <= 300 },
 };
 
-/// A week's board (this week unless ?week=), and with POST a new run. One
-/// row per player, kept only if it beats their week: a single statement,
-/// so runs saved at the same moment never overwrite each other.
+/// A week's board (this week unless ?week=2026-10-12 or ?week=last; ?week=all
+/// ranks everyone's all-time best), and with POST a new run. One row per
+/// player, kept only if it beats their week: a single statement, so runs
+/// saved at the same moment never overwrite each other. ?limit= up to 500.
 async function arcade(request, env, ckEnv, q, a) {
   const asked = q.get("week") || "";
-  const week = /^\d{4}-\d{2}-\d{2}$/.test(asked) ? asked : reactionWeek();
+  const limit = Math.min(Math.max(Number(q.get("limit")) || 20, 1), 500);
+  const week = /^\d{4}-\d{2}-\d{2}$/.test(asked) ? asked
+    : asked === "last" ? reactionWeek(Date.now() - 7 * 86400_000)
+    : asked === "all" ? "all" : reactionWeek();
   if (request.method === "POST") {
     let body;
     try { body = await request.json(); } catch { return new Response("bad json", { status: 400 }); }
@@ -757,13 +761,16 @@ async function arcade(request, env, ckEnv, q, a) {
       bestUpsert(env, ckEnv, a, user, name, value, now),
     ]);
   }
-  const { results: list } = await env.DB.prepare(`SELECT user AS userId, name, ${a.field} FROM ${a.table}
-    WHERE env = ?1 AND week = ?2 ORDER BY ${a.field} ${a.order}, at ASC`).bind(ckEnv, week).all();
+  const { results: list } = week === "all"
+    ? await env.DB.prepare(`SELECT user AS userId, name, value AS ${a.field} FROM best
+        WHERE env = ?1 AND game = ?2 AND name <> '' ORDER BY value ${a.order}, at ASC`).bind(ckEnv, a.game).all()
+    : await env.DB.prepare(`SELECT user AS userId, name, ${a.field} FROM ${a.table}
+        WHERE env = ?1 AND week = ?2 ORDER BY ${a.field} ${a.order}, at ASC`).bind(ckEnv, week).all();
   list.forEach((e, i) => { e.rank = i + 1; });
   const user = q.get("user");
   const me = user ? list.find((e) => e.userId === user) : null;
   return json({
-    week, total: list.length, top: list.slice(0, 20),
+    week, total: list.length, top: list.slice(0, limit),
     me: me ? { name: me.name, [a.field]: me[a.field], rank: me.rank } : null,
     best: user ? (await bests(env, ckEnv, user))[a.game] : null,
   });
@@ -865,9 +872,9 @@ export async function migrateToD1(env) {
 
 // --------------------------------------------------------------- helpers
 
-/// "2026-10-12": the Monday that starts the current UTC week.
-function reactionWeek() {
-  const d = new Date();
+/// "2026-10-12": the Monday that starts the UTC week (this one by default).
+function reactionWeek(at = Date.now()) {
+  const d = new Date(at);
   d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
   return d.toISOString().slice(0, 10);
 }

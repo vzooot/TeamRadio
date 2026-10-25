@@ -25,6 +25,11 @@ struct LightsOutView: View {
     @AppStorage("lightsOutHistory") private var history = ""
     @AppStorage("chatNickname") private var nickname = ""
     @State private var board: LeaderboardService.ReactionBoard?
+    @State private var boardLoaded = false
+    @State private var showFullBoard = false
+    /// The start screen's status height, kept through the run so the
+    /// lights never move.
+    @State private var statusHeight: CGFloat = 0
     @State private var userId: String?
 
     private static let appStore = URL(string: "https://apps.apple.com/app/id6804406860")!
@@ -42,6 +47,8 @@ struct LightsOutView: View {
                 Spacer(minLength: 0)
                 gantry
                 status
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { if case .ready = phase { statusHeight = $0 } }
+                    .frame(minHeight: statusHeight, alignment: .top)
                 Spacer(minLength: 0)
                 controls
             }
@@ -57,10 +64,19 @@ struct LightsOutView: View {
             if best > 0, best < Self.minReaction { best = 0 }
             #if DEBUG
             if UserDefaults.standard.bool(forKey: "LightsOutAutoStart") { start() }
+            // -ShowFullBoard YES: opens the full board, for screenshots
+            if UserDefaults.standard.bool(forKey: "ShowFullBoard") { showFullBoard = true }
             #endif
             userId = await ChatService.currentUserId()
             if let userId { await LeaderboardService.syncBests(user: userId) }
             board = await LeaderboardService.reaction(user: userId, name: nil, ms: nil)
+            boardLoaded = true
+        }
+        .sheet(isPresented: $showFullBoard) {
+            ArcadeFullBoard(game: .lightsOut, userId: userId)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.background)
         }
     }
 
@@ -291,33 +307,10 @@ struct LightsOutView: View {
         Task { if let updated = await LeaderboardService.reaction(user: userId, name: nickname, ms: ms) { board = updated } }
     }
 
-    /// Top five this week, under the start prompt.
-    @ViewBuilder
+    /// This week's podium and your place; the full board behind it.
     private var weeklyBoard: some View {
-        if let top = board?.top, !top.isEmpty {
-            VStack(spacing: 6) {
-                Text("FASTEST THIS WEEK")
-                    .font(.f1(11, weight: .bold))
-                    .tracking(2)
-                    .foregroundStyle(Color(red: 1, green: 0.75, blue: 0.2))
-                ForEach(top.prefix(3)) { e in
-                    HStack {
-                        Text("\(e.rank)").font(.f1(14)).foregroundStyle(Theme.dimText).frame(width: 24, alignment: .leading)
-                        Text(e.name).font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(e.userId == userId ? Theme.accent : .white).lineLimit(1)
-                        Spacer()
-                        Text(String(format: "%.3f", Double(e.ms) / 1000)).font(.f1Digits(14)).foregroundStyle(.white)
-                    }
-                }
-            }
-            .padding(14)
-            .frame(maxWidth: 320)
-            .background(RoundedRectangle(cornerRadius: 14).fill(Theme.card))
-        } else if nickname.isEmpty {
-            Text("Pick a Paddock name to get on the weekly leaderboard.")
-                .font(.system(size: 12))
-                .foregroundStyle(Theme.faintText)
-        }
+        ArcadeBoardCard(game: .lightsOut, standing: board.map(ArcadeGame.from), loaded: boardLoaded,
+                        hasName: !nickname.isEmpty) { showFullBoard = true }
     }
 
     static func verdict(_ s: Double) -> String {

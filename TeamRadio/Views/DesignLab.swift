@@ -47,6 +47,7 @@ struct DesignLab: View {
             case "reactC": ReactionsDraft(style: .chips)
             case "reactMenu": ReactionsDraft(style: .pill, pressed: true)
             case "reactLive": ReactionsLive()
+            case "arcadeFull": BoardDraftFull()
             default: Text("unknown draft \(id)").foregroundStyle(.white)
             }
         }

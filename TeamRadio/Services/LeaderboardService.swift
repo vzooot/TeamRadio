@@ -61,10 +61,21 @@ enum LeaderboardService {
         let me: Me?
     }
 
-    /// This week's Lights Out board; with `ms` it also submits a time.
-    static func reaction(user: String?, name: String?, ms: Int?) async -> ReactionBoard? {
+    /// This week's Lights Out board (`week`: "last", "all" for all-time
+    /// bests, or a Monday); with `ms` it also submits a time.
+    static func reaction(user: String?, name: String?, ms: Int?, week: String? = nil, limit: Int? = nil) async -> ReactionBoard? {
+        #if DEBUG
+        // -DemoArcade YES: a made-up week of 48 players, for screenshots
+        if UserDefaults.standard.bool(forKey: "DemoArcade") {
+            let rows = BoardDraftData.rows.prefix(limit ?? 20)
+            return ReactionBoard(total: 48, top: rows.map { .init(userId: $0.me ? (user ?? "me") : $0.name, name: $0.name, ms: $0.ms, rank: $0.rank) },
+                                 me: .init(name: "You", ms: BoardDraftData.me.ms, rank: 17))
+        }
+        #endif
         var components = URLComponents(url: base.appending(path: "reaction"), resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "env", value: environment)] + (user.map { [URLQueryItem(name: "user", value: $0)] } ?? [])
+            + (week.map { [URLQueryItem(name: "week", value: $0)] } ?? [])
+            + (limit.map { [URLQueryItem(name: "limit", value: String($0))] } ?? [])
         var request = URLRequest(url: components.url!)
         request.timeoutInterval = 10
         if let user, let name, let ms {
@@ -94,10 +105,20 @@ enum LeaderboardService {
         let me: Me?
     }
 
-    /// This week's Reaction Wall board; with `score` it also submits a run.
-    static func wall(user: String?, name: String?, score: Int?) async -> WallBoard? {
+    /// This week's Reaction Wall board (`week` as for Lights Out); with
+    /// `score` it also submits a run.
+    static func wall(user: String?, name: String?, score: Int?, week: String? = nil, limit: Int? = nil) async -> WallBoard? {
+        #if DEBUG
+        if UserDefaults.standard.bool(forKey: "DemoArcade") {
+            let rows = BoardDraftData.rows.prefix(limit ?? 20)
+            return WallBoard(total: 48, top: rows.map { .init(userId: $0.me ? (user ?? "me") : $0.name, name: $0.name, score: 96 - $0.rank * 2, rank: $0.rank) },
+                             me: .init(name: "You", score: 62, rank: 17))
+        }
+        #endif
         var components = URLComponents(url: base.appending(path: "wall"), resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "env", value: environment)] + (user.map { [URLQueryItem(name: "user", value: $0)] } ?? [])
+            + (week.map { [URLQueryItem(name: "week", value: $0)] } ?? [])
+            + (limit.map { [URLQueryItem(name: "limit", value: String($0))] } ?? [])
         var request = URLRequest(url: components.url!)
         request.timeoutInterval = 10
         if let user, let name, let score {
