@@ -11,6 +11,7 @@ final class StartSounds {
     private let player = AVAudioPlayerNode()
     private let format = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1)!
     private var click: AVAudioPlayer?
+    private var fanfare: AVAudioPlayer?
     private var started = false
 
     private func start() {
@@ -23,6 +24,10 @@ final class StartSounds {
         if let url = Bundle.main.url(forResource: "radio-key", withExtension: "caf") {
             click = try? AVAudioPlayer(contentsOf: url)
             click?.prepareToPlay()
+        }
+        if let url = Bundle.main.url(forResource: "personal-best", withExtension: "caf") {
+            fanfare = try? AVAudioPlayer(contentsOf: url)
+            fanfare?.prepareToPlay()
         }
         started = true
     }
@@ -57,6 +62,15 @@ final class StartSounds {
         for i in 0..<fade { data[total - 1 - i] *= Float(i) / Float(fade) }
         player.scheduleBuffer(buffer, completionHandler: nil)
         if !player.isPlaying { player.play() }
+    }
+
+    /// A personal best, in either game: the five start lights as five
+    /// rising beeps, resolving into a warm chord (approved take 2,
+    /// build/mockups/sounds/highscore/five-lights-2.wav).
+    func personalBest() {
+        start()
+        fanfare?.currentTime = 0
+        fanfare?.play()
     }
 
     /// Reaction recorded.

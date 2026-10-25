@@ -326,10 +326,11 @@ struct LightsOutView: View {
             submit(seconds)
             if personalBest {
                 ArcadeHaptics.finished(personalBest: true)
+                StartSounds.shared.personalBest()
             } else {
                 UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                StartSounds.shared.radioClick()
             }
-            StartSounds.shared.radioClick()
             phase = .result(seconds)
             showCelebration = true
         }

@@ -398,10 +398,10 @@ struct ReactionWallView: View {
 
     private func finish() {
         target = nil
-        StartSounds.shared.radioClick()
         let previous = best
         let personalBest = run.score > 0 && run.score > previous
         ArcadeHaptics.finished(personalBest: personalBest)
+        if personalBest { StartSounds.shared.personalBest() } else { StartSounds.shared.radioClick() }
         if personalBest { best = run.score }
         outcome = RunOutcome(personalBest: personalBest, previousBest: Double(previous))
         phase = .finished(run)
