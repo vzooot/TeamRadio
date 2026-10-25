@@ -166,9 +166,11 @@ struct GamesView: View {
                       onPicks: { showPicks = true }, onResult: { showResult = true })
             SectionTitle("ARCADE")
                 .id("arcade")
-            HStack(spacing: 12) {
-                ArcadeTile(kind: .wall, rank: model.wallBoard?.me?.rank) { showWall = true }
-                ArcadeTile(kind: .lightsOut, rank: model.lightsBoard?.me?.rank) { showLightsOut = true }
+            VStack(spacing: 12) {
+                ArcadeBanner(kind: .lightsOut, rank: model.lightsBoard?.me?.rank,
+                             players: model.lightsBoard?.total) { showLightsOut = true }
+                ArcadeBanner(kind: .wall, rank: model.wallBoard?.me?.rank,
+                             players: model.wallBoard?.total) { showWall = true }
             }
         }
     }
@@ -329,90 +331,80 @@ private struct SlantShape: Shape {
     }
 }
 
-/// Arcade tile: carbon with lights for the Reaction Wall, the photo for
-/// Lights Out; best score in LEDs and the weekly position.
-private struct ArcadeTile: View {
+
+/// One full-width banner per arcade game (approved draft A,
+/// build/mockups/games-banners.png): the game's art across it, title, best
+/// in LEDs and your place on the left, a glowing play button on the right.
+private struct ArcadeBanner: View {
     enum Kind { case lightsOut, wall }
     let kind: Kind
     let rank: Int?
+    let players: Int?
     let onPlay: () -> Void
     @AppStorage("wallBest") private var wallBest = 0
     @AppStorage("lightsOutBest") private var lightsBest: Double = 0
 
-    var body: some View {
-        Button(action: onPlay) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text(kind == .wall ? "TRAINING" : "REACTION TEST")
-                        .font(.f1(9, weight: .heavy)).tracking(1.5)
-                        .foregroundStyle(kind == .wall ? Theme.accent : Theme.live)
-                    Spacer()
-                    if kind == .wall, wallBest == 0 {
-                        Text("NEW").font(.f1(9, weight: .heavy)).foregroundStyle(Theme.onAccent)
-                            .padding(.horizontal, 6).padding(.vertical, 2)
-                            .background(Capsule().fill(Theme.accent))
-                    }
-                }
-                Spacer()
-                Text(kind == .wall ? "REACTION\nWALL" : "LIGHTS\nOUT")
-                    .font(.f1(21).italic())
-                    .foregroundStyle(Theme.chromeText)
-                    .lineSpacing(-4)
-                HStack(spacing: 8) {
-                    LEDText(text: best, pitch: 2.6,
-                            color: kind == .wall ? Theme.accent : Color(red: 1, green: 0.42, blue: 0.12))
-                    Text(caption)
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.8))
-                        .lineLimit(1)
-                }
-            }
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(height: 200)
-            .background {
-                ZStack {
-                    switch kind {
-                    case .lightsOut:
-                        Color.clear.overlay(Image("LightsOutHero").resizable().scaledToFill())
-                    case .wall:
-                        CarbonFiber()
-                        Grid(horizontalSpacing: 8, verticalSpacing: 8) {
-                            ForEach(0..<2, id: \.self) { r in
-                                GridRow {
-                                    ForEach(0..<3, id: \.self) { c in
-                                        WallPad(lit: r * 3 + c == 2 || r * 3 + c == 3, size: 30)
-                                    }
-                                }
-                            }
-                        }
-                        .offset(y: -22)
-                    }
-                    LinearGradient(colors: [.clear, Theme.background.opacity(0.92)], startPoint: .center, endPoint: .bottom)
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 20))
-                // The photo is wider than the tile: clipping hides the rest
-                // but it still caught taps over the neighbouring tile.
-                .allowsHitTesting(false)
-            }
-            .overlay(RoundedRectangle(cornerRadius: 20)
-                .strokeBorder(kind == .wall ? AnyShapeStyle(Theme.accent.opacity(0.6)) : AnyShapeStyle(Theme.glassStroke)))
-            .contentShape(RoundedRectangle(cornerRadius: 20))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(kind == .wall ? "Play Reaction Wall" : "Play Lights Out")
-    }
-
+    private var tint: Color { kind == .wall ? Theme.accent : Theme.live }
+    private var ledColor: Color { kind == .wall ? Theme.accent : Color(red: 1, green: 0.42, blue: 0.12) }
+    private var title: String { kind == .wall ? "REACTION WALL" : "LIGHTS OUT" }
+    private var kicker: String { kind == .wall ? "TRAINING · 60 SECONDS" : "REACTION TEST" }
     private var best: String {
-        switch kind {
-        case .wall: wallBest > 0 ? "\(wallBest)" : "--"
-        case .lightsOut: lightsBest > 0 ? String(format: "%.3f", lightsBest) : "-.---"
-        }
+        kind == .wall ? (wallBest > 0 ? "\(wallBest)" : "--") : (lightsBest > 0 ? String(format: "%.3f", lightsBest) : "-.---")
+    }
+    private var rankText: String { rank.map { "P\($0)" + (players.map { " OF \($0)" } ?? "") } ?? "NOT RANKED" }
+
+    var body: some View {
+        Button(action: onPlay) { cinematic }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Play \(title.capitalized)")
     }
 
-    private var caption: String {
-        let unit = kind == .wall ? "pts" : "best"
-        if let rank { return "\(unit) · P\(rank)" }
-        return kind == .wall ? (wallBest > 0 ? "your best" : "60 seconds") : (lightsBest > 0 ? "your best" : "beat 0.200")
+    private var cinematic: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(kicker).font(.f1(10, weight: .heavy)).tracking(1.5).foregroundStyle(tint)
+                Text(title).font(.f1(26).italic()).foregroundStyle(Theme.chromeText).lineLimit(1).minimumScaleFactor(0.7)
+                HStack(spacing: 8) {
+                    LEDText(text: best, pitch: 2.6, color: ledColor)
+                    Text("best · \(rankText.lowercased())").font(.system(size: 11, weight: .semibold)).foregroundStyle(.white.opacity(0.8))
+                }
+            }
+            Spacer()
+            Image(systemName: "play.fill")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 52, height: 52)
+                .background(Circle().fill(Color.black.opacity(0.5)))
+                .overlay(Circle().strokeBorder(tint, lineWidth: 2.5))
+                .shadow(color: tint.opacity(0.8), radius: 10)
+        }
+        .padding(16)
+        .frame(height: 118)
+        .background { art.overlay(LinearGradient(colors: [Theme.background.opacity(0.95), Theme.background.opacity(0.6), .clear],
+                                                 startPoint: .leading, endPoint: .trailing)) }
+        .clipShape(RoundedRectangle(cornerRadius: 22))
+        .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(tint.opacity(0.55), lineWidth: 1.2))
+        .shadow(color: tint.opacity(0.25), radius: 14)
+        .contentShape(RoundedRectangle(cornerRadius: 22))
+    }
+
+    @ViewBuilder
+    private var art: some View {
+        switch kind {
+        case .lightsOut:
+            Color.clear.overlay(Image("LightsOutHero").resizable().scaledToFill()).allowsHitTesting(false)
+        case .wall:
+            ZStack {
+                CarbonFiber()
+                Grid(horizontalSpacing: 8, verticalSpacing: 8) {
+                    ForEach(0..<2, id: \.self) { r in
+                        GridRow { ForEach(0..<2, id: \.self) { c in WallPad(lit: r != c, size: 22) } }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .padding(.trailing, 82)
+            }
+            .allowsHitTesting(false)
+        }
     }
 }

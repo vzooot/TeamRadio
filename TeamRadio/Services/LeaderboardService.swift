@@ -114,8 +114,11 @@ enum LeaderboardService {
         #if DEBUG
         if UserDefaults.standard.bool(forKey: "DemoArcade") {
             let rows = BoardDraftData.rows.prefix(limit ?? 20)
+            // with -WallPhase <points>, that run is the player's week
+            let run = Int(UserDefaults.standard.string(forKey: "WallPhase") ?? "")
+            let mine = run.map { points in BoardDraftData.rows.filter { 96 - $0.rank * 2 > points }.count + 1 } ?? 17
             return WallBoard(total: 48, top: rows.map { .init(userId: $0.me ? (user ?? "me") : $0.name, name: $0.name, score: 96 - $0.rank * 2, rank: $0.rank) },
-                             me: .init(name: "You", score: 62, rank: 17))
+                             me: .init(name: "You", score: run ?? 62, rank: mine))
         }
         #endif
         var components = URLComponents(url: base.appending(path: "wall"), resolvingAgainstBaseURL: false)!
