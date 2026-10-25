@@ -27,9 +27,6 @@ struct LightsOutView: View {
     @State private var board: LeaderboardService.ReactionBoard?
     @State private var boardLoaded = false
     @State private var showFullBoard = false
-    /// The start screen's status height, kept through the run so the
-    /// lights never move.
-    @State private var statusHeight: CGFloat = 0
     @State private var userId: String?
 
     private static let appStore = URL(string: "https://apps.apple.com/app/id6804406860")!
@@ -42,15 +39,16 @@ struct LightsOutView: View {
                 .ignoresSafeArea()
                 .animation(.easeOut(duration: 0.15), value: litCount)
 
-            VStack(spacing: 22) {
+            // Nothing moves or disappears during a run: the lights at their
+            // full size, one status line, the week's board (also after a
+            // jump start), the start button.
+            VStack(spacing: 14) {
                 header
-                Spacer(minLength: 0)
-                // the lights keep their full size; the rest makes room
                 gantry
-                    .layoutPriority(1)
+                    .fixedSize(horizontal: false, vertical: true)
                 status
-                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { if case .ready = phase { statusHeight = $0 } }
-                    .frame(minHeight: statusHeight, alignment: .top)
+                    .frame(height: 64)
+                weeklyBoard
                 Spacer(minLength: 0)
                 controls
             }
@@ -68,6 +66,12 @@ struct LightsOutView: View {
             if UserDefaults.standard.bool(forKey: "LightsOutAutoStart") { start() }
             // -ShowFullBoard YES: opens the full board, for screenshots
             if UserDefaults.standard.bool(forKey: "ShowFullBoard") { showFullBoard = true }
+            // -LightsOutPhase jump|0.234: shows that end of a run, for screenshots
+            switch UserDefaults.standard.string(forKey: "LightsOutPhase") {
+            case "jump"?: phase = .jumpStart
+            case let value?: if let seconds = Double(value) { phase = .result(seconds) }
+            case nil: break
+            }
             #endif
             userId = await ChatService.currentUserId()
             if let userId { await LeaderboardService.syncBests(user: userId) }
@@ -140,51 +144,41 @@ struct LightsOutView: View {
     private var status: some View {
         switch phase {
         case .ready:
-            VStack(spacing: 18) {
-                prompt("HOLD TO START", sub: "The lights come on while you hold. Let go the moment they go out.")
-                weeklyBoard
-            }
+            prompt("HOLD TO START", sub: "Let go the moment the lights go out.")
         case .lighting, .holding:
             prompt("HOLD IT…", sub: "Don't let go before lights out.")
         case .go:
             prompt("LET GO!", sub: " ", color: Theme.accent)
         case .jumpStart:
-            prompt("JUMP START", sub: "You let go too early. Drive-through penalty.", color: Theme.live)
+            prompt("JUMP START", sub: "You let go too early. Hold to try again.", color: Theme.live)
         case .result(let seconds):
-            VStack(spacing: 8) {
+            VStack(spacing: 6) {
                 Text(Self.verdict(seconds))
-                    .font(.f1(18).italic())
+                    .font(.f1(22).italic())
                     .foregroundStyle(.white)
-                Text(seconds <= best ? "NEW PERSONAL BEST" : String(format: "Personal best %.3f · F1 drivers ≈ 0.200", best))
+                Text(seconds <= best ? "NEW PERSONAL BEST" : String(format: "PERSONAL BEST %.3f · F1 DRIVERS ≈ 0.200", best))
                     .font(.f1(11, weight: .bold))
                     .tracking(1.5)
                     .foregroundStyle(seconds <= best ? Color(red: 1, green: 0.75, blue: 0.2) : Theme.dimText)
-                if let me = board?.me, let total = board?.total {
-                    Text("THIS WEEK: #\(me.rank) OF \(total) · BEST \(String(format: "%.3f", Double(me.ms) / 1000))")
-                        .font(.f1(11, weight: .bold))
-                        .tracking(1.5)
-                        .foregroundStyle(Theme.accent)
-                }
             }
         }
     }
 
     private func prompt(_ title: String, sub: String, color: Color = .white) -> some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 6) {
             Text(title)
-                .font(.f1(30).italic())
+                .font(.f1(24).italic())
                 .foregroundStyle(color)
             Text(sub)
                 .font(.system(size: 14))
                 .foregroundStyle(Theme.dimText)
                 .multilineTextAlignment(.center)
         }
-        .frame(minHeight: 90)
     }
 
-    /// The brake pedal while a start is possible; after a run, START AGAIN
-    /// (and sharing a good time). Only the pedal reacts to holding, so a
-    /// stray touch elsewhere can't launch or end a run.
+    /// The start button: hold to start, and after a run hold START AGAIN
+    /// (sharing a good time beside it). Only the button reacts to holding,
+    /// so a stray touch elsewhere can't launch or end a run.
     @ViewBuilder
     private var controls: some View {
         StartButton(title: startTitle, pressed: fingerDown)
