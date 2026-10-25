@@ -64,6 +64,7 @@ final class GamesModel {
     }
 
     func loadArcadeBoards() async {
+        if let userId { await LeaderboardService.syncBests(user: userId) }
         async let wall = LeaderboardService.wall(user: userId, name: nil, score: nil)
         async let lights = LeaderboardService.reaction(user: userId, name: nil, ms: nil)
         (wallBoard, lightsBoard) = await (wall, lights)

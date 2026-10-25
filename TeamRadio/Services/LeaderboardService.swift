@@ -109,6 +109,36 @@ enum LeaderboardService {
         return try? JSONDecoder().decode(WallBoard.self, from: data)
     }
 
+    private struct Bests: Decodable {
+        let lights: Int?   // ms
+        let wall: Int?
+    }
+
+    /// Personal bests live on the phone and on the server, so a new phone
+    /// or a reinstall keeps them: the better of the two wins on both sides.
+    static func syncBests(user: String) async {
+        let defaults = UserDefaults.standard
+        let lights = defaults.double(forKey: "lightsOutBest")   // seconds
+        let wall = defaults.integer(forKey: "wallBest")
+        let localMs = lights > 0 ? Int((lights * 1000).rounded()) : nil
+        var body: [String: Any] = ["user": user]
+        if let localMs { body["lights"] = localMs }
+        if wall > 0 { body["wall"] = wall }
+        var components = URLComponents(url: base.appending(path: "best"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "env", value: environment)]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 10
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        guard let (data, _) = try? await URLSession.shared.data(for: request),
+              let server = try? JSONDecoder().decode(Bests.self, from: data) else { return }
+        await MainActor.run {
+            if let ms = server.lights, ms < localMs ?? .max { UserDefaults.standard.set(Double(ms) / 1000, forKey: "lightsOutBest") }
+            if let points = server.wall, points > wall { UserDefaults.standard.set(points, forKey: "wallBest") }
+        }
+    }
+
     struct PlayerPicks: Decodable, Equatable {
         struct Item: Decodable, Equatable, Identifiable {
             let kind: String

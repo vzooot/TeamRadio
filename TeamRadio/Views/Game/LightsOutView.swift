@@ -59,6 +59,7 @@ struct LightsOutView: View {
             if UserDefaults.standard.bool(forKey: "LightsOutAutoStart") { start() }
             #endif
             userId = await ChatService.currentUserId()
+            if let userId { await LeaderboardService.syncBests(user: userId) }
             board = await LeaderboardService.reaction(user: userId, name: nil, ms: nil)
         }
     }

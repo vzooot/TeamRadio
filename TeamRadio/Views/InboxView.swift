@@ -170,6 +170,25 @@ struct DMThreadView: View {
                             .foregroundStyle(Theme.faintText)
                             .multilineTextAlignment(.center)
                             .padding(.vertical, 8)
+                        if model.canLoadOlder {
+                            Button {
+                                Task { await model.loadOlder() }
+                            } label: {
+                                HStack(spacing: 6) {
+                                    if model.isLoadingOlder {
+                                        ProgressView().tint(Theme.dimText)
+                                    }
+                                    Text("LOAD EARLIER MESSAGES")
+                                        .font(.f1(11, weight: .bold))
+                                        .tracking(1)
+                                }
+                                .foregroundStyle(Theme.dimText)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(model.isLoadingOlder)
+                        }
                         ForEach(model.messages) { message in
                             bubble(message)
                                 .id(message.id)

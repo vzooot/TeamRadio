@@ -85,6 +85,7 @@ struct ReactionWallView: View {
             if UserDefaults.standard.bool(forKey: "WallDemo") { autoplay() }
             #endif
             userId = await ChatService.currentUserId()
+            if let userId { await LeaderboardService.syncBests(user: userId) }
             board = await LeaderboardService.wall(user: userId, name: nil, score: nil)
         }
     }
