@@ -1,7 +1,9 @@
 import AVFoundation
 
-/// Short synthesized tones for Lights Out: a beep for each light, a soft
-/// two-note "uh-oh" for a jump start, and the app's radio key click on a good start.
+/// The arcade games' sounds: a beep for each light, a soft "uh-oh" for a
+/// jump start, a soft pop for each Reaction Wall hit, the radio key click
+/// on a better run, "oh-oh" on a worse one, and the five-lights fanfare on a
+/// personal best.
 /// Ambient session, so the silent switch mutes them like any game sound.
 @MainActor
 final class StartSounds {
@@ -11,7 +13,23 @@ final class StartSounds {
     private let player = AVAudioPlayerNode()
     private let format = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1)!
     private var click: AVAudioPlayer?
+    private var fanfare: AVAudioPlayer?
+    private var ohOhSound: AVAudioPlayer?
+    /// Taps go through the engine on their own node: no player start-up
+    /// delay, and a new tap cuts the last one off.
+    private let tapPlayer = AVAudioPlayerNode()
+    private var tapBuffer: AVAudioPCMBuffer?
+    private var tapRedBuffer: AVAudioPCMBuffer?
     private var started = false
+
+    /// A bundled .caf, read into a buffer for the engine.
+    private func load(_ name: String) -> AVAudioPCMBuffer? {
+        guard let url = Bundle.main.url(forResource: name, withExtension: "caf"),
+              let file = try? AVAudioFile(forReading: url),
+              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(file.length)),
+              (try? file.read(into: buffer)) != nil else { return nil }
+        return buffer
+    }
 
     private func start() {
         guard !started else { return }
@@ -19,10 +37,22 @@ final class StartSounds {
         try? AVAudioSession.sharedInstance().setActive(true)
         engine.attach(player)
         engine.connect(player, to: engine.mainMixerNode, format: format)
+        engine.attach(tapPlayer)
+        engine.connect(tapPlayer, to: engine.mainMixerNode, format: format)
+        tapBuffer = load("tap")
+        tapRedBuffer = load("tap-red")
         try? engine.start()
         if let url = Bundle.main.url(forResource: "radio-key", withExtension: "caf") {
             click = try? AVAudioPlayer(contentsOf: url)
             click?.prepareToPlay()
+        }
+        if let url = Bundle.main.url(forResource: "personal-best", withExtension: "caf") {
+            fanfare = try? AVAudioPlayer(contentsOf: url)
+            fanfare?.prepareToPlay()
+        }
+        if let url = Bundle.main.url(forResource: "oh-oh", withExtension: "caf") {
+            ohOhSound = try? AVAudioPlayer(contentsOf: url)
+            ohOhSound?.prepareToPlay()
         }
         started = true
     }
@@ -57,6 +87,33 @@ final class StartSounds {
         for i in 0..<fade { data[total - 1 - i] *= Float(i) / Float(fade) }
         player.scheduleBuffer(buffer, completionHandler: nil)
         if !player.isPlaying { player.play() }
+    }
+
+    /// A Reaction Wall hit: a soft little bubble pop, like a rubber button
+    /// (build/mockups/sounds/wall/tap-soft-2-bubble.wav); a red light, two
+    /// bubbles at once, a soft "pling" (red-C-pling.wav).
+    func tap(red: Bool = false) {
+        start()
+        guard let buffer = red ? tapRedBuffer : tapBuffer else { return }
+        tapPlayer.scheduleBuffer(buffer, at: nil, options: .interrupts, completionHandler: nil)
+        if !tapPlayer.isPlaying { tapPlayer.play() }
+    }
+
+    /// A run that beat neither your best nor your week: a soft, muffled
+    /// "bwomp" (approved, build/mockups/sounds/wall/worse-2-bwomp.wav).
+    func ohOh() {
+        start()
+        ohOhSound?.currentTime = 0
+        ohOhSound?.play()
+    }
+
+    /// A personal best, in either game: the five start lights as five
+    /// rising beeps, resolving into a warm chord (approved take 2,
+    /// build/mockups/sounds/highscore/five-lights-2.wav).
+    func personalBest() {
+        start()
+        fanfare?.currentTime = 0
+        fanfare?.play()
     }
 
     /// Reaction recorded.

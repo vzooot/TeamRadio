@@ -101,6 +101,7 @@ struct ReactionWallView: View {
             // during the presentation made the slide stutter.
             try? await Task.sleep(for: .milliseconds(450))
             StartSounds.shared.prepare()
+            ArcadeHaptics.prepare()
             #if DEBUG
             // -WallDemo YES: starts and plays itself, for screenshots and videos
             if UserDefaults.standard.bool(forKey: "WallDemo") { autoplay() }
@@ -397,10 +398,18 @@ struct ReactionWallView: View {
 
     private func finish() {
         target = nil
-        StartSounds.shared.radioClick()
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
         let previous = best
         let personalBest = run.score > 0 && run.score > previous
+        ArcadeHaptics.finished(personalBest: personalBest)
+        // Fanfare for a best, the radio click for a better week, oh-oh for a worse run.
+        let betterWeek = board?.me.map { run.score > $0.score } ?? (run.score > 0)
+        if personalBest {
+            StartSounds.shared.personalBest()
+        } else if betterWeek {
+            StartSounds.shared.radioClick()
+        } else {
+            StartSounds.shared.ohOh()
+        }
         if personalBest { best = run.score }
         outcome = RunOutcome(personalBest: personalBest, previousBest: Double(previous))
         phase = .finished(run)
@@ -445,7 +454,8 @@ struct ReactionWallView: View {
             run.hits += 1
             run.score += lit.double ? 2 : 1
             run.reactions.append(CACurrentMediaTime() - lit.litAt)
-            UIImpactFeedbackGenerator(style: lit.double ? .heavy : .light).impactOccurred()
+            ArcadeHaptics.hit(double: lit.double)
+            StartSounds.shared.tap(red: lit.double)
             flash = pad
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(120))
@@ -454,7 +464,7 @@ struct ReactionWallView: View {
             next()
         } else {
             run.misses += 1
-            UIImpactFeedbackGenerator(style: .rigid).impactOccurred(intensity: 0.5)
+            ArcadeHaptics.miss()
         }
     }
 

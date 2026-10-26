@@ -192,37 +192,27 @@ struct GamesView: View {
 
 // MARK: - Pieces
 
-/// The player's season standing as the leaderboard itself (approved draft
-/// C, Marketing/drafts/2026-10-13/leaderboard-A-B-C.png): a slanted
-/// position tag, points and the score against the AI Strategist, then the
-/// players just above and below in timing-tower lines, and one link to the
-/// full leaderboard (season, last round and leagues).
+/// The player's season standing (approved: the medallion with draft A,
+/// build/mockups/season-tags.png + season-card.png): your position in a
+/// glowing medallion, points and the gap to the leader on one line, then
+/// you against the AI Strategist as a tug of war that says who leads by how
+/// much, and one link to the full leaderboard (season, last round, leagues).
 private struct RankBoard: View {
     let board: LeaderboardService.Board?
     let onOpen: () -> Void
 
-    private var leader: Int { board?.top.first?.points ?? 0 }
-
-    /// The player with their neighbours; the top three until they're ranked.
-    private var lines: [LeaderboardService.Entry] {
-        guard let board else { return [] }
-        guard let me = board.me else { return Array(board.top.prefix(3)) }
-        let window = me.rank == 1 ? 1...3 : (me.rank - 1)...(me.rank + 1)
-        let around = board.top.filter { window.contains($0.rank) }
-        return around.isEmpty ? Array(board.top.prefix(1)) : around
-    }
-
     var body: some View {
         VStack(spacing: 0) {
-            Button(action: onOpen) { summary }
-                .buttonStyle(.plain)
-            if !lines.isEmpty {
-                Divider().overlay(Color.white.opacity(0.08))
-                ForEach(lines) { entry in
-                    Button(action: onOpen) { line(entry) }
-                        .buttonStyle(.plain)
+            Button(action: onOpen) {
+                VStack(spacing: 12) {
+                    standing
+                    if let ai = board?.strategist { duel(ai: ai.points) }
                 }
+                .padding(.horizontal, 14)
+                .padding(.top, 14)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
             // One way in: the leaderboard switches between the season, the
             // last round and the player's leagues itself.
             link("list.number", "FULL LEADERBOARD", action: onOpen)
@@ -233,75 +223,85 @@ private struct RankBoard: View {
         .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Theme.glassStroke))
     }
 
-    private var summary: some View {
-        HStack(spacing: 0) {
-            Text(board?.me.map { "P\($0.rank)" } ?? "P–")
-                .font(.f1(30).italic())
-                .foregroundStyle(Theme.onAccent)
-                .padding(.leading, 16)
-                .padding(.trailing, 24)
-                .frame(height: 64)
-                .background(SlantShape().fill(Theme.accentGradient))
-            VStack(alignment: .leading, spacing: 2) {
+    /// Your position in the neon ring of the Lights Out start button, your
+    /// points beside it.
+    private var standing: some View {
+        HStack(spacing: 16) {
+            ZStack {
+                Circle().fill(RadialGradient(colors: [Color(white: 0.16), Color(white: 0.04)], center: .top, startRadius: 0, endRadius: 80))
+                Circle().strokeBorder(Theme.accent, lineWidth: 4)
+                    .shadow(color: Theme.accent.opacity(0.9), radius: 6)
+                    .shadow(color: Theme.accent.opacity(0.5), radius: 14)
+                Circle().strokeBorder(.white.opacity(0.08), lineWidth: 1).padding(9)
+                Text(board?.me.map { "P\($0.rank)" } ?? "P–")
+                    .font(.f1(26).italic())
+                    .foregroundStyle(Theme.chromeText)
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
+                    .padding(12)
+            }
+            .frame(width: 86, height: 86)
+            .opacity(board?.me == nil ? 0.5 : 1)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("SEASON").font(.f1(11, weight: .bold)).tracking(2).foregroundStyle(Color.white.opacity(0.7))
                 if let me = board?.me, let total = board?.total {
-                    Text("OF \(total) \(total == 1 ? "PLAYER" : "PLAYERS") · SEASON")
-                        .font(.f1(10, weight: .heavy)).tracking(1.5).foregroundStyle(Theme.dimText)
-                    Text("\(me.points) PTS").font(.f1Digits(22)).foregroundStyle(.white)
+                    Text("\(me.points) PTS").font(.f1Digits(28)).foregroundStyle(Theme.chromeText)
+                    Text(gapLine(me: me, total: total))
+                        .font(.f1(10, weight: .heavy)).tracking(1.2).foregroundStyle(Theme.dimText)
+                        .lineLimit(1).minimumScaleFactor(0.8)
                 } else {
-                    Text("NOT RANKED YET").font(.f1(10, weight: .heavy)).tracking(1.5).foregroundStyle(Theme.dimText)
-                    Text("Make your picks").font(.system(size: 15, weight: .semibold)).foregroundStyle(.white)
+                    Text("NOT RANKED YET").font(.f1Digits(20)).foregroundStyle(Theme.chromeText)
+                    Text("MAKE YOUR PICKS").font(.f1(10, weight: .heavy)).tracking(1.2).foregroundStyle(Theme.dimText)
                 }
             }
-            .padding(.leading, 8)
-            Spacer(minLength: 4)
-            if let ai = board?.strategist {
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("VS AI").font(.f1(10, weight: .heavy)).tracking(1.5).foregroundStyle(Theme.dimText)
-                    HStack(spacing: 4) {
-                        Text("\(board?.me?.points ?? 0)").font(.f1Digits(20)).foregroundStyle(Theme.accent)
-                        Text("–").foregroundStyle(Theme.dimText)
-                        Text("\(ai.points)").font(.f1Digits(20)).foregroundStyle(Theme.violet)
-                    }
-                }
-                .padding(.trailing, 16)
-            }
+            Spacer(minLength: 0)
         }
-        .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
     }
 
-    /// Timing-tower line: boxed position, a tick, name, gap to the leader.
-    private func line(_ entry: LeaderboardService.Entry) -> some View {
-        let isMe = entry.userId == board?.me?.userId
-        return HStack(spacing: 10) {
-            Text("\(entry.rank)")
-                .font(.f1Digits(15))
-                .foregroundStyle(entry.rank <= 3 ? Theme.onAccent : .white)
-                .frame(width: 30, height: 26)
-                .background(RoundedRectangle(cornerRadius: 6).fill(Self.positionFill(entry.rank)))
-            Rectangle().fill(isMe ? Theme.accent : Color.white.opacity(0.25)).frame(width: 3, height: 20)
-            Text(isMe ? "YOU" : entry.name.uppercased())
-                .font(.f1(14).italic())
-                .foregroundStyle(isMe ? Theme.accent : .white)
-                .lineLimit(1)
-            Spacer()
-            Text(entry.rank == 1 ? "\(entry.points) PTS" : "+\(leader - entry.points)")
-                .font(.f1Digits(14))
-                .foregroundStyle(entry.rank == 1 ? .white : Theme.dimText)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 7)
-        .background(isMe ? Theme.accent.opacity(0.12) : .clear)
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
+    /// A glowing neon tube: a bright core fading into its colour.
+    private func neonTube(_ tint: Color) -> some View {
+        Capsule()
+            .fill(LinearGradient(colors: [.white.opacity(0.9), tint, tint.opacity(0.8)], startPoint: .top, endPoint: .bottom))
+            .shadow(color: tint.opacity(0.9), radius: 6)
+            .shadow(color: tint.opacity(0.4), radius: 12)
     }
 
-    private static func positionFill(_ rank: Int) -> AnyShapeStyle {
-        switch rank {
-        case 1: AnyShapeStyle(Color(red: 1, green: 0.78, blue: 0.25))
-        case 2, 3: AnyShapeStyle(Color.white.opacity(0.85))
-        default: AnyShapeStyle(Color.white.opacity(0.08))
+    /// "Only player so far", "Leading 340 players", "Of 340 players · 42 behind P1".
+    private func gapLine(me: LeaderboardService.Me, total: Int) -> String {
+        if total == 1 { return "ONLY PLAYER SO FAR · SEASON" }
+        if me.rank == 1 { return "LEADING \(total) PLAYERS · SEASON" }
+        let behind = (board?.top.first?.points ?? me.points) - me.points
+        return "OF \(total) PLAYERS · \(behind) BEHIND P1"
+    }
+
+    /// You against the AI Strategist: a bar pushed by each side's points,
+    /// with who leads, and by how much, in words.
+    private func duel(ai: Int) -> some View {
+        let you = board?.me?.points ?? 0
+        return VStack(spacing: 6) {
+            HStack {
+                Text("YOU \(you)").font(.f1(12, weight: .heavy)).foregroundStyle(Theme.accent)
+                Spacer()
+                Text(you == ai ? "LEVEL WITH THE AI" : you > ai ? "YOU LEAD BY \(you - ai)" : "AI LEADS BY \(ai - you)")
+                    .font(.f1(10, weight: .heavy)).tracking(1).foregroundStyle(.white.opacity(0.8))
+                Spacer()
+                Text("\(ai) AI").font(.f1(12, weight: .heavy)).foregroundStyle(Theme.violet)
+            }
+            GeometryReader { geo in
+                let share = you + ai == 0 ? 0.5 : CGFloat(you) / CGFloat(you + ai)
+                HStack(spacing: 3) {
+                    neonTube(Theme.accent)
+                        .frame(width: min(max(10, (geo.size.width - 3) * share), geo.size.width - 12))
+                    neonTube(Theme.violet)
+                }
+            }
+            .frame(height: 10)
         }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.04)))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("You \(you) points, AI Strategist \(ai) points")
     }
 
     private func link(_ icon: String, _ title: String, action: @escaping () -> Void) -> some View {
@@ -316,18 +316,6 @@ private struct RankBoard: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-    }
-}
-
-private struct SlantShape: Shape {
-    func path(in r: CGRect) -> Path {
-        Path { p in
-            p.move(to: .zero)
-            p.addLine(to: CGPoint(x: r.maxX, y: 0))
-            p.addLine(to: CGPoint(x: r.maxX - 14, y: r.maxY))
-            p.addLine(to: CGPoint(x: 0, y: r.maxY))
-            p.closeSubpath()
-        }
     }
 }
 

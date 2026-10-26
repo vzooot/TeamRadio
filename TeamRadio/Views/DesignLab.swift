@@ -48,6 +48,12 @@ struct DesignLab: View {
             case "reactMenu": ReactionsDraft(style: .pill, pressed: true)
             case "reactLive": ReactionsLive()
             case "arcadeFull": BoardDraftFull()
+            case "seasonTags": SeasonTagDrafts()
+            case "seasonFuture": SeasonFutureDrafts()
+            case "seasonCockpit": SeasonCockpitDrafts()
+            case "seasonA": SeasonCardDrafts(style: "A")
+            case "seasonB": SeasonCardDrafts(style: "B")
+            case "seasonC": SeasonCardDrafts(style: "C")
             default: Text("unknown draft \(id)").foregroundStyle(.white)
             }
         }
