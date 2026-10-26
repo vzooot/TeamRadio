@@ -223,33 +223,48 @@ private struct RankBoard: View {
         .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Theme.glassStroke))
     }
 
+    /// Your position in the neon ring of the Lights Out start button, your
+    /// points beside it.
     private var standing: some View {
-        HStack(spacing: 14) {
-            Text(board?.me.map { "P\($0.rank)" } ?? "P–")
-                .font(.f1(board?.me.map { $0.rank > 99 } == true ? 20 : 26).italic())
-                .foregroundStyle(Theme.onAccent)
-                .minimumScaleFactor(0.6)
-                .lineLimit(1)
-                .padding(6)
-                .frame(width: 66, height: 66)
-                .background(Circle().fill(Theme.accentGradient))
-                .overlay(Circle().strokeBorder(.white.opacity(0.5), lineWidth: 1.5).padding(3))
-                .shadow(color: Theme.accent.opacity(0.6), radius: 10)
-                .opacity(board?.me == nil ? 0.5 : 1)
-            VStack(alignment: .leading, spacing: 3) {
+        HStack(spacing: 16) {
+            ZStack {
+                Circle().fill(RadialGradient(colors: [Color(white: 0.16), Color(white: 0.04)], center: .top, startRadius: 0, endRadius: 80))
+                Circle().strokeBorder(Theme.accent, lineWidth: 4)
+                    .shadow(color: Theme.accent.opacity(0.9), radius: 6)
+                    .shadow(color: Theme.accent.opacity(0.5), radius: 14)
+                Circle().strokeBorder(.white.opacity(0.08), lineWidth: 1).padding(9)
+                Text(board?.me.map { "P\($0.rank)" } ?? "P–")
+                    .font(.f1(26).italic())
+                    .foregroundStyle(Theme.chromeText)
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
+                    .padding(12)
+            }
+            .frame(width: 86, height: 86)
+            .opacity(board?.me == nil ? 0.5 : 1)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("SEASON").font(.f1(11, weight: .bold)).tracking(2).foregroundStyle(Color.white.opacity(0.7))
                 if let me = board?.me, let total = board?.total {
-                    Text("\(me.points) PTS").font(.f1Digits(22)).foregroundStyle(.white)
+                    Text("\(me.points) PTS").font(.f1Digits(28)).foregroundStyle(Theme.chromeText)
                     Text(gapLine(me: me, total: total))
-                        .font(.f1(10, weight: .heavy)).tracking(1).foregroundStyle(Theme.dimText)
+                        .font(.f1(10, weight: .heavy)).tracking(1.2).foregroundStyle(Theme.dimText)
                         .lineLimit(1).minimumScaleFactor(0.8)
                 } else {
-                    Text("NOT RANKED YET").font(.f1(10, weight: .heavy)).tracking(1.5).foregroundStyle(Theme.dimText)
-                    Text("Make your picks").font(.system(size: 15, weight: .semibold)).foregroundStyle(.white)
+                    Text("NOT RANKED YET").font(.f1Digits(20)).foregroundStyle(Theme.chromeText)
+                    Text("MAKE YOUR PICKS").font(.f1(10, weight: .heavy)).tracking(1.2).foregroundStyle(Theme.dimText)
                 }
             }
             Spacer(minLength: 0)
         }
         .accessibilityElement(children: .combine)
+    }
+
+    /// A glowing neon tube: a bright core fading into its colour.
+    private func neonTube(_ tint: Color) -> some View {
+        Capsule()
+            .fill(LinearGradient(colors: [.white.opacity(0.9), tint, tint.opacity(0.8)], startPoint: .top, endPoint: .bottom))
+            .shadow(color: tint.opacity(0.9), radius: 6)
+            .shadow(color: tint.opacity(0.4), radius: 12)
     }
 
     /// "Only player so far", "Leading 340 players", "Of 340 players · 42 behind P1".
@@ -275,12 +290,10 @@ private struct RankBoard: View {
             }
             GeometryReader { geo in
                 let share = you + ai == 0 ? 0.5 : CGFloat(you) / CGFloat(you + ai)
-                HStack(spacing: 2) {
-                    Capsule().fill(Theme.accent)
-                        .frame(width: min(max(8, (geo.size.width - 2) * share), geo.size.width - 10))
-                        .shadow(color: Theme.accent.opacity(0.7), radius: 5)
-                    Capsule().fill(Theme.violet)
-                        .shadow(color: Theme.violet.opacity(0.7), radius: 5)
+                HStack(spacing: 3) {
+                    neonTube(Theme.accent)
+                        .frame(width: min(max(10, (geo.size.width - 3) * share), geo.size.width - 12))
+                    neonTube(Theme.violet)
                 }
             }
             .frame(height: 10)

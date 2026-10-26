@@ -49,6 +49,8 @@ struct DesignLab: View {
             case "reactLive": ReactionsLive()
             case "arcadeFull": BoardDraftFull()
             case "seasonTags": SeasonTagDrafts()
+            case "seasonFuture": SeasonFutureDrafts()
+            case "seasonCockpit": SeasonCockpitDrafts()
             case "seasonA": SeasonCardDrafts(style: "A")
             case "seasonB": SeasonCardDrafts(style: "B")
             case "seasonC": SeasonCardDrafts(style: "C")

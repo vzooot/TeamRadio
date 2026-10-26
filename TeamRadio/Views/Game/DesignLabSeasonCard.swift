@@ -1,6 +1,382 @@
 #if DEBUG
 import SwiftUI
 
+/// `-DesignLab seasonCockpit`: three season cards built from the countdown
+/// screen's own parts (carbon panel with the trio glow, neon tiles, LED
+/// lettering, the neon ring), each keeping the you-vs-AI bar.
+struct SeasonCockpitDrafts: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                // -DesignPage 2: only C, which runs off the first screen
+                ForEach(UserDefaults.standard.integer(forKey: "DesignPage") == 2 ? ["C · NEON RING"]
+                        : ["A · NEON TILES", "B · LED BOARD", "C · NEON RING"], id: \.self) { title in
+                    Text(title).font(.f1(11, weight: .heavy)).tracking(2).foregroundStyle(Theme.accent)
+                    CockpitCard(style: String(title.prefix(1)), c: .alone)
+                    CockpitCard(style: String(title.prefix(1)), c: .busy)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 40)
+        }
+    }
+}
+
+private struct CockpitCard: View {
+    let style: String
+    let c: FutureCase
+
+    var body: some View {
+        VStack(spacing: 14) {
+            switch style {
+            case "B": board
+            case "C": ring
+            default: tiles
+            }
+            tug
+        }
+        .padding(16)
+        .background(
+            CarbonFiber()
+                .clipShape(RoundedRectangle(cornerRadius: 22))
+                .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(Theme.glassStroke, lineWidth: 1))
+                .trioGlow(cornerRadius: 22)
+        )
+    }
+
+    private var header: some View {
+        HStack {
+            Text("SEASON").font(.f1(11, weight: .bold)).tracking(2).foregroundStyle(Color.white.opacity(0.7))
+            Spacer()
+            Text(c.total == 1 ? "ONLY PLAYER SO FAR" : c.rank == 1 ? "LEADING \(c.total)" : "\(c.behind) BEHIND P1 · OF \(c.total)")
+                .font(.f1(10, weight: .heavy)).tracking(1.2).foregroundStyle(Theme.dimText)
+        }
+    }
+
+    // A: the countdown's neon tiles: position, points, and the duel gap.
+    private var tiles: some View {
+        VStack(spacing: 10) {
+            header
+            HStack(spacing: 10) {
+                StatTile(text: "P\(c.rank)", label: "POSITION", tint: Theme.accent)
+                StatTile(text: "\(c.points)", label: "POINTS", tint: Theme.accent)
+                StatTile(text: c.points >= c.ai ? "+\(c.points - c.ai)" : "−\(c.ai - c.points)", label: "VS AI", tint: Theme.violet)
+            }
+        }
+    }
+
+    // B: the countdown's LED board, lettering your standing in amber.
+    private var board: some View {
+        VStack(spacing: 10) {
+            header
+            HStack(spacing: 16) {
+                LEDText(text: "P\(c.rank)", pitch: 5, color: Color(red: 1, green: 0.42, blue: 0.12))
+                Rectangle().fill(Color.white.opacity(0.12)).frame(width: 1, height: 40)
+                LEDText(text: "\(c.points)", pitch: 5, color: Theme.accent)
+                Text("PTS").font(.f1(11, weight: .bold)).tracking(2).foregroundStyle(Color.white.opacity(0.7))
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 12)
+            .background(RoundedRectangle(cornerRadius: 14).fill(Color.black.opacity(0.55)))
+            .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.white.opacity(0.08)))
+        }
+    }
+
+    // C: your position in the neon ring of the Lights Out start button.
+    private var ring: some View {
+        HStack(spacing: 16) {
+            ZStack {
+                Circle().fill(RadialGradient(colors: [Color(white: 0.16), Color(white: 0.04)], center: .top, startRadius: 0, endRadius: 80))
+                Circle().strokeBorder(Theme.accent, lineWidth: 4)
+                    .shadow(color: Theme.accent.opacity(0.9), radius: 6)
+                    .shadow(color: Theme.accent.opacity(0.5), radius: 14)
+                Circle().strokeBorder(.white.opacity(0.08), lineWidth: 1).padding(9)
+                Text("P\(c.rank)").font(.f1(26).italic()).foregroundStyle(Theme.chromeText).minimumScaleFactor(0.6).padding(10)
+            }
+            .frame(width: 86, height: 86)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("SEASON").font(.f1(11, weight: .bold)).tracking(2).foregroundStyle(Color.white.opacity(0.7))
+                Text("\(c.points) PTS").font(.f1Digits(28)).foregroundStyle(Theme.chromeText)
+                Text(c.total == 1 ? "ONLY PLAYER SO FAR" : c.rank == 1 ? "LEADING \(c.total) PLAYERS" : "OF \(c.total) · \(c.behind) BEHIND P1")
+                    .font(.f1(10, weight: .heavy)).tracking(1.2).foregroundStyle(Theme.dimText)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    /// The you-vs-AI bar, as two neon tubes meeting.
+    private var tug: some View {
+        VStack(spacing: 6) {
+            HStack {
+                Text("YOU \(c.points)").font(.f1(12, weight: .heavy)).foregroundStyle(Theme.accent)
+                Spacer()
+                Text(c.points == c.ai ? "LEVEL WITH THE AI" : c.points > c.ai ? "YOU LEAD BY \(c.points - c.ai)" : "AI LEADS BY \(c.ai - c.points)")
+                    .font(.f1(10, weight: .heavy)).tracking(1).foregroundStyle(.white.opacity(0.8))
+                Spacer()
+                Text("\(c.ai) AI").font(.f1(12, weight: .heavy)).foregroundStyle(Theme.violet)
+            }
+            GeometryReader { geo in
+                let share = CGFloat(c.points) / CGFloat(max(1, c.points + c.ai))
+                HStack(spacing: 3) {
+                    tube(Theme.accent).frame(width: min(max(10, (geo.size.width - 3) * share), geo.size.width - 12))
+                    tube(Theme.violet)
+                }
+            }
+            .frame(height: 10)
+        }
+    }
+
+    private func tube(_ tint: Color) -> some View {
+        Capsule()
+            .fill(LinearGradient(colors: [.white.opacity(0.9), tint, tint.opacity(0.8)], startPoint: .top, endPoint: .bottom))
+            .shadow(color: tint.opacity(0.9), radius: 6)
+    }
+}
+
+/// A neon-rimmed tile like the countdown's, holding text.
+private struct StatTile: View {
+    let text: String
+    let label: String
+    let tint: Color
+
+    var body: some View {
+        VStack(spacing: 2) {
+            Text(text).font(.f1Digits(28)).foregroundStyle(Theme.chromeText)
+                .shadow(color: .white.opacity(0.5), radius: 6).lineLimit(1).minimumScaleFactor(0.6)
+            Text(label).font(.f1(10, weight: .bold)).tracking(1.5).foregroundStyle(Color.white.opacity(0.7))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 16).fill(LinearGradient(colors: [Color(white: 0.03), Color(white: 0.09)], startPoint: .top, endPoint: .bottom))
+                RoundedRectangle(cornerRadius: 16).fill(LinearGradient(colors: [Color.white.opacity(0.10), .clear], startPoint: .top, endPoint: .center))
+                RoundedRectangle(cornerRadius: 16).strokeBorder(tint.opacity(0.9), lineWidth: 3).blur(radius: 5)
+                RoundedRectangle(cornerRadius: 16).strokeBorder(LinearGradient(colors: [Color.white.opacity(0.95), tint, tint.opacity(0.8)],
+                                                                               startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 2)
+            }
+            .shadow(color: tint.opacity(0.5), radius: 10)
+        )
+    }
+}
+
+/// `-DesignLab seasonFuture`: three futuristic season cards in the approved
+/// "telemetry glass" direction (Docs/redesign-telemetry-glass.md), each in
+/// the two situations.
+struct SeasonFutureDrafts: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                ForEach(["A · TELEMETRY READOUT", "B · HUD GAUGE", "C · HOLOGRAM"], id: \.self) { title in
+                    Text(title).font(.f1(11, weight: .heavy)).tracking(2).foregroundStyle(Theme.accent)
+                    HStack(alignment: .top, spacing: 8) {
+                        ForEach([FutureCase.alone, FutureCase.busy], id: \.rank) { c in
+                            FutureCard(style: String(title.prefix(1)), c: c)
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.top, 8)
+        }
+    }
+}
+
+private struct FutureCase {
+    let rank: Int, total: Int, points: Int, ai: Int, behind: Int
+    static let alone = FutureCase(rank: 1, total: 1, points: 4, ai: 19, behind: 0)
+    static let busy = FutureCase(rank: 12, total: 340, points: 86, ai: 71, behind: 42)
+}
+
+private struct FutureCard: View {
+    let style: String
+    let c: FutureCase
+
+    private var lead: String { c.points == c.ai ? "LEVEL" : c.points > c.ai ? "+\(c.points - c.ai) YOU" : "+\(c.ai - c.points) AI" }
+    private let mono = Font.system(size: 9, weight: .semibold, design: .monospaced)
+
+    var body: some View {
+        Group {
+            switch style {
+            case "B": gauge
+            case "C": hologram
+            default: readout
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func glass<S: View>(_ light: Color, @ViewBuilder _ content: () -> S) -> some View {
+        content()
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24))
+            .background(Ellipse().fill(light).frame(width: 160, height: 110).blur(radius: 45).opacity(0.6))
+    }
+
+    private func rule(_ n: String, _ meta: String) -> some View {
+        VStack(spacing: 4) {
+            HStack {
+                Text("\(n) / SEASON").font(mono).tracking(1.2).foregroundStyle(Theme.accent)
+                Spacer()
+                Text(meta).font(mono).tracking(1.2).foregroundStyle(Theme.dimText)
+            }
+            HStack(spacing: 0) {
+                ForEach(0..<24, id: \.self) { i in
+                    Rectangle().fill(Color.white.opacity(i % 6 == 0 ? 0.5 : 0.18)).frame(width: 1, height: i % 6 == 0 ? 6 : 3)
+                    Spacer(minLength: 0)
+                }
+            }
+            .frame(height: 6, alignment: .top)
+        }
+    }
+
+    private func row(_ label: String, _ value: String, _ tint: Color = .white) -> some View {
+        HStack {
+            Text(label).font(mono).tracking(1.2).foregroundStyle(Theme.dimText)
+            Spacer()
+            Text(value).font(.system(size: 11, weight: .bold, design: .monospaced)).foregroundStyle(tint)
+        }
+    }
+
+    /// Six cells each, lit by share of the combined points.
+    private func cells(_ value: Int, _ total: Int, _ tint: Color) -> some View {
+        let lit = total == 0 ? 0 : Int((Double(value) / Double(total) * 6).rounded())
+        return HStack(spacing: 3) {
+            ForEach(0..<6, id: \.self) { i in
+                RoundedRectangle(cornerRadius: 2).fill(i < lit ? tint : tint.opacity(0.15))
+                    .frame(height: 8)
+                    .shadow(color: i < lit ? tint.opacity(0.8) : .clear, radius: 4)
+            }
+        }
+    }
+
+    // A: a timing-screen readout: LED position, monospaced data rows and
+    // two 6-cell energy bars for you and the AI.
+    private var readout: some View {
+        glass(Theme.accent) {
+            VStack(alignment: .leading, spacing: 9) {
+                rule("01", "\(c.total) PLR")
+                HStack(alignment: .center, spacing: 10) {
+                    LEDText(text: "P\(c.rank)", pitch: 4, color: Theme.accent)
+                    Spacer(minLength: 0)
+                }
+                row("PTS", String(format: "%03d", c.points))
+                row("GAP P1", c.behind == 0 ? "LEADER" : "-\(c.behind)")
+                Rectangle().fill(Color.white.opacity(0.1)).frame(height: 1)
+                HStack(spacing: 6) { Text("YOU").font(mono).foregroundStyle(Theme.accent).frame(width: 24, alignment: .leading); cells(c.points, c.points + c.ai, Theme.accent) }
+                HStack(spacing: 6) { Text("AI").font(mono).foregroundStyle(Theme.violet).frame(width: 24, alignment: .leading); cells(c.ai, c.points + c.ai, Theme.violet) }
+                row("Δ", lead, c.points >= c.ai ? Theme.accent : Theme.violet)
+            }
+        }
+    }
+
+    // B: a HUD gauge: the duel as a ring split cyan/violet with ticks,
+    // your position in LEDs in the middle, corner brackets.
+    private var gauge: some View {
+        glass(Theme.violet) {
+            VStack(spacing: 8) {
+                rule("01", "\(c.total) PLR")
+                ZStack {
+                    let share = Double(c.points) / Double(max(1, c.points + c.ai))
+                    Circle().trim(from: 0, to: 0.75).stroke(Color.white.opacity(0.08), style: StrokeStyle(lineWidth: 8, lineCap: .round)).rotationEffect(.degrees(135))
+                    Circle().trim(from: 0, to: 0.75 * share).stroke(Theme.accent, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                        .rotationEffect(.degrees(135)).shadow(color: Theme.accent, radius: 6)
+                    Circle().trim(from: 0.75 * share + 0.01, to: 0.75).stroke(Theme.violet, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                        .rotationEffect(.degrees(135)).shadow(color: Theme.violet, radius: 6)
+                    ForEach(0..<16, id: \.self) { i in
+                        Rectangle().fill(Color.white.opacity(0.35)).frame(width: 1, height: 4)
+                            .offset(y: -50).rotationEffect(.degrees(-135 + Double(i) * 18))
+                    }
+                    VStack(spacing: 4) {
+                        LEDText(text: "P\(c.rank)", pitch: 3, color: Theme.accent)
+                        Text("\(c.points) PTS").font(.system(size: 10, weight: .bold, design: .monospaced)).foregroundStyle(.white)
+                    }
+                }
+                .frame(width: 112, height: 112)
+                .frame(maxWidth: .infinity)
+                HStack {
+                    Text("YOU \(c.points)").font(mono).foregroundStyle(Theme.accent)
+                    Spacer()
+                    Text("AI \(c.ai)").font(mono).foregroundStyle(Theme.violet)
+                }
+            }
+            .overlay { Brackets().stroke(Theme.accent.opacity(0.6), lineWidth: 1.2).padding(-4) }
+        }
+    }
+
+    // C: a hologram: a perspective grid glowing under a big chrome position,
+    // you and the AI as two energy columns rising from it.
+    private var hologram: some View {
+        glass(Theme.accent) {
+            VStack(alignment: .leading, spacing: 8) {
+                rule("01", "\(c.total) PLR")
+                ZStack(alignment: .bottom) {
+                    PerspectiveGrid().stroke(Theme.accent.opacity(0.35), lineWidth: 0.7).frame(height: 54)
+                    HStack(alignment: .bottom, spacing: 10) {
+                        Text("P\(c.rank)").font(.f1(36).italic()).foregroundStyle(Theme.chromeText)
+                            .shadow(color: Theme.accent.opacity(0.9), radius: 12)
+                        Spacer(minLength: 0)
+                        column(c.points, Theme.accent, "YOU")
+                        column(c.ai, Theme.violet, "AI")
+                    }
+                    .padding(.horizontal, 4)
+                }
+                .frame(height: 96)
+                row("PTS", "\(c.points)")
+                row("Δ AI", lead, c.points >= c.ai ? Theme.accent : Theme.violet)
+            }
+        }
+    }
+
+    private func column(_ value: Int, _ tint: Color, _ label: String) -> some View {
+        let height = 70 * CGFloat(value) / CGFloat(max(1, max(c.points, c.ai)))
+        return VStack(spacing: 3) {
+            Text("\(value)").font(.system(size: 10, weight: .bold, design: .monospaced)).foregroundStyle(tint)
+            RoundedRectangle(cornerRadius: 3)
+                .fill(LinearGradient(colors: [tint, tint.opacity(0.15)], startPoint: .top, endPoint: .bottom))
+                .frame(width: 16, height: max(6, height))
+                .shadow(color: tint.opacity(0.8), radius: 6)
+            Text(label).font(mono).foregroundStyle(tint)
+        }
+    }
+}
+
+/// HUD corner brackets.
+private struct Brackets: Shape {
+    func path(in r: CGRect) -> Path {
+        let l: CGFloat = 14
+        var p = Path()
+        for (corner, dx, dy) in [(CGPoint(x: r.minX, y: r.minY), 1.0, 1.0), (CGPoint(x: r.maxX, y: r.minY), -1.0, 1.0),
+                                 (CGPoint(x: r.minX, y: r.maxY), 1.0, -1.0), (CGPoint(x: r.maxX, y: r.maxY), -1.0, -1.0)] {
+            p.move(to: CGPoint(x: corner.x + l * dx, y: corner.y))
+            p.addLine(to: corner)
+            p.addLine(to: CGPoint(x: corner.x, y: corner.y + l * dy))
+        }
+        return p
+    }
+}
+
+/// A floor grid running towards a vanishing point.
+private struct PerspectiveGrid: Shape {
+    func path(in r: CGRect) -> Path {
+        var p = Path()
+        let vanish = CGPoint(x: r.midX, y: r.minY - r.height * 1.4)
+        for i in 0...10 {
+            let x = r.minX + r.width * CGFloat(i) / 10
+            let t = (r.maxY - r.minY) / (r.maxY - vanish.y)
+            p.move(to: CGPoint(x: x, y: r.maxY))
+            p.addLine(to: CGPoint(x: x + (vanish.x - x) * t, y: r.minY))
+        }
+        for j in 0...4 {
+            let y = r.minY + r.height * pow(CGFloat(j) / 4, 1.6)
+            p.move(to: CGPoint(x: r.minX, y: y)); p.addLine(to: CGPoint(x: r.maxX, y: y))
+        }
+        return p
+    }
+}
+
 /// `-DesignLab seasonTags`: the current season card with three shapes for
 /// the position tag (no slanted cut against the card's corner).
 struct SeasonTagDrafts: View {
