@@ -27,6 +27,21 @@ enum NotificationManager {
         await removeSessionAlerts()
     }
 
+    #if DEBUG
+    /// -ProvisionalPush YES: quiet notifications without the system prompt
+    /// (the simulator can't grant it otherwise), then lists what has been
+    /// delivered with its attachments, for testing pushes with media.
+    static func provisionalPushCheck() async {
+        let center = UNUserNotificationCenter.current()
+        _ = try? await center.requestAuthorization(options: [.alert, .sound, .provisional])
+        print("delivered: authorization", await center.notificationSettings().authorizationStatus.rawValue)
+        for note in await center.deliveredNotifications() {
+            let media = note.request.content.attachments.map { "\($0.url.lastPathComponent) (\($0.type))" }
+            print("delivered:", note.request.content.title, "| attachments:", media)
+        }
+    }
+    #endif
+
     /// Posted when alerts get switched on outside the settings card (the
     /// first-launch prompt), so the Countdown tab schedules them.
     static let didEnable = Notification.Name("sessionAlertsDidEnable")

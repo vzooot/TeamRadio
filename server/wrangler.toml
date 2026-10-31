@@ -17,6 +17,12 @@ binding = "DB"
 database_name = "teamradio"
 database_id = "c2e645e9-cdab-40b1-b673-1cbe7ee19ee4"
 
+# Media that announcements attach (the app's notification service
+# extension downloads it), e.g. /media/champion.mp4. Served before the
+# Worker runs; every other path reaches the Worker as before.
+[assets]
+directory = "./public"
+
 [vars]
 # CloudKit environments the prediction-game scorer reads picks from.
 CK_ENVS = "development,production"

@@ -127,6 +127,9 @@ struct RootView: View {
                 .presentationBackground(Theme.background)
         }
         .task {
+            #if DEBUG
+            if UserDefaults.standard.bool(forKey: "ProvisionalPush") { await NotificationManager.provisionalPushCheck() }
+            #endif
             // First launch: ask for notifications once the app has settled.
             guard !Self.designLabOpen, await NotificationManager.shouldPrompt() else { return }
             try? await Task.sleep(for: .seconds(2.5))

@@ -266,12 +266,15 @@ async function pushSessionStart(env, race, session, leftMs, onlyKeys, forLead) {
 
 /// A normal notification to every registered device (or only `onlyEnv`:
 /// "sandbox" to test on development builds first). `link` opens a tab,
-/// e.g. "teamradio://games". Dead tokens are dropped.
-async function announce(env, { title, body, link, onlyEnv }) {
+/// e.g. "teamradio://games"; `media` (an https link to a short video or an
+/// image) is attached by the app's notification service extension, and
+/// apps without it show the plain message. Dead tokens are dropped.
+async function announce(env, { title, body, link, media, mediaThumb, onlyEnv }) {
   const jwt = await apnsJWT(env);
   const payload = JSON.stringify({
-    aps: { alert: { title, body }, sound: "default" },
+    aps: { alert: { title, body }, sound: "default", ...(media ? { "mutable-content": 1 } : {}) },
     ...(link ? { link } : {}),
+    ...(media ? { media, ...(mediaThumb != null ? { mediaThumb } : {}) } : {}),
   });
   const counts = { sent: 0, failed: 0, removed: 0 };
   let cursor;
@@ -305,6 +308,8 @@ async function announce(env, { title, body, link, onlyEnv }) {
 }
 
 const APP_TOPIC = "com.woqomoqo.OneF";
+/// server/public/media, served by this Worker's static assets.
+const MEDIA = "https://teamradio-push.eam-adio.workers.dev/media";
 
 /// Sends an announcement once per `id`, however often it's called.
 async function announceOnce(env, id, message) {
@@ -360,6 +365,9 @@ async function titleAnnouncements(env, now) {
       title: `🏆 ${leader.name} is the ${t.season} World Champion`,
       body: "See the final standings.",
       link: "teamradio://standings",
+      // the trophy clip; its thumbnail is the lit podium near the end
+      media: `${MEDIA}/champion.mp4`,
+      mediaThumb: 9,
     });
     return;
   }

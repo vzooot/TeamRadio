@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		AF00002A2E00002A0000F200 /* TeamRadioWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AF0000202E0000200000F200 /* TeamRadioWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		AF00004A2E00004A0000F400 /* TeamRadioNotificationService.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AF0000402E0000400000F400 /* TeamRadioNotificationService.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -17,6 +18,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = AF0000222E0000220000F200;
 			remoteInfo = TeamRadioWidgetsExtension;
+		};
+		AF00004B2E00004B0000F400 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AF00000A2E00000A0000F100 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AF0000422E0000420000F400;
+			remoteInfo = TeamRadioNotificationService;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -28,6 +36,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				AF00002A2E00002A0000F200 /* TeamRadioWidgetsExtension.appex in Embed Foundation Extensions */,
+				AF00004A2E00004A0000F400 /* TeamRadioNotificationService.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -37,12 +46,14 @@
 /* Begin PBXFileReference section */
 		AF0000042E0000040000F100 /* TeamRadio.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TeamRadio.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AF0000202E0000200000F200 /* TeamRadioWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TeamRadioWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		AF0000402E0000400000F400 /* TeamRadioNotificationService.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TeamRadioNotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		AF0000012E0000010000F100 /* TeamRadio */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = TeamRadio; sourceTree = "<group>"; };
 		AF0000212E0000210000F200 /* TeamRadioWidgets */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = TeamRadioWidgets; sourceTree = "<group>"; };
 		AF0000302E0000300000F300 /* Shared */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Shared; sourceTree = "<group>"; };
+		AF0000412E0000410000F400 /* TeamRadioNotificationService */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = TeamRadioNotificationService; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -60,6 +71,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AF0000442E0000440000F400 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -69,6 +87,7 @@
 				AF0000012E0000010000F100 /* TeamRadio */,
 				AF0000212E0000210000F200 /* TeamRadioWidgets */,
 				AF0000302E0000300000F300 /* Shared */,
+				AF0000412E0000410000F400 /* TeamRadioNotificationService */,
 				AF0000032E0000030000F100 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -78,6 +97,7 @@
 			children = (
 				AF0000042E0000040000F100 /* TeamRadio.app */,
 				AF0000202E0000200000F200 /* TeamRadioWidgetsExtension.appex */,
+				AF0000402E0000400000F400 /* TeamRadioNotificationService.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -98,6 +118,7 @@
 			);
 			dependencies = (
 				AF00002C2E00002C0000F200 /* PBXTargetDependency */,
+				AF00004C2E00004C0000F400 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				AF0000012E0000010000F100 /* TeamRadio */,
@@ -133,6 +154,28 @@
 			productReference = AF0000202E0000200000F200 /* TeamRadioWidgetsExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		AF0000422E0000420000F400 /* TeamRadioNotificationService */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AF0000462E0000460000F400 /* Build configuration list for PBXNativeTarget "TeamRadioNotificationService" */;
+			buildPhases = (
+				AF0000432E0000430000F400 /* Sources */,
+				AF0000442E0000440000F400 /* Frameworks */,
+				AF0000452E0000450000F400 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				AF0000412E0000410000F400 /* TeamRadioNotificationService */,
+			);
+			name = TeamRadioNotificationService;
+			packageProductDependencies = (
+			);
+			productName = TeamRadioNotificationService;
+			productReference = AF0000402E0000400000F400 /* TeamRadioNotificationService.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -164,6 +207,7 @@
 			targets = (
 				AF0000052E0000050000F100 /* TeamRadio */,
 				AF0000222E0000220000F200 /* TeamRadioWidgetsExtension */,
+				AF0000422E0000420000F400 /* TeamRadioNotificationService */,
 			);
 		};
 /* End PBXProject section */
@@ -177,6 +221,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		AF0000252E0000250000F200 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AF0000452E0000450000F400 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -200,6 +251,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AF0000432E0000430000F400 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -207,6 +265,11 @@
 			isa = PBXTargetDependency;
 			target = AF0000222E0000220000F200 /* TeamRadioWidgetsExtension */;
 			targetProxy = AF00002B2E00002B0000F200 /* PBXContainerItemProxy */;
+		};
+		AF00004C2E00004C0000F400 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AF0000422E0000420000F400 /* TeamRadioNotificationService */;
+			targetProxy = AF00004B2E00004B0000F400 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -431,6 +494,52 @@
 			};
 			name = Release;
 		};
+		AF0000472E0000470000F400 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = NotificationServiceSupport/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Team Radio";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.3.2;
+				PRODUCT_BUNDLE_IDENTIFIER = com.woqomoqo.OneF.NotificationService;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		AF0000482E0000480000F400 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = NotificationServiceSupport/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Team Radio";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.3.2;
+				PRODUCT_BUNDLE_IDENTIFIER = com.woqomoqo.OneF.NotificationService;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -457,6 +566,15 @@
 			buildConfigurations = (
 				AF0000272E0000270000F200 /* Debug */,
 				AF0000282E0000280000F200 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AF0000462E0000460000F400 /* Build configuration list for PBXNativeTarget "TeamRadioNotificationService" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AF0000472E0000470000F400 /* Debug */,
+				AF0000482E0000480000F400 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
