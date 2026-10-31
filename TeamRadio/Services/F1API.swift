@@ -45,6 +45,12 @@ enum F1API {
             .standingsTable?.standingsLists.first?.driverStandings ?? []
     }
 
+    /// The full drivers' standings with the season and the round they're after.
+    static func driversTable() async throws -> StandingsList? {
+        try await fetch("current/driverstandings.json", query: [URLQueryItem(name: "limit", value: "40")])
+            .standingsTable?.standingsLists.first
+    }
+
     /// Constructors' championship top order.
     static func constructorStandings(limit: Int = 5) async throws -> [ConstructorStanding] {
         try await fetch("current/constructorstandings.json", query: [URLQueryItem(name: "limit", value: "\(limit)")])

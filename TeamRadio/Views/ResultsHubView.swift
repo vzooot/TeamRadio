@@ -7,12 +7,8 @@ import SwiftUI
 struct ResultsHubView: View {
     enum Page { case results, standings }
 
-    #if DEBUG
-    // -ResultsPage standings: open on the standings, for screenshots
-    @State private var page: Page = UserDefaults.standard.string(forKey: "ResultsPage") == "standings" ? .standings : .results
-    #else
-    @State private var page: Page = .results
-    #endif
+    /// Held by the root, so links and the title moment can open the standings.
+    @Binding var page: Page
 
     var body: some View {
         ZStack {
