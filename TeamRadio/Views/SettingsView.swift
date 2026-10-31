@@ -18,6 +18,7 @@ struct SettingsView: View {
     @State private var news = AppSettings.news
     @State private var chat = ChatService.roomPushEnabled
     @State private var blocked = false
+    @State private var liveActivitiesAllowed = LiveActivityManager.allowedByIOS
     @State private var showAbout = false
     @State private var next: (race: Race, session: WeekendSession)?
 
@@ -45,13 +46,17 @@ struct SettingsView: View {
             // iOS may have notifications off for the app altogether.
             let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
             blocked = status == .denied
+            liveActivitiesAllowed = LiveActivityManager.allowedByIOS
         }
         .onChange(of: countdown) { _, on in
             PushSync.countdownOn = on
+            // off clears the Lock Screen now; on shows the running countdown now
+            if on { Task { await LiveActivityManager.ensureCountdown() } } else { LiveActivityManager.endAll() }
             changed()
         }
         .onChange(of: hours) { _, value in
             PushSync.countdownHours = value
+            Task { await LiveActivityManager.ensureCountdown() }
             changed()
         }
         .onChange(of: notifications) { old, on in
@@ -114,6 +119,20 @@ struct SettingsView: View {
     private var countdownSection: some View {
         section("LOCK SCREEN COUNTDOWN") {
             row("lock.iphone", "AUTOMATIC COUNTDOWN", "Appears by itself before every session, all season", $countdown, master: true)
+            if countdown && !liveActivitiesAllowed {
+                Button {
+                    if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                } label: {
+                    Text("Live Activities are off for Team Radio in iPhone Settings, so nothing can appear. Tap to turn them on.")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.live)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 14)
+                        .padding(.bottom, 10)
+                }
+                .buttonStyle(.plain)
+            }
             VStack(spacing: 6) {
                 lockScreenPreview
                 Text("Shows up \(hours) \(hours == 1 ? "hour" : "hours") before each session")
