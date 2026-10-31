@@ -261,6 +261,11 @@ enum DirectMessageService {
     /// CloudKit itself pushes "X sent you a private message" for every new
     /// record addressed to me — no server in the loop. Idempotent.
     static func subscribeToInbox(me: String) async {
+        // Settings: the Notifications main switch also silences private messages.
+        guard await AppSettings.notificationsOn else {
+            _ = try? await database.deleteSubscription(withID: "dm-inbox-\(me)")
+            return
+        }
         let subscription = CKQuerySubscription(
             recordType: "DirectMessage",
             predicate: NSPredicate(format: "toId == %@", me),

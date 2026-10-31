@@ -125,7 +125,7 @@ enum ChatService {
 
     static func subscribeToRoom(me: String) async {
         let id = "room-\(me)"
-        guard roomPushEnabled else {
+        guard roomPushEnabled, await AppSettings.notificationsOn else {
             _ = try? await database.deleteSubscription(withID: id)
             return
         }

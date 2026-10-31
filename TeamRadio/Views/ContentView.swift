@@ -2,7 +2,8 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var model = RaceViewModel()
-    @State private var showAbout = false
+    /// The steering-wheel button: Settings (About is inside).
+    @State private var showSettings = false
     @State private var dotd = DotdModel()
     @State private var showDotd = false
     @State private var showEmily = false
@@ -61,8 +62,10 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: NotificationManager.didEnable)) { _ in
             Task { await NotificationManager.reschedule(season: model.season) }
         }
-        .sheet(isPresented: $showAbout) {
-            AboutView()
+        .sheet(isPresented: $showSettings) {
+            SettingsView(season: model.season)
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.background)
         }
         .task(id: model.nextRace?.id) {
             guard GameFeature.isEnabled, !model.season.isEmpty else { return }
@@ -112,7 +115,7 @@ struct ContentView: View {
                         LiveSessionBanner(race: race)
                     }
 
-                    HeaderView(onInfo: { showAbout = true })
+                    HeaderView(onInfo: { showSettings = true })
                 }
                 .padding(.bottom, -6)
                 // the helmet hangs over the race card, so the header draws on top
@@ -127,7 +130,7 @@ struct ContentView: View {
                     }
                     .id("hero")
 
-                    CountdownView(race: race)
+                    CountdownView(race: race, onSettings: { showSettings = true })
                     emilyBar
 
                     // The weekend's sessions always right under the countdown.
@@ -175,12 +178,6 @@ struct ContentView: View {
                 }
 
                 // (The championship lives in the Standings tab, not here.)
-
-                if model.displayRace != nil {
-                    // Settings for every session, just above the season's races.
-                    SessionAlertsCard(season: model.season)
-                        .id("alerts")
-                }
 
                 if !model.season.isEmpty {
                     SeasonView(season: model.season, nextRaceId: model.nextRace?.id,
@@ -355,7 +352,7 @@ struct HeaderView: View {
                 if let onInfo {
                     Button(action: onInfo) { CockpitButton() }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("About and settings")
+                        .accessibilityLabel("Settings")
                 }
             }
 
@@ -446,71 +443,6 @@ struct SeasonOverBanner: View {
     }
 }
 
-/// Toggle for on-device session alerts: one notification 15 minutes before
-/// every upcoming session of the season.
-struct SessionAlertsCard: View {
-    let season: [Race]
-
-    @State private var enabled = NotificationManager.isEnabled
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-        HStack(spacing: 12) {
-            Image(systemName: enabled ? "bell.badge.fill" : "bell.slash")
-                .font(.system(size: 20))
-                .foregroundStyle(enabled ? Theme.accent : Theme.dimText)
-                .frame(width: 30)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("SESSION ALERTS")
-                    .font(.f1(15).italic())
-                    .foregroundStyle(.white)
-                Text("A notification 15 minutes before every session")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Theme.dimText)
-            }
-
-            Spacer()
-
-            Toggle("", isOn: $enabled)
-                .labelsHidden()
-                .tint(Theme.accent)
-        }
-        Rectangle().fill(Color.white.opacity(0.06)).frame(height: 1)
-        LockScreenCountdownRow()
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 18)
-                .fill(Theme.card)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18)
-                        .strokeBorder(Theme.glassStroke, lineWidth: 1)
-                )
-        )
-        #if DEBUG
-        .onChange(of: DemoDirector.shared.alertsOn) { _, on in
-            if let on { withAnimation { enabled = on } }
-        }
-        #endif
-        .onReceive(NotificationCenter.default.publisher(for: NotificationManager.didEnable)) { _ in
-            enabled = true
-        }
-        .onChange(of: enabled) { old, wantsOn in
-            guard old != wantsOn else { return }
-            #if DEBUG
-            if DemoDirector.shared.isActive { return }   // demo: on screen only
-            #endif
-            Task {
-                let result = await NotificationManager.setEnabled(wantsOn, season: season)
-                // Flips back if the user denied the permission prompt.
-                if result != wantsOn { enabled = result }
-            }
-        }
-    }
-}
-
 /// Impossible-to-miss banner shown at the very top while a session is on track.
 struct LiveSessionBanner: View {
     let race: Race
@@ -584,42 +516,4 @@ struct FooterView: View {
 
 #Preview {
     ContentView()
-}
-
-
-/// How early the server starts the Lock Screen countdown for each session,
-/// or off. One choice, applied to every session of the season. Sits inside
-/// the Session Alerts card.
-struct LockScreenCountdownRow: View {
-    @State private var lead = PushSync.lead
-    private let options: [(Int, String)] = [(0, "OFF"), (15, "15 MIN"), (60, "1 H"), (180, "3 H")]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 12) {
-                Image(systemName: lead == 0 ? "lock.slash" : "lock.iphone")
-                    .font(.system(size: 20))
-                    .foregroundStyle(lead == 0 ? Theme.dimText : Theme.accent)
-                    .frame(width: 30)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("LOCK SCREEN COUNTDOWN")
-                        .font(.f1(15).italic())
-                        .foregroundStyle(.white)
-                    Text(lead == 0 ? "Off. Pin a session yourself with the pin button."
-                         : "Appears by itself before every session, all season")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Theme.dimText)
-                }
-            }
-            HStack(spacing: 6) {
-                ForEach(options, id: \.0) { value, label in
-                    Button { lead = value } label: {
-                        NeonChip(title: label, tint: Theme.accent, selected: lead == value)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-        .onChange(of: lead) { _, value in PushSync.lead = value }
-    }
 }

@@ -4,9 +4,12 @@ import SwiftUI
 /// to count down to it. Defaults to the next session that hasn't started.
 struct CountdownView: View {
     let race: Race
+    /// The status line under the countdown opens Settings.
+    var onSettings: () -> Void = {}
 
     @State private var selectedId: String?
-    @State private var pinned = false
+    @State private var countdownOn = PushSync.countdownOn
+    @State private var countdownHours = PushSync.countdownHours
 
     private var sessions: [WeekendSession] { race.sessions }
 
@@ -83,23 +86,17 @@ struct CountdownView: View {
                         .padding(.vertical, 18)
                 }
 
-                if let session, session.date.addingTimeInterval(session.kind.expectedDuration) > now {
-                    pinButton(session: session)
-                }
+                autoCountdownLine
             }
-            .onAppear { pinned = LiveActivityManager.hasPinIntent }
+            // Settings may have changed while it was open.
+            .onAppear { readSettings() }
+            .onReceive(NotificationCenter.default.publisher(for: AppSettings.didChange)) { _ in readSettings() }
             // Updated in place when the race changes (the digits roll over):
             // start again from that race's next session.
-            .onChange(of: race.id) { _, _ in
-                selectedId = nil
-                pinned = LiveActivityManager.hasPinIntent
-            }
+            .onChange(of: race.id) { _, _ in selectedId = nil }
             #if DEBUG
             .onChange(of: DemoDirector.shared.sessionIndex) { _, i in
                 if let i, sessions.indices.contains(i) { selectedId = sessions[i].id }
-            }
-            .onChange(of: DemoDirector.shared.pinned) { _, on in
-                if let on { pinned = on }                    // demo: on screen only
             }
             #endif
             .padding(18)
@@ -115,35 +112,36 @@ struct CountdownView: View {
         }
     }
 
-    /// Starts/stops the Wolt-style Live Activity on the Lock Screen and in
-    /// the Dynamic Island.
-    private func pinButton(session: WeekendSession) -> some View {
-        Button {
-            if pinned {
-                LiveActivityManager.unpin()
-                pinned = false
-            } else {
-                LiveActivityManager.start(race: race, session: session)
-                pinned = true
-                ReviewPrompt.goodMoment()
-            }
-        } label: {
+    private func readSettings() {
+        countdownOn = PushSync.countdownOn
+        countdownHours = PushSync.countdownHours
+    }
+
+    /// What happens by itself (the server starts the Lock Screen countdown
+    /// before every session); tapping it opens Settings.
+    private var autoCountdownLine: some View {
+        let tint = countdownOn ? Theme.accent : Theme.dimText
+        return Button(action: onSettings) {
             HStack(spacing: 6) {
-                Image(systemName: pinned ? "pin.slash.fill" : "pin.fill")
-                    .font(.system(size: 11, weight: .bold))
-                Text(pinned ? "UNPIN FROM LOCK SCREEN" : "PIN \(session.kind.short) TO LOCK SCREEN")
+                Image(systemName: countdownOn ? "lock.iphone" : "lock.slash")
+                    .font(.system(size: 12, weight: .bold))
+                Text(countdownOn ? "ON YOUR LOCK SCREEN \(countdownHours) H BEFORE" : "LOCK SCREEN COUNTDOWN OFF")
                     .font(.f1(12, weight: .bold))
                     .tracking(1)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer(minLength: 4)
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 12))
             }
-            .foregroundStyle(pinned ? Theme.dimText : Theme.accent)
-            .frame(maxWidth: .infinity)
+            .foregroundStyle(tint)
+            .padding(.horizontal, 12)
             .padding(.vertical, 9)
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .strokeBorder(pinned ? Theme.cardStroke : Theme.accent.opacity(0.5), lineWidth: 1)
-            )
+            .background(RoundedRectangle(cornerRadius: 10).fill(tint.opacity(0.08)))
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityHint("Opens Settings")
     }
 
     private func sessionPicker(now: Date, selected: WeekendSession?) -> some View {

@@ -12,8 +12,19 @@ enum NotificationManager {
     /// for the prediction game's reminders.
     private static let maxScheduled = 58
 
-    static var isEnabled: Bool {
+    /// Session alerts' own switch.
+    static var sessionAlertsOn: Bool {
         UserDefaults.standard.bool(forKey: enabledKey)
+    }
+
+    /// Alerts go out: their own switch and the Notifications main switch.
+    static var isEnabled: Bool {
+        sessionAlertsOn && AppSettings.notificationsOn
+    }
+
+    /// The main switch went off: no session alerts until it's back on.
+    static func removeAll() async {
+        await removeSessionAlerts()
     }
 
     /// Posted when alerts get switched on outside the settings card (the
