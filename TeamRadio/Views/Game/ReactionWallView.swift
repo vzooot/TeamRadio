@@ -65,34 +65,9 @@ struct ReactionWallView: View {
                            center: .top, startRadius: 0, endRadius: 520)
                 .ignoresSafeArea()
 
-            // Nothing moves or disappears during a run: the wall, one status
-            // line, the week's board (also after a run), the button.
-            VStack(spacing: 14) {
-                VStack(spacing: 14) {
-                    header
-                    wall
-                    status
-                        .frame(height: 58)
-                    weeklyBoard
-                }
-                // After every run, its card; the button (drawn after it)
-                // stays above the dim to go again.
-                .overlay {
-                    if showCard, case .finished(let result) = phase, let outcome {
-                        resultCard(result, outcome)
-                            .transition(.opacity)
-                    }
-                }
-                .zIndex(1)
-                Spacer(minLength: 0)
-                controls
-                    .zIndex(2)
+            GameScreen { sideBySide in
+                if sideBySide { self.sideBySide } else { column }
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
-            // Phone-sized on iPad: the lights stay big and close together
-            // instead of scattering over a board the width of the screen.
-            .frame(maxWidth: 520)
         }
         .animation(.easeOut(duration: 0.2), value: showCard)
         .onDisappear { game?.cancel() }
@@ -133,6 +108,70 @@ struct ReactionWallView: View {
     private var isRunning: Bool {
         if case .running = phase { return true }
         return false
+    }
+
+    // MARK: - Layouts
+
+    /// Phones: nothing moves or disappears during a run: the wall, one
+    /// status line, the week's board (also after a run), the button.
+    private var column: some View {
+        VStack(spacing: 14) {
+            VStack(spacing: 14) {
+                header
+                wall
+                status
+                    .frame(height: 58)
+                weeklyBoard
+            }
+            .overlay { runCard }
+            .zIndex(1)
+            Spacer(minLength: 0)
+            controls
+                .zIndex(2)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        // Phone-sized on iPad: the lights stay big and close together
+        // instead of scattering over a board the width of the screen.
+        .frame(maxWidth: 520)
+        .frame(maxWidth: .infinity)
+    }
+
+    /// Wide screens (iPhone Duo, landscape): the wall and its status on the
+    /// left, the week's board and the button on the right.
+    private var sideBySide: some View {
+        HStack(alignment: .center, spacing: 28) {
+            VStack(spacing: 12) {
+                header
+                wall
+                status
+                    .frame(height: 58)
+            }
+            .frame(maxWidth: 440)
+            // The run's card over the wall; the board and the button beside
+            // it stay lit to read the new place and go again.
+            .overlay { runCard }
+            .zIndex(1)
+            VStack(spacing: 22) {
+                weeklyBoard
+                controls
+            }
+            .frame(maxWidth: 380)
+            .zIndex(2)
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// After every run, its card; the button (drawn after it) stays above
+    /// the dim to go again.
+    @ViewBuilder
+    private var runCard: some View {
+        if showCard, case .finished(let result) = phase, let outcome {
+            resultCard(result, outcome)
+                .transition(.opacity)
+        }
     }
 
     // MARK: - Pieces

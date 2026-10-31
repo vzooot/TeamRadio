@@ -42,34 +42,9 @@ struct LightsOutView: View {
                 .ignoresSafeArea()
                 .animation(.easeOut(duration: 0.15), value: litCount)
 
-            // Nothing moves or disappears during a run: the lights at their
-            // full size, one status line, the week's board (also after a
-            // jump start), the start button.
-            VStack(spacing: 14) {
-                VStack(spacing: 14) {
-                    header
-                    gantry
-                        .fixedSize(horizontal: false, vertical: true)
-                    status
-                        .frame(height: 64)
-                    weeklyBoard
-                }
-                // After every run, its card over the screen; the start button
-                // (drawn after it) stays lit above the dim to go again.
-                .overlay {
-                    if showCelebration, case .result(let seconds) = phase, let outcome {
-                        RunCard(seconds: seconds, outcome: outcome, verdict: Self.verdict(seconds),
-                                week: board?.me.map { (rank: $0.rank, total: board?.total ?? 0) }) { showCelebration = false }
-                            .transition(.opacity)
-                    }
-                }
-                .zIndex(1)
-                Spacer(minLength: 0)
-                controls
-                    .zIndex(2)
+            GameScreen { sideBySide in
+                if sideBySide { self.sideBySide } else { column }
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
         }
         .animation(.easeOut(duration: 0.2), value: showCelebration)
         .onDisappear { sequence?.cancel() }
@@ -110,6 +85,70 @@ struct LightsOutView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.background)
+        }
+    }
+
+    // MARK: - Layouts
+
+    /// Phones: nothing moves or disappears during a run: the lights at their
+    /// full size, one status line, the week's board (also after a jump
+    /// start), the start button.
+    private var column: some View {
+        VStack(spacing: 14) {
+            VStack(spacing: 14) {
+                header
+                gantry
+                    .fixedSize(horizontal: false, vertical: true)
+                status
+                    .frame(height: 64)
+                weeklyBoard
+            }
+            .overlay { runCard }
+            .zIndex(1)
+            Spacer(minLength: 0)
+            controls
+                .zIndex(2)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+    }
+
+    /// Wide screens (iPhone Duo, landscape): the lights and the status on
+    /// the left, the week's board and the start button on the right.
+    private var sideBySide: some View {
+        HStack(alignment: .center, spacing: 28) {
+            VStack(spacing: 14) {
+                header
+                gantry
+                    .fixedSize(horizontal: false, vertical: true)
+                status
+                    .frame(height: 64)
+            }
+            .frame(maxWidth: 480)
+            // The run's card over the lights; the board and the start button
+            // beside it stay lit to read the new place and go again.
+            .overlay { runCard }
+            .zIndex(1)
+            VStack(spacing: 22) {
+                weeklyBoard
+                controls
+            }
+            .frame(maxWidth: 380)
+            .zIndex(2)
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// After every run, its card over the screen; the start button (drawn
+    /// after it) stays lit above the dim to go again.
+    @ViewBuilder
+    private var runCard: some View {
+        if showCelebration, case .result(let seconds) = phase, let outcome {
+            RunCard(seconds: seconds, outcome: outcome, verdict: Self.verdict(seconds),
+                    week: board?.me.map { (rank: $0.rank, total: board?.total ?? 0) }) { showCelebration = false }
+                .transition(.opacity)
         }
     }
 

@@ -14,6 +14,9 @@ struct ContentView: View {
 
     /// The schedule and circuit are on screen (false while a switch swaps them).
     @State private var sectionsShown = true
+    /// A screen too wide and too short for the phone column (the iPhone Duo
+    /// unfolded): two columns instead.
+    @State private var wide = false
 
     /// Switching race: the countdown stays and updates in place, its digits
     /// rolling to the new race; the schedule and circuit slip out, are
@@ -49,9 +52,10 @@ struct ContentView: View {
                     Task { await model.load() }
                 }
             case .loaded:
-                loadedContent
+                if wide { wideContent } else { loadedContent }
             }
         }
+        .onGeometryChange(for: Bool.self) { $0.size.width > $0.size.height && $0.size.height < 760 } action: { wide = $0 }
         .task {
             await model.load()
             await NotificationManager.adoptDefault()
@@ -133,26 +137,10 @@ struct ContentView: View {
                     CountdownView(race: race, onSettings: { showSettings = true })
                     emilyBar
 
-                    // The weekend's sessions always right under the countdown.
-                    VStack {
-                        WeekendScheduleView(race: race, weather: model.weather, weatherLoading: model.extrasLoading)
-                            .id(race.id)
-                    }
-                    .cascade(sectionsShown, delay: 0)
-                    .id("schedule")
-
-                    // ...and the circuit right after the weekend's sessions.
-                    VStack {
-                        if let map = model.trackMap {
-                            // fades only: the 3D scene is too heavy to slide
-                            TrackSectionView(map: map, circuit: race.circuit)
-                                .id(race.circuit.circuitId)
-                        } else if model.extrasLoading {
-                            TrackPlaceholder()
-                        }
-                    }
-                    .cascade(sectionsShown, delay: 0.08)
-                    .id("trackSection")
+                    // The weekend's sessions always right under the countdown,
+                    // and the circuit right after them.
+                    schedule(race)
+                    track(race)
 
                     #if DEBUG
                     if BlendDraft.gameZoneInApp {
@@ -161,14 +149,7 @@ struct ContentView: View {
                     #endif
                     // The fan vote (Ask Emily sits under the countdown); the games
                     // themselves live in the Games tab.
-                    if GameFeature.isEnabled, !model.isBrowsing {
-                        TimelineView(.periodic(from: .now, by: 30)) { context in
-                            if dotd.race != nil {
-                                DotdBoldCard(model: dotd, now: context.date, onVote: { showDotd = true })
-                            }
-                        }
-                        .transaction(value: model.isBrowsing) { $0.animation = nil }
-                    }
+                    fanVote
 
                     if !Self.demoMode {
                         InviteBanner()
@@ -179,13 +160,7 @@ struct ContentView: View {
 
                 // (The championship lives in the Standings tab, not here.)
 
-                if !model.season.isEmpty {
-                    SeasonView(season: model.season, nextRaceId: model.nextRace?.id,
-                               selectedId: model.displayRace?.id) { race in
-                        pickFromSeason(race, proxy: proxy)
-                    }
-                    .id("season")
-                }
+                seasonList(proxy)
 
                 FooterView()
             }
@@ -234,6 +209,112 @@ struct ContentView: View {
             withAnimation(.easeInOut(duration: step.duration)) { proxy.scrollTo(id, anchor: step.anchor) }
         }
         #endif
+        }
+    }
+
+    /// The iPhone Duo unfolded (approved draft A): the race and its
+    /// countdown always in view on the left, everything else scrolling on
+    /// the right. The phone column above stays as it is.
+    private var wideContent: some View {
+        ScrollViewReader { proxy in
+        HStack(alignment: .top, spacing: 18) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
+                    VStack(alignment: .leading, spacing: 22) {
+                        if let race = model.nextRace {
+                            LiveSessionBanner(race: race)
+                        }
+                        HeaderView(onInfo: { showSettings = true })
+                    }
+                    .padding(.bottom, -6)
+                    .zIndex(1)
+
+                    if let race = model.displayRace {
+                        RaceHeroCarousel(season: model.season, race: race, dockActive: $raceDock, edge: $raceEdge,
+                                         nextId: model.nextRace?.id, onBack: backToNextRace) { picked in
+                            switchRace(to: picked)
+                        }
+                        CountdownView(race: race, onSettings: { showSettings = true })
+                    } else {
+                        SeasonOverBanner()
+                    }
+                }
+                .padding(.top, 8)
+                .padding(.bottom, 24)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollIndicators(.hidden)
+            .frame(width: 430)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
+                    if let race = model.displayRace {
+                        emilyBar
+                        schedule(race)
+                        track(race)
+                        fanVote
+                        InviteBanner()
+                    }
+                    seasonList(proxy)
+                    FooterView()
+                }
+                .padding(.top, 8)
+                .padding(.bottom, 32)
+                // where a pick from the season list glides back to
+                .id("top")
+            }
+            .scrollIndicators(.hidden)
+            .refreshable { await model.load() }
+        }
+        .padding(.horizontal, 18)
+        .scrollDisabled(raceDock)
+        }
+    }
+
+    private func schedule(_ race: Race) -> some View {
+        VStack {
+            WeekendScheduleView(race: race, weather: model.weather, weatherLoading: model.extrasLoading)
+                .id(race.id)
+        }
+        .cascade(sectionsShown, delay: 0)
+        .id("schedule")
+    }
+
+    private func track(_ race: Race) -> some View {
+        VStack {
+            if let map = model.trackMap {
+                // fades only: the 3D scene is too heavy to slide
+                TrackSectionView(map: map, circuit: race.circuit)
+                    .id(race.circuit.circuitId)
+            } else if model.extrasLoading {
+                TrackPlaceholder()
+            }
+        }
+        .cascade(sectionsShown, delay: 0.08)
+        .id("trackSection")
+    }
+
+    /// Driver of the Day, while the next race is on screen.
+    @ViewBuilder
+    private var fanVote: some View {
+        if GameFeature.isEnabled, !model.isBrowsing {
+            TimelineView(.periodic(from: .now, by: 30)) { context in
+                if dotd.race != nil {
+                    DotdBoldCard(model: dotd, now: context.date, onVote: { showDotd = true })
+                }
+            }
+            .transaction(value: model.isBrowsing) { $0.animation = nil }
+        }
+    }
+
+    @ViewBuilder
+    private func seasonList(_ proxy: ScrollViewProxy) -> some View {
+        if !model.season.isEmpty {
+            SeasonView(season: model.season, nextRaceId: model.nextRace?.id,
+                       selectedId: model.displayRace?.id) { race in
+                pickFromSeason(race, proxy: proxy)
+            }
+            .id("season")
         }
     }
 

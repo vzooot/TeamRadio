@@ -116,6 +116,12 @@ struct GamesView: View {
                     try? await Task.sleep(for: .seconds(5))
                     proxy.scrollTo(id, anchor: .top)
                 }
+                .task {
+                    // -OpenGame lights|wall: opens that arcade game, for screenshots
+                    guard let id = UserDefaults.standard.string(forKey: "OpenGame") else { return }
+                    try? await Task.sleep(for: .seconds(1))
+                    if id == "wall" { showWall = true } else { showLightsOut = true }
+                }
                 #endif
             }
             .transition(.opacity)
