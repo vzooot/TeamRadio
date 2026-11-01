@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import WebKit
 
 /// Paddock news, broadcast style: a live ticker of headlines, the lead story
 /// as a giant headline, teams in the news (tap one to filter), trending
@@ -8,6 +9,9 @@ struct NewsView: View {
     @State private var model = NewsViewModel()
     @State private var team: NewsTeam?
     @Environment(\.openURL) private var openURL
+    @State private var wide = false
+    /// The story open in the reader (iPhone Duo); the lead until one's tapped.
+    @State private var open: NewsItem?
 
     var body: some View {
         ZStack {
@@ -28,6 +32,8 @@ struct NewsView: View {
                         .font(.subheadline)
                         .foregroundStyle(Theme.dimText)
                 }
+            } else if wide {
+                reader
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
@@ -41,6 +47,7 @@ struct NewsView: View {
                 .refreshable { await model.load() }
             }
         }
+        .onWideScreen($wide)
         .task { await model.load() }
     }
 
@@ -68,14 +75,9 @@ struct NewsView: View {
         return [lead] + list.filter { $0.id != lead.id }
     }
 
+    /// The teams in the news; tap one to filter the stories.
     @ViewBuilder
-    private var content: some View {
-        let list = stories
-        if let lead = list.first {
-            Button { openURL(lead.link) } label: { LeadStory(item: lead) }
-                .buttonStyle(.plain)
-        }
-
+    private var teams: some View {
         let inNews = NewsTeam.all
             .map { t in (team: t, count: model.items.filter { t.mentioned(in: $0.title) }.count) }
             .filter { $0.count > 0 }
@@ -106,6 +108,96 @@ struct NewsView: View {
                 .padding(.vertical, 2)
             }
         }
+    }
+
+    /// The iPhone Duo unfolded (approved draft B,
+    /// build/mockups/duo2/sheet-3-games-news.png): the stories in the left
+    /// half; the one tapped opens in the right, without leaving the app.
+    private var reader: some View {
+        let list = stories
+        let current = list.first { $0.id == open?.id } ?? list.first
+        return HStack(alignment: .top, spacing: 18) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    header
+                    NewsTicker(headlines: model.items.prefix(8).map(\.title))
+                    if let lead = list.first {
+                        Button { open = lead } label: { LeadStory(item: lead) }
+                            .buttonStyle(.plain)
+                            .overlay(alignment: .topLeading) {
+                                if current?.id == lead.id { openBadge.padding(10) }
+                            }
+                    }
+                    teams
+                    if list.count > 1 { NewsSection(title: "LATEST") }
+                    ForEach(list.dropFirst()) { item in
+                        let on = current?.id == item.id
+                        Button { open = item } label: {
+                            WireRow(item: item)
+                                .padding(8)
+                                .background(RoundedRectangle(cornerRadius: 14).fill(on ? Theme.accent.opacity(0.12) : .clear)
+                                    .overlay(RoundedRectangle(cornerRadius: 14)
+                                        .strokeBorder(on ? Theme.accent.opacity(0.7) : .clear, lineWidth: 1.2)))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    if list.isEmpty {
+                        Text("No stories about \(team?.name.capitalized ?? "this team") right now.")
+                            .font(.subheadline)
+                            .foregroundStyle(Theme.dimText)
+                    }
+                }
+                .padding(.bottom, 32)
+            }
+            .scrollIndicators(.hidden)
+            .refreshable { await model.load() }
+            .frame(width: WideScreen.column)
+
+            if let current {
+                VStack(spacing: 0) {
+                    HStack(spacing: 10) {
+                        NewsMeta(item: current)
+                        Spacer()
+                        Button { openURL(current.link) } label: {
+                            Label("SAFARI", systemImage: "safari")
+                                .font(.f1(10, weight: .heavy))
+                                .foregroundStyle(Theme.accent)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Open in Safari")
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(Theme.card)
+                    NewsWebView(url: current.link)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 18))
+                .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Theme.glassStroke, lineWidth: 1))
+                .padding(.vertical, 10)
+            }
+        }
+        .padding(.horizontal, 18)
+    }
+
+    private var openBadge: some View {
+        Text("OPEN →")
+            .font(.f1(10, weight: .heavy))
+            .tracking(1)
+            .foregroundStyle(Theme.onAccent)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Capsule().fill(Theme.accentGradient))
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        let list = stories
+        if let lead = list.first {
+            Button { openURL(lead.link) } label: { LeadStory(item: lead) }
+                .buttonStyle(.plain)
+        }
+
+        teams
 
         let trending = Array(list.dropFirst().prefix(5))
         if !trending.isEmpty {
@@ -334,6 +426,59 @@ private struct NewsArt: View {
             }
         }
         .clipped()
+    }
+}
+
+/// The reader's page (iPhone Duo): the story's site, with a spinner until
+/// it has loaded.
+private struct NewsWebView: View {
+    let url: URL
+    @State private var loading = true
+
+    var body: some View {
+        Site(url: url, loading: $loading)
+            .overlay { if loading { ProgressView().tint(Theme.accent) } }
+            .background(Theme.card)
+    }
+
+    private struct Site: UIViewRepresentable {
+        let url: URL
+        @Binding var loading: Bool
+
+        func makeUIView(context: Context) -> WKWebView {
+            let web = WKWebView()
+            web.isOpaque = false
+            web.backgroundColor = .clear
+            web.navigationDelegate = context.coordinator
+            web.load(URLRequest(url: url))
+            return web
+        }
+
+        func updateUIView(_ web: WKWebView, context: Context) {
+            context.coordinator.page = self
+            guard context.coordinator.requested != url else { return }
+            context.coordinator.requested = url
+            web.load(URLRequest(url: url))
+        }
+
+        func makeCoordinator() -> Coordinator { Coordinator(page: self) }
+
+        final class Coordinator: NSObject, WKNavigationDelegate {
+            var page: Site
+            var requested: URL?
+
+            init(page: Site) {
+                self.page = page
+                requested = page.url
+            }
+
+            func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) { page.loading = true }
+            func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { page.loading = false }
+            func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { page.loading = false }
+            func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+                page.loading = false
+            }
+        }
     }
 }
 

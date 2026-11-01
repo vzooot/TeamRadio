@@ -53,20 +53,21 @@ private struct RollingDigit: View {
     let digit: Character
     let hot: Bool
     let rolls: Bool
+    var size: CGFloat = 38
 
     var body: some View {
         ZStack {
             Text(String(digit))
-                .font(.f1Digits(38))
+                .font(.f1Digits(size))
                 .foregroundStyle(hot ? AnyShapeStyle(Theme.liveGradient) : AnyShapeStyle(Theme.chromeText))
-                .shadow(color: (hot ? Theme.live : .white).opacity(0.55), radius: 6)
-                .padding(10)
+                .shadow(color: (hot ? Theme.live : .white).opacity(0.55), radius: 6 * size / 38)
+                .padding(10 * size / 38)
                 .drawingGroup()
-                .padding(-10)
+                .padding(-10 * size / 38)
                 .id(digit)
                 .transition(rolls
-                    ? .asymmetric(insertion: .offset(y: -16).combined(with: .opacity),
-                                  removal: .offset(y: 16).combined(with: .opacity))
+                    ? .asymmetric(insertion: .offset(y: -16 * size / 38).combined(with: .opacity),
+                                  removal: .offset(y: 16 * size / 38).combined(with: .opacity))
                     : .identity)
         }
     }
@@ -80,6 +81,8 @@ struct NeonTile: View {
     var hot: Bool = false
     /// Digits roll to the next value (cheap: see `RollingDigit`).
     var rolls = true
+    /// Digit size; the iPhone Duo's first screen uses big tiles.
+    var digits: CGFloat = 38
 
     private var rim: Color { hot ? Theme.live : tint }
     /// Room around the tile for its outer glow (shadow radius 12).
@@ -92,17 +95,17 @@ struct NeonTile: View {
             // made the tab stutter once a second (measured on device).
             HStack(spacing: 0) {
                 ForEach(Array(String(format: "%02d", value).enumerated()), id: \.offset) { _, digit in
-                    RollingDigit(digit: digit, hot: hot, rolls: rolls)
+                    RollingDigit(digit: digit, hot: hot, rolls: rolls, size: digits)
                 }
             }
             .animation(rolls ? .snappy(duration: 0.3) : nil, value: value)
             Text(label)
-                .font(.f1(11, weight: .bold))
-                .tracking(2)
+                .font(.f1(digits > 38 ? 12 : 11, weight: .bold))
+                .tracking(digits > 38 ? 3 : 2)
                 .foregroundStyle(hot ? Theme.live.opacity(0.9) : Color.white.opacity(0.7))
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 15)
+        .padding(.vertical, digits > 38 ? 12 : 15)
         .background(chrome)
     }
 

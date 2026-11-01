@@ -6,31 +6,59 @@ import SwiftUI
 struct TrackSectionView: View {
     let map: TrackMap
     let circuit: Circuit
+    /// The iPhone Duo's first screen (approved draft B): the circuit fills
+    /// the height it's given, open on the page, with its name above.
+    var fill = false
 
     @State private var resetToken = 0
     @State private var showRealWorld = false
     @State private var guide: CircuitGuide?
     @State private var selectedCorner: Int?
 
+    private var inset: CGFloat { fill ? 0 : 14 }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionTitle("THE CIRCUIT")
-                .task(id: circuit.circuitId) {
-                    guard GameFeature.isEnabled else { return }
-                    guide = await GuideService.guide(circuitId: circuit.circuitId, corners: map.corners.count)
+            Group {
+                if fill {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("THE CIRCUIT")
+                            .font(.f1(11, weight: .heavy))
+                            .tracking(2)
+                            .foregroundStyle(Theme.accent)
+                        Text(circuit.circuitName.uppercased())
+                            .font(.f1(18).italic())
+                            .foregroundStyle(Theme.chromeText)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+                } else {
+                    SectionTitle("THE CIRCUIT")
                 }
+            }
+            .task(id: circuit.circuitId) {
+                guard GameFeature.isEnabled else { return }
+                guide = await GuideService.guide(circuitId: circuit.circuitId, corners: map.corners.count)
+            }
 
             VStack(spacing: 0) {
                 // The 3D map runs behind the whole card (see the background
-                // below); this space is where it's framed. Apple Maps stays here.
+                // below); this space is where it's framed. Apple Maps stays
+                // here. Filling a space, the map is drawn here, centred.
                 ZStack {
                     if showRealWorld, let coordinate = circuit.coordinate {
                         CircuitMapView(coordinate: coordinate)
+                            .clipShape(RoundedRectangle(cornerRadius: fill ? 18 : 0))
+                    } else if fill {
+                        TrackStage(map: map, resetToken: resetToken, selectedCorner: selectedCorner) { number in
+                            withAnimation(.easeOut(duration: 0.2)) { selectedCorner = number }
+                        }
                     } else {
                         Color.clear
                     }
                 }
-                .frame(height: TrackSceneBuilder.framed)
+                .frame(height: fill ? nil : TrackSceneBuilder.framed)
+                .frame(maxHeight: fill ? .infinity : nil)
                 .overlay(alignment: .topTrailing) {
                     HStack(spacing: 8) {
                         if circuit.coordinate != nil {
@@ -69,7 +97,7 @@ struct TrackSectionView: View {
                         statChip(String(format: "%.0F M", gain), "ELEVATION")
                     }
                 }
-                .padding(.horizontal, 14)
+                .padding(.horizontal, inset)
                 .padding(.bottom, 14)
 
                 if let guide, !guide.corners.isEmpty {
@@ -79,7 +107,7 @@ struct TrackSectionView: View {
             // The circuit carries on under the stats and fades away instead
             // of being cut off at the map's edge.
             .background(alignment: .top) {
-                if !showRealWorld {
+                if !showRealWorld && !fill {
                     Track3DView(map: map, resetToken: resetToken, selectedCorner: selectedCorner) { number in
                         withAnimation(.easeOut(duration: 0.2)) { selectedCorner = number }
                     }
@@ -93,22 +121,24 @@ struct TrackSectionView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 20))
                 }
             }
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(
-                        LinearGradient(
-                            colors: [Theme.card, Color.black.opacity(0.7)],
-                            startPoint: .top, endPoint: .bottom
+            .background {
+                if !fill {
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(
+                            LinearGradient(
+                                colors: [Theme.card, Color.black.opacity(0.7)],
+                                startPoint: .top, endPoint: .bottom
+                            )
                         )
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20)
-                            .strokeBorder(Theme.glassStroke, lineWidth: 1)
-                    )
-                    .trioGlow(cornerRadius: 20)
-            )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .strokeBorder(Theme.glassStroke, lineWidth: 1)
+                        )
+                        .trioGlow(cornerRadius: 20)
+                }
+            }
 
-            if let wiki = URL(string: circuit.url ?? "") {
+            if !fill, let wiki = URL(string: circuit.url ?? "") {
                 Link(destination: wiki) {
                     HStack(spacing: 4) {
                         Text("Circuit details on Wikipedia")
@@ -130,7 +160,7 @@ struct TrackSectionView: View {
                 .font(.f1(10, weight: .bold))
                 .tracking(3)
                 .foregroundStyle(Theme.faintText)
-                .padding(.horizontal, 14)
+                .padding(.horizontal, inset)
             ScrollViewReader { proxy in
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
@@ -152,7 +182,7 @@ struct TrackSectionView: View {
                             .id(corner.number)
                         }
                     }
-                    .padding(.horizontal, 14)
+                    .padding(.horizontal, inset)
                 }
                 // A turn tapped on the map scrolls its chip into view.
                 .onChange(of: selectedCorner) { _, number in
@@ -179,7 +209,7 @@ struct TrackSectionView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(RoundedRectangle(cornerRadius: 12).fill(Theme.accent.opacity(0.08)))
                 .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.accent.opacity(0.3)))
-                .padding(.horizontal, 14)
+                .padding(.horizontal, inset)
                 .transition(.opacity)
             }
         }

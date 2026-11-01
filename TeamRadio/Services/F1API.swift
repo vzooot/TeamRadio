@@ -39,9 +39,9 @@ enum F1API {
             .raceTable?.races ?? []
     }
 
-    /// Current championship top order.
-    static func driverStandings(limit: Int = 5) async throws -> [DriverStanding] {
-        try await fetch("current/driverstandings.json", query: [URLQueryItem(name: "limit", value: "\(limit)")])
+    /// Current championship top order (or as it stood after `round`).
+    static func driverStandings(limit: Int = 5, after round: String? = nil) async throws -> [DriverStanding] {
+        try await fetch("current/\(round.map { "\($0)/" } ?? "")driverstandings.json", query: [URLQueryItem(name: "limit", value: "\(limit)")])
             .standingsTable?.standingsLists.first?.driverStandings ?? []
     }
 
@@ -51,9 +51,9 @@ enum F1API {
             .standingsTable?.standingsLists.first
     }
 
-    /// Constructors' championship top order.
-    static func constructorStandings(limit: Int = 5) async throws -> [ConstructorStanding] {
-        try await fetch("current/constructorstandings.json", query: [URLQueryItem(name: "limit", value: "\(limit)")])
+    /// Constructors' championship top order (or as it stood after `round`).
+    static func constructorStandings(limit: Int = 5, after round: String? = nil) async throws -> [ConstructorStanding] {
+        try await fetch("current/\(round.map { "\($0)/" } ?? "")constructorstandings.json", query: [URLQueryItem(name: "limit", value: "\(limit)")])
             .standingsTable?.standingsLists.first?.constructorStandings ?? []
     }
 

@@ -6,6 +6,10 @@ struct CountdownView: View {
     let race: Race
     /// The status line under the countdown opens Settings.
     var onSettings: () -> Void = {}
+    /// The iPhone Duo's first screen (approved draft B,
+    /// build/mockups/duo2/sheet-1-first-screen.png): open on the page, the
+    /// time in four big tiles, two by two, the session chips under them.
+    var big = false
 
     @State private var selectedId: String?
     @State private var countdownOn = PushSync.countdownOn
@@ -33,14 +37,18 @@ struct CountdownView: View {
             let target = session?.date ?? now
             let remaining = target.timeIntervalSince(now)
 
-            VStack(spacing: 14) {
-                sessionPicker(now: now, selected: session)
+            VStack(spacing: big ? 10 : 14) {
+                if !big { sessionPicker(now: now, selected: session) }
 
-                if let session {
-                    Text("\(session.kind.rawValue.uppercased()) · \(session.date.formatted(.dateTime.weekday(.wide).hour().minute()).uppercased())")
-                        .font(.f1(12, weight: .bold))
-                        .tracking(2)
-                        .foregroundStyle(Theme.dimText)
+                // Big, the session and the race-week label share a line.
+                if big {
+                    HStack {
+                        if let session { sessionLine(session) }
+                        Spacer(minLength: 8)
+                        if remaining > 0, let label = raceWeekend(now: now).label { gantryLabel(label) }
+                    }
+                } else if let session {
+                    sessionLine(session)
                 }
 
                 if remaining > 0 {
@@ -48,31 +56,41 @@ struct CountdownView: View {
                     DotMatrixBoard(litLights: gantry.lit, pages: infoPages(session: session, remaining: remaining),
                                    standby: gantry.lit == 0)
                         .alignedToContent()
-                    if let label = gantry.label {
-                        Text(label)
-                            .font(.f1(11, weight: .bold))
-                            .tracking(3)
-                            .foregroundStyle(Theme.live)
-                            .shadow(color: Theme.live.opacity(0.7), radius: 6)
+                    if !big, let label = gantry.label {
+                        gantryLabel(label)
                     }
                     let parts = split(remaining)
-                    HStack(spacing: 10) {
-                        NeonTile(value: parts.days, label: "DAYS")
-                        NeonTile(value: parts.hours, label: "HRS")
-                        NeonTile(value: parts.minutes, label: "MIN")
-                        NeonTile(value: parts.seconds, label: "SEC", hot: true)
-                    }
-                    .padding(.top, 4)
-                    .overlay(alignment: .bottom) {
-                        // chassis screws between the tiles
-                        GeometryReader { geo in
-                            ForEach([0.25, 0.75], id: \.self) { f in
-                                Screw(size: 9)
-                                    .position(x: geo.size.width * f, y: geo.size.height + 8)
+                    if big {
+                        Grid(horizontalSpacing: 12, verticalSpacing: 12) {
+                            GridRow {
+                                NeonTile(value: parts.days, label: "DAYS", digits: 54)
+                                NeonTile(value: parts.hours, label: "HOURS", digits: 54)
+                            }
+                            GridRow {
+                                NeonTile(value: parts.minutes, label: "MINUTES", digits: 54)
+                                NeonTile(value: parts.seconds, label: "SECONDS", hot: true, digits: 54)
                             }
                         }
+                        .padding(.top, 4)
+                    } else {
+                        HStack(spacing: 10) {
+                            NeonTile(value: parts.days, label: "DAYS")
+                            NeonTile(value: parts.hours, label: "HRS")
+                            NeonTile(value: parts.minutes, label: "MIN")
+                            NeonTile(value: parts.seconds, label: "SEC", hot: true)
+                        }
+                        .padding(.top, 4)
+                        .overlay(alignment: .bottom) {
+                            // chassis screws between the tiles
+                            GeometryReader { geo in
+                                ForEach([0.25, 0.75], id: \.self) { f in
+                                    Screw(size: 9)
+                                        .position(x: geo.size.width * f, y: geo.size.height + 8)
+                                }
+                            }
+                        }
+                        .padding(.bottom, 10)
                     }
-                    .padding(.bottom, 10)
                 } else if let session, now < session.date.addingTimeInterval(session.kind.expectedDuration) {
                     // Race start = lights out; a live practice/quali keeps the weekend's lights.
                     DotMatrixBoard(litLights: session.kind == .race ? 0 : raceWeekend(now: now).lit)
@@ -86,6 +104,7 @@ struct CountdownView: View {
                         .padding(.vertical, 18)
                 }
 
+                if big { sessionPicker(now: now, selected: session) }
                 autoCountdownLine
             }
             // Settings may have changed while it was open.
@@ -99,17 +118,39 @@ struct CountdownView: View {
                 if let i, sessions.indices.contains(i) { selectedId = sessions[i].id }
             }
             #endif
-            .padding(18)
-            .background(
-                CarbonFiber()
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20)
-                            .strokeBorder(Theme.glassStroke, lineWidth: 1)
-                    )
-                    .trioGlow(cornerRadius: 20)
-            )
+            .padding(big ? 0 : 18)
+            .background {
+                if !big {
+                    CarbonFiber()
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .strokeBorder(Theme.glassStroke, lineWidth: 1)
+                        )
+                        .trioGlow(cornerRadius: 20)
+                }
+            }
         }
+    }
+
+    /// "RACE · SUNDAY 21:00"
+    private func sessionLine(_ session: WeekendSession) -> some View {
+        Text("\(session.kind.rawValue.uppercased()) · \(session.date.formatted(.dateTime.weekday(.wide).hour().minute()).uppercased())")
+            .font(.f1(12, weight: .bold))
+            .tracking(2)
+            .foregroundStyle(Theme.dimText)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+    }
+
+    /// "RACE WEEK", "LIGHTS OUT TOMORROW", "RACE DAY"
+    private func gantryLabel(_ label: String) -> some View {
+        Text(label)
+            .font(.f1(11, weight: .bold))
+            .tracking(3)
+            .foregroundStyle(Theme.live)
+            .shadow(color: Theme.live.opacity(0.7), radius: 6)
+            .lineLimit(1)
     }
 
     private func readSettings() {
