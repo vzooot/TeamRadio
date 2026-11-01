@@ -1,8 +1,13 @@
-React, compete, keep every record:
+Made for iPhone Duo
 
-• React to any message with an emoji: hold a message in the Paddock or in a private chat
-• Lights Out and Reaction Wall get a glowing podium for the week's top three, your place, and a full board with all-time bests and last week
-• Lights Out has a big new start button and a result card after every run, gold for a personal best
-• Your personal bests now follow you to a new phone, and weekly winners are kept for good
-• Long private conversations show their older messages
-• The Games tab opens faster
+Unfold it and Team Radio becomes two screens:
+• The race on one: the countdown as a glowing ring clock, the start lights, Ask Emily and the season
+• The weekend on the other: the 3D circuit, the schedule with the weather, and the standings
+• Hold it sideways like a book or prop it up like a laptop: the two screens follow the fold, and nothing sits on it
+• Results sit beside the standings after each round, Games put your picks next to the arcade, and News opens a story beside the list
+• Lights Out and Reaction Wall play with their board beside the game
+
+Also new:
+• Settings behind the steering wheel: an automatic Lock Screen countdown before every session (1, 2, 4 or 8 hours ahead) and a switch for every kind of notification
+• A champion moment when the title is decided, and a crown over the standings
+• Fixes for a Lock Screen countdown crash and two rare crashes
