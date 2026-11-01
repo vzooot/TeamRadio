@@ -12,6 +12,8 @@ struct StandingsTabView: View {
     /// Spoiler mode (shared with Results): the tables stay blurred until tapped.
     @AppStorage("spoilerMode") private var spoilerMode = false
     @State private var revealed = false
+    /// Once the title is settled: its crown over the drivers (hidden with them in spoiler mode).
+    @Environment(\.champion) private var champion
 
     private var isShielded: Bool { spoilerMode && !revealed }
 
@@ -61,7 +63,10 @@ struct StandingsTabView: View {
                 // Spoiler mode hides the tables too (points give results away).
                 Group {
                     if mode == .drivers {
-                        fullDriversList
+                        VStack(spacing: 16) {
+                            if let champion { ChampionCrown(champion: champion) }
+                            fullDriversList
+                        }
                     } else {
                         fullConstructorsList
                     }

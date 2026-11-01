@@ -12,9 +12,35 @@ enum NotificationManager {
     /// for the prediction game's reminders.
     private static let maxScheduled = 58
 
-    static var isEnabled: Bool {
+    /// Session alerts' own switch.
+    static var sessionAlertsOn: Bool {
         UserDefaults.standard.bool(forKey: enabledKey)
     }
+
+    /// Alerts go out: their own switch and the Notifications main switch.
+    static var isEnabled: Bool {
+        sessionAlertsOn && AppSettings.notificationsOn
+    }
+
+    /// The main switch went off: no session alerts until it's back on.
+    static func removeAll() async {
+        await removeSessionAlerts()
+    }
+
+    #if DEBUG
+    /// -ProvisionalPush YES: quiet notifications without the system prompt
+    /// (the simulator can't grant it otherwise), then lists what has been
+    /// delivered with its attachments, for testing pushes with media.
+    static func provisionalPushCheck() async {
+        let center = UNUserNotificationCenter.current()
+        _ = try? await center.requestAuthorization(options: [.alert, .sound, .provisional])
+        print("delivered: authorization", await center.notificationSettings().authorizationStatus.rawValue)
+        for note in await center.deliveredNotifications() {
+            let media = note.request.content.attachments.map { "\($0.url.lastPathComponent) (\($0.type))" }
+            print("delivered:", note.request.content.title, "| attachments:", media)
+        }
+    }
+    #endif
 
     /// Posted when alerts get switched on outside the settings card (the
     /// first-launch prompt), so the Countdown tab schedules them.

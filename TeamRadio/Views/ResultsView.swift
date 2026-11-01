@@ -10,8 +10,18 @@ struct ResultsView: View {
         case qualifying = "QUALI"
     }
 
-    @State private var model = ResultsViewModel()
+    @State private var model: ResultsViewModel
     @State private var mode: Mode?
+    /// The constructors' top five under the classification (off on the
+    /// iPhone Duo, where the standings sit beside it).
+    private let showsConstructors: Bool
+
+    /// `model`: shared with the standings beside it on the iPhone Duo.
+    @MainActor
+    init(model: ResultsViewModel? = nil, showsConstructors: Bool = true) {
+        _model = State(initialValue: model ?? ResultsViewModel())
+        self.showsConstructors = showsConstructors
+    }
     /// Spoiler mode: classifications stay blurred until tapped.
     @AppStorage("spoilerMode") private var spoilerMode = false
     @State private var revealed = false
@@ -133,7 +143,7 @@ struct ResultsView: View {
                     }
                 }
 
-                if !model.constructorStandings.isEmpty {
+                if showsConstructors, !model.constructorStandings.isEmpty {
                     ConstructorStandingsView(standings: model.constructorStandings)
                 }
             }

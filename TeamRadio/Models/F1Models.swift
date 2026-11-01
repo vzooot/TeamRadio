@@ -42,12 +42,13 @@ struct StandingsTable: Decodable {
 }
 
 struct StandingsList: Decodable {
+    let season: String?
     let round: String?
     let driverStandings: [DriverStanding]?
     let constructorStandings: [ConstructorStanding]?
 
     enum CodingKeys: String, CodingKey {
-        case round
+        case season, round
         case driverStandings = "DriverStandings"
         case constructorStandings = "ConstructorStandings"
     }

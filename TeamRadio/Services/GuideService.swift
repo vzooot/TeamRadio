@@ -20,6 +20,9 @@ struct CircuitGuide: Decodable, Equatable {
     }
 }
 
+/// Main-actor isolated: two circuit views loading at once used to write the
+/// cache from two threads and crash.
+@MainActor
 enum GuideService {
     private static var cache: [String: CircuitGuide] = [:]
 

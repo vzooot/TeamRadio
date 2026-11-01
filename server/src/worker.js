@@ -266,12 +266,15 @@ async function pushSessionStart(env, race, session, leftMs, onlyKeys, forLead) {
 
 /// A normal notification to every registered device (or only `onlyEnv`:
 /// "sandbox" to test on development builds first). `link` opens a tab,
-/// e.g. "teamradio://games". Dead tokens are dropped.
-async function announce(env, { title, body, link, onlyEnv }) {
+/// e.g. "teamradio://games"; `media` (an https link to a short video or an
+/// image) is attached by the app's notification service extension, and
+/// apps without it show the plain message. Dead tokens are dropped.
+async function announce(env, { title, body, link, media, mediaThumb, onlyEnv }) {
   const jwt = await apnsJWT(env);
   const payload = JSON.stringify({
-    aps: { alert: { title, body }, sound: "default" },
+    aps: { alert: { title, body }, sound: "default", ...(media ? { "mutable-content": 1 } : {}) },
     ...(link ? { link } : {}),
+    ...(media ? { media, ...(mediaThumb != null ? { mediaThumb } : {}) } : {}),
   });
   const counts = { sent: 0, failed: 0, removed: 0 };
   let cursor;
@@ -305,6 +308,8 @@ async function announce(env, { title, body, link, onlyEnv }) {
 }
 
 const APP_TOPIC = "com.woqomoqo.OneF";
+/// server/public/media, served by this Worker's static assets.
+const MEDIA = "https://teamradio-push.eam-adio.workers.dev/media";
 
 /// Sends an announcement once per `id`, however often it's called.
 async function announceOnce(env, id, message) {
@@ -315,9 +320,79 @@ async function announceOnce(env, id, message) {
   console.log("announced", id, JSON.stringify(counts));
 }
 
+const JOLPICA = "https://api.jolpi.ca/ergast/f1";
+
+/// The drivers' title: the standings, the rounds still to race and the most
+/// points each can give (25 a race, 8 more with a sprint).
+async function titleState() {
+  const [standings, schedule] = await Promise.all([
+    fetch(`${JOLPICA}/current/driverstandings.json?limit=40`, { cf: { cacheTtl: 300 } }).then((r) => r.json()),
+    fetch(`${JOLPICA}/current.json?limit=40`, { cf: { cacheTtl: 300 } }).then((r) => r.json()),
+  ]);
+  const list = standings?.MRData?.StandingsTable?.StandingsLists?.[0];
+  const races = schedule?.MRData?.RaceTable?.Races ?? [];
+  if (!list || !races.length) return null;
+  const drivers = list.DriverStandings.map((d) => ({
+    name: `${d.Driver.givenName} ${d.Driver.familyName}`, points: Number(d.points), wins: Number(d.wins),
+  }));
+  return { season: list.season, round: Number(list.round), drivers, races };
+}
+
+const maxPoints = (race) => 25 + (race.Sprint ? 8 : 0);
+
+/// Nobody can catch the leader with `left` points and `racesLeft` races to
+/// go (a tie goes to the driver with more wins).
+export function titleDecided(drivers, left, racesLeft) {
+  const [leader, ...rivals] = drivers;
+  return rivals.every((r) => leader.points - r.points > left
+    || (leader.points - r.points === left && leader.wins > r.wins + racesLeft));
+}
+
+/// "Title decider" before a race where the leader can clinch, and "World
+/// Champion" once the standings after a race show it's done. Each once.
+async function titleAnnouncements(env, now) {
+  const t = await titleState();
+  if (!t || t.drivers.length < 2) return;
+  const after = (round) => t.races.filter((r) => Number(r.round) > round);
+  const sum = (list) => list.reduce((s, r) => s + maxPoints(r), 0);
+  const leader = t.drivers[0];
+
+  // Champion: the latest standings settle it, within two days of that race.
+  const last = t.races.find((r) => Number(r.round) === t.round);
+  const lastStart = last && new Date(`${last.date}T${last.time || "00:00:00Z"}`).getTime();
+  if (last && now - lastStart < 2 * 86400_000 && titleDecided(t.drivers, sum(after(t.round)), after(t.round).length)) {
+    await announceOnce(env, `champion:${t.season}`, {
+      title: `🏆 ${leader.name} is the ${t.season} World Champion`,
+      body: "See the final standings.",
+      link: "teamradio://standings",
+      // the trophy clip; its thumbnail is the lit podium near the end
+      media: `${MEDIA}/champion.mp4`,
+      mediaThumb: 9,
+    });
+    return;
+  }
+
+  // Title decider: three hours before the next race, if the leader could
+  // clinch it there (best case: wins it while the rivals score nothing).
+  const next = after(t.round)[0];
+  if (!next) return;
+  const start = new Date(`${next.date}T${next.time || "00:00:00Z"}`).getTime();
+  if (now < start - 3 * 3600_000 || now > start - 2 * 3600_000) return;
+  if (titleDecided(t.drivers, sum(after(t.round)), after(t.round).length)) return;   // already settled
+  const best = [{ ...leader, points: leader.points + maxPoints(next), wins: leader.wins + 1 }, ...t.drivers.slice(1)];
+  if (!titleDecided(best, sum(after(Number(next.round))), after(Number(next.round)).length)) return;
+  await announceOnce(env, `decider:${t.season}-${next.round}`, {
+    title: `🏆 Title decider in ${next.Circuit?.Location?.country || next.raceName}`,
+    body: `${leader.name} can clinch the championship today. Follow it live in Team Radio.`,
+    link: "teamradio://countdown",
+  });
+}
+
 /// Scheduled messages each race weekend (the results one comes from the
-/// game scorer): picks open two days before qualifying.
+/// game scorer): picks open two days before qualifying, and the title
+/// decider and champion messages when the championship is on the line.
 async function autoAnnouncements(env) {
+  await titleAnnouncements(env, Date.now()).catch((e) => console.log("title", String(e)));
   const race = await nextRace();
   if (!race) return;
   const quali = race.sessions.find((s) => s.short === "QUALI");

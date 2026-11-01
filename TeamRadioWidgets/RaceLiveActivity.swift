@@ -83,7 +83,10 @@ struct RaceLiveActivity: Widget {
             if date.timeIntervalSinceNow > 24 * 3600 {
                 Text(date, style: .relative)
             } else {
-                Text(timerInterval: Date.now...date, countsDown: true)
+                // Past the start but not LIVE yet: hold at 0:00 (a range that
+                // ends before it starts traps).
+                let now = Date.now
+                Text(timerInterval: now...max(date, now), countsDown: true)
             }
         }
         .font(.system(size: size, weight: .black).width(.condensed).monospacedDigit())

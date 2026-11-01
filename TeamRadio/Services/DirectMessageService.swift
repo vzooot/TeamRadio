@@ -37,8 +37,13 @@ enum DMKeys {
     private static let service = "com.woqomoqo.OneF.dm"
     private static let account = "curve25519"
     private static var cached: Curve25519.KeyAgreement.PrivateKey?
+    /// The inbox, an open conversation and the badge ask at the same time;
+    /// without it two first calls could each create and save a different key.
+    private static let lock = NSLock()
 
     static var privateKey: Curve25519.KeyAgreement.PrivateKey {
+        lock.lock()
+        defer { lock.unlock() }
         if let cached { return cached }
         if let raw = load(), let key = try? Curve25519.KeyAgreement.PrivateKey(rawRepresentation: raw) {
             cached = key
@@ -123,7 +128,10 @@ enum DMError: LocalizedError {
 /// end-to-end; only the sender and recipient names and ids are in the clear.
 enum DirectMessageService {
     private static var database: CKDatabase { ChatService.container.publicCloudDatabase }
+    /// Other people's public keys, read and written from several tasks at
+    /// once (inbox, conversation, badge), so behind a lock.
     private static var keyCache: [String: Data] = [:]
+    private static let keyCacheLock = NSLock()
 
     static func threadId(_ a: String, _ b: String) -> String {
         [a, b].sorted().joined(separator: "|")
@@ -140,10 +148,10 @@ enum DirectMessageService {
     }
 
     static func publicKey(of userId: String) async -> Data? {
-        if let cached = keyCache[userId] { return cached }
+        if let cached = keyCacheLock.withLock({ keyCache[userId] }) { return cached }
         guard let record = try? await database.record(for: CKRecord.ID(recordName: "key-\(userId)")),
               let data = record["publicKey"] as? Data else { return nil }
-        keyCache[userId] = data
+        keyCacheLock.withLock { keyCache[userId] = data }
         return data
     }
 
@@ -261,6 +269,11 @@ enum DirectMessageService {
     /// CloudKit itself pushes "X sent you a private message" for every new
     /// record addressed to me — no server in the loop. Idempotent.
     static func subscribeToInbox(me: String) async {
+        // Settings: the Notifications main switch also silences private messages.
+        guard await AppSettings.notificationsOn else {
+            _ = try? await database.deleteSubscription(withID: "dm-inbox-\(me)")
+            return
+        }
         let subscription = CKQuerySubscription(
             recordType: "DirectMessage",
             predicate: NSPredicate(format: "toId == %@", me),

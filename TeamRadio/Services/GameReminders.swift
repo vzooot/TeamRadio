@@ -9,12 +9,20 @@ import UserNotifications
 enum GameReminders {
     private static let prefix = "game-"
 
-    static func reschedule(race: Race?, saved: Set<PickGroup>, now: Date = .now) async {
+    /// Every pending picks reminder, gone (switched off in Settings).
+    static func removeAll() async {
         let center = UNUserNotificationCenter.current()
         let pending = await center.pendingNotificationRequests().map(\.identifier).filter { $0.hasPrefix(prefix) }
         center.removePendingNotificationRequests(withIdentifiers: pending)
+    }
 
-        guard let race, await center.notificationSettings().authorizationStatus == .authorized else { return }
+    static func reschedule(race: Race?, saved: Set<PickGroup>, now: Date = .now) async {
+        let center = UNUserNotificationCenter.current()
+        await removeAll()
+
+        // Settings: picks reminders on, under the Notifications main switch.
+        guard let race, AppSettings.notificationsOn, AppSettings.picksReminders,
+              await center.notificationSettings().authorizationStatus == .authorized else { return }
         let flag = Flags.emoji(for: race.circuit.location.country)
         let name = race.raceName
 

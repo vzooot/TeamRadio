@@ -2,7 +2,8 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var model = RaceViewModel()
-    @State private var showAbout = false
+    /// The steering-wheel button: Settings (About is inside).
+    @State private var showSettings = false
     @State private var dotd = DotdModel()
     @State private var showDotd = false
     @State private var showEmily = false
@@ -13,6 +14,10 @@ struct ContentView: View {
 
     /// The schedule and circuit are on screen (false while a switch swaps them).
     @State private var sectionsShown = true
+    /// The iPhone Duo's inner display: the race and the weekend, one each
+    /// side of the fold.
+    @State private var halves: Halves?
+    @State private var standings = StandingsViewModel()
 
     /// Switching race: the countdown stays and updates in place, its digits
     /// rolling to the new race; the schedule and circuit slip out, are
@@ -48,9 +53,10 @@ struct ContentView: View {
                     Task { await model.load() }
                 }
             case .loaded:
-                loadedContent
+                if let halves { duoContent(halves) } else { loadedContent }
             }
         }
+        .onHalves($halves)
         .task {
             await model.load()
             await NotificationManager.adoptDefault()
@@ -61,8 +67,10 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: NotificationManager.didEnable)) { _ in
             Task { await NotificationManager.reschedule(season: model.season) }
         }
-        .sheet(isPresented: $showAbout) {
-            AboutView()
+        .sheet(isPresented: $showSettings) {
+            SettingsView(season: model.season)
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.background)
         }
         .task(id: model.nextRace?.id) {
             guard GameFeature.isEnabled, !model.season.isEmpty else { return }
@@ -112,7 +120,7 @@ struct ContentView: View {
                         LiveSessionBanner(race: race)
                     }
 
-                    HeaderView(onInfo: { showAbout = true })
+                    HeaderView(onInfo: { showSettings = true })
                 }
                 .padding(.bottom, -6)
                 // the helmet hangs over the race card, so the header draws on top
@@ -127,29 +135,13 @@ struct ContentView: View {
                     }
                     .id("hero")
 
-                    CountdownView(race: race)
+                    CountdownView(race: race, onSettings: { showSettings = true })
                     emilyBar
 
-                    // The weekend's sessions always right under the countdown.
-                    VStack {
-                        WeekendScheduleView(race: race, weather: model.weather, weatherLoading: model.extrasLoading)
-                            .id(race.id)
-                    }
-                    .cascade(sectionsShown, delay: 0)
-                    .id("schedule")
-
-                    // ...and the circuit right after the weekend's sessions.
-                    VStack {
-                        if let map = model.trackMap {
-                            // fades only: the 3D scene is too heavy to slide
-                            TrackSectionView(map: map, circuit: race.circuit)
-                                .id(race.circuit.circuitId)
-                        } else if model.extrasLoading {
-                            TrackPlaceholder()
-                        }
-                    }
-                    .cascade(sectionsShown, delay: 0.08)
-                    .id("trackSection")
+                    // The weekend's sessions always right under the countdown,
+                    // and the circuit right after them.
+                    schedule(race)
+                    track(race)
 
                     #if DEBUG
                     if BlendDraft.gameZoneInApp {
@@ -158,14 +150,7 @@ struct ContentView: View {
                     #endif
                     // The fan vote (Ask Emily sits under the countdown); the games
                     // themselves live in the Games tab.
-                    if GameFeature.isEnabled, !model.isBrowsing {
-                        TimelineView(.periodic(from: .now, by: 30)) { context in
-                            if dotd.race != nil {
-                                DotdBoldCard(model: dotd, now: context.date, onVote: { showDotd = true })
-                            }
-                        }
-                        .transaction(value: model.isBrowsing) { $0.animation = nil }
-                    }
+                    fanVote
 
                     if !Self.demoMode {
                         InviteBanner()
@@ -176,19 +161,7 @@ struct ContentView: View {
 
                 // (The championship lives in the Standings tab, not here.)
 
-                if model.displayRace != nil {
-                    // Settings for every session, just above the season's races.
-                    SessionAlertsCard(season: model.season)
-                        .id("alerts")
-                }
-
-                if !model.season.isEmpty {
-                    SeasonView(season: model.season, nextRaceId: model.nextRace?.id,
-                               selectedId: model.displayRace?.id) { race in
-                        pickFromSeason(race, proxy: proxy)
-                    }
-                    .id("season")
-                }
+                seasonList(proxy)
 
                 FooterView()
             }
@@ -237,6 +210,169 @@ struct ContentView: View {
             withAnimation(.easeInOut(duration: step.duration)) { proxy.scrollTo(id, anchor: step.anchor) }
         }
         #endif
+        }
+    }
+
+    /// The iPhone Duo's inner display (approved, build/mockups/duo6/sheet-hub.png):
+    /// two screens, one each side of the fold, nothing across it. The race
+    /// half: the header, the countdown as a ring clock with the race on it,
+    /// Emily, the fan vote and the season. The weekend half: its own screen
+    /// with the circuit, the timetable and the standings. Side by side when
+    /// held like a book, one above the other standing like a laptop; the
+    /// phone column stays as it is.
+    @ViewBuilder
+    private func duoContent(_ halves: Halves) -> some View {
+        let gap: CGFloat = 28
+        Group {
+            if halves.axis == .horizontal {
+                HStack(alignment: .top, spacing: gap) {
+                    raceHalf(column: true)
+                        .frame(width: max(0, halves.fold - gap / 2 - 16))
+                    weekendHalf
+                }
+                .padding(.horizontal, 16)
+            } else {
+                VStack(spacing: gap) {
+                    raceHalf(column: false)
+                        .frame(height: max(0, halves.fold - gap / 2))
+                    weekendHalf
+                }
+                .padding(.horizontal, 16)
+            }
+        }
+        .background(alignment: .topTrailing) {
+            // the weekend half's own light, so the halves read as two screens
+            RadialGradient(colors: [Theme.violet.opacity(0.14), .clear], center: .topTrailing, startRadius: 0, endRadius: 420)
+                .ignoresSafeArea()
+        }
+        .task { await standings.load() }
+    }
+
+    /// The race and its countdown, then everything else for the weekend
+    /// ahead, scrolling. In a column (book pose) the countdown card carries
+    /// the race; across the top (laptop pose) the race card sits beside it.
+    private func raceHalf(column: Bool) -> some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 18) {
+                        if let race = model.nextRace {
+                            LiveSessionBanner(race: race)
+                        }
+                        if column {
+                            HeaderView(onInfo: { showSettings = true })
+                        }
+                    }
+                    .padding(.bottom, column ? -6 : 0)
+                    .zIndex(1)
+                    // where a pick from the season list glides back to
+                    .id("top")
+
+                    if let race = model.displayRace {
+                        if column {
+                            if model.isBrowsing { nextRaceButton }
+                            CountdownView(race: race, onSettings: { showSettings = true }, ring: 246, showsRaceTitle: true)
+                        } else {
+                            HStack(alignment: .top, spacing: 16) {
+                                VStack(alignment: .leading, spacing: 16) {
+                                    HeaderView(onInfo: { showSettings = true }).padding(.bottom, -6).zIndex(1)
+                                    RaceHeroView(race: race, onBack: model.isBrowsing ? backToNextRace : nil)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                CountdownView(race: race, onSettings: { showSettings = true }, ring: 190)
+                                    .padding(.top, 8)
+                            }
+                        }
+                        emilyBar
+                        fanVote
+                        if !Self.demoMode {
+                            InviteBanner()
+                        }
+                    } else {
+                        SeasonOverBanner()
+                    }
+                    seasonList(proxy)
+                    FooterView()
+                }
+                .padding(.top, 8)
+                .padding(.bottom, 24)
+            }
+            .scrollIndicators(.hidden)
+            .refreshable { await model.load() }
+        }
+    }
+
+    @ViewBuilder
+    private var weekendHalf: some View {
+        if let race = model.displayRace {
+            WeekendHub(race: race, model: model, standings: standings)
+                .cascade(sectionsShown, delay: 0.08)
+        } else {
+            Color.clear
+        }
+    }
+
+    /// While browsing another round: back to the next race.
+    private var nextRaceButton: some View {
+        Button(action: backToNextRace) {
+            HStack(spacing: 4) {
+                Image(systemName: "arrow.uturn.backward").font(.system(size: 9, weight: .bold))
+                Text("NEXT RACE").font(.f1(10, weight: .bold)).tracking(1)
+            }
+            .foregroundStyle(Theme.accent)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(Theme.accent.opacity(0.1))
+                .overlay(Capsule().strokeBorder(Theme.accent.opacity(0.5), lineWidth: 1)))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Back to next race")
+    }
+
+    private func schedule(_ race: Race) -> some View {
+        VStack {
+            WeekendScheduleView(race: race, weather: model.weather, weatherLoading: model.extrasLoading)
+                .id(race.id)
+        }
+        .cascade(sectionsShown, delay: 0)
+        .id("schedule")
+    }
+
+    private func track(_ race: Race) -> some View {
+        VStack {
+            if let map = model.trackMap {
+                // fades only: the 3D scene is too heavy to slide
+                TrackSectionView(map: map, circuit: race.circuit)
+                    .id(race.circuit.circuitId)
+            } else if model.extrasLoading {
+                TrackPlaceholder()
+            }
+        }
+        .cascade(sectionsShown, delay: 0.08)
+        .id("trackSection")
+    }
+
+    /// Driver of the Day, while the next race is on screen.
+    @ViewBuilder
+    private var fanVote: some View {
+        if GameFeature.isEnabled, !model.isBrowsing {
+            TimelineView(.periodic(from: .now, by: 30)) { context in
+                if dotd.race != nil {
+                    DotdBoldCard(model: dotd, now: context.date, onVote: { showDotd = true })
+                }
+            }
+            .transaction(value: model.isBrowsing) { $0.animation = nil }
+        }
+    }
+
+    @ViewBuilder
+    private func seasonList(_ proxy: ScrollViewProxy) -> some View {
+        if !model.season.isEmpty {
+            SeasonView(season: model.season, nextRaceId: model.nextRace?.id,
+                       selectedId: model.displayRace?.id) { race in
+                pickFromSeason(race, proxy: proxy)
+            }
+            .id("season")
         }
     }
 
@@ -355,7 +491,7 @@ struct HeaderView: View {
                 if let onInfo {
                     Button(action: onInfo) { CockpitButton() }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("About and settings")
+                        .accessibilityLabel("Settings")
                 }
             }
 
@@ -446,71 +582,6 @@ struct SeasonOverBanner: View {
     }
 }
 
-/// Toggle for on-device session alerts: one notification 15 minutes before
-/// every upcoming session of the season.
-struct SessionAlertsCard: View {
-    let season: [Race]
-
-    @State private var enabled = NotificationManager.isEnabled
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-        HStack(spacing: 12) {
-            Image(systemName: enabled ? "bell.badge.fill" : "bell.slash")
-                .font(.system(size: 20))
-                .foregroundStyle(enabled ? Theme.accent : Theme.dimText)
-                .frame(width: 30)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("SESSION ALERTS")
-                    .font(.f1(15).italic())
-                    .foregroundStyle(.white)
-                Text("A notification 15 minutes before every session")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Theme.dimText)
-            }
-
-            Spacer()
-
-            Toggle("", isOn: $enabled)
-                .labelsHidden()
-                .tint(Theme.accent)
-        }
-        Rectangle().fill(Color.white.opacity(0.06)).frame(height: 1)
-        LockScreenCountdownRow()
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 18)
-                .fill(Theme.card)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18)
-                        .strokeBorder(Theme.glassStroke, lineWidth: 1)
-                )
-        )
-        #if DEBUG
-        .onChange(of: DemoDirector.shared.alertsOn) { _, on in
-            if let on { withAnimation { enabled = on } }
-        }
-        #endif
-        .onReceive(NotificationCenter.default.publisher(for: NotificationManager.didEnable)) { _ in
-            enabled = true
-        }
-        .onChange(of: enabled) { old, wantsOn in
-            guard old != wantsOn else { return }
-            #if DEBUG
-            if DemoDirector.shared.isActive { return }   // demo: on screen only
-            #endif
-            Task {
-                let result = await NotificationManager.setEnabled(wantsOn, season: season)
-                // Flips back if the user denied the permission prompt.
-                if result != wantsOn { enabled = result }
-            }
-        }
-    }
-}
-
 /// Impossible-to-miss banner shown at the very top while a session is on track.
 struct LiveSessionBanner: View {
     let race: Race
@@ -584,42 +655,4 @@ struct FooterView: View {
 
 #Preview {
     ContentView()
-}
-
-
-/// How early the server starts the Lock Screen countdown for each session,
-/// or off. One choice, applied to every session of the season. Sits inside
-/// the Session Alerts card.
-struct LockScreenCountdownRow: View {
-    @State private var lead = PushSync.lead
-    private let options: [(Int, String)] = [(0, "OFF"), (15, "15 MIN"), (60, "1 H"), (180, "3 H")]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 12) {
-                Image(systemName: lead == 0 ? "lock.slash" : "lock.iphone")
-                    .font(.system(size: 20))
-                    .foregroundStyle(lead == 0 ? Theme.dimText : Theme.accent)
-                    .frame(width: 30)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("LOCK SCREEN COUNTDOWN")
-                        .font(.f1(15).italic())
-                        .foregroundStyle(.white)
-                    Text(lead == 0 ? "Off. Pin a session yourself with the pin button."
-                         : "Appears by itself before every session, all season")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Theme.dimText)
-                }
-            }
-            HStack(spacing: 6) {
-                ForEach(options, id: \.0) { value, label in
-                    Button { lead = value } label: {
-                        NeonChip(title: label, tint: Theme.accent, selected: lead == value)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-        .onChange(of: lead) { _, value in PushSync.lead = value }
-    }
 }

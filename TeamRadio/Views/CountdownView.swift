@@ -4,9 +4,17 @@ import SwiftUI
 /// to count down to it. Defaults to the next session that hasn't started.
 struct CountdownView: View {
     let race: Race
+    /// The status line under the countdown opens Settings.
+    var onSettings: () -> Void = {}
+    /// The iPhone Duo's inner display (approved, build/mockups/duo6/sheet-hub.png):
+    /// the time in a ring clock this wide instead of the four tiles.
+    var ring: CGFloat?
+    /// The race on top of the card (the Duo's race half, where no race card sits above).
+    var showsRaceTitle = false
 
     @State private var selectedId: String?
-    @State private var pinned = false
+    @State private var countdownOn = PushSync.countdownOn
+    @State private var countdownHours = PushSync.countdownHours
 
     private var sessions: [WeekendSession] { race.sessions }
 
@@ -30,46 +38,52 @@ struct CountdownView: View {
             let target = session?.date ?? now
             let remaining = target.timeIntervalSince(now)
 
-            VStack(spacing: 14) {
+            VStack(spacing: ring == nil ? 14 : 12) {
+                if showsRaceTitle { raceTitle }
+
                 sessionPicker(now: now, selected: session)
 
-                if let session {
-                    Text("\(session.kind.rawValue.uppercased()) · \(session.date.formatted(.dateTime.weekday(.wide).hour().minute()).uppercased())")
-                        .font(.f1(12, weight: .bold))
-                        .tracking(2)
-                        .foregroundStyle(Theme.dimText)
+                if ring == nil, let session {
+                    sessionLine(session)
                 }
 
                 if remaining > 0 {
                     let gantry = raceWeekend(now: now)
-                    DotMatrixBoard(litLights: gantry.lit, pages: infoPages(session: session, remaining: remaining),
-                                   standby: gantry.lit == 0)
-                        .alignedToContent()
-                    if let label = gantry.label {
-                        Text(label)
-                            .font(.f1(11, weight: .bold))
-                            .tracking(3)
-                            .foregroundStyle(Theme.live)
-                            .shadow(color: Theme.live.opacity(0.7), radius: 6)
-                    }
-                    let parts = split(remaining)
-                    HStack(spacing: 10) {
-                        NeonTile(value: parts.days, label: "DAYS")
-                        NeonTile(value: parts.hours, label: "HRS")
-                        NeonTile(value: parts.minutes, label: "MIN")
-                        NeonTile(value: parts.seconds, label: "SEC", hot: true)
-                    }
-                    .padding(.top, 4)
-                    .overlay(alignment: .bottom) {
-                        // chassis screws between the tiles
-                        GeometryReader { geo in
-                            ForEach([0.25, 0.75], id: \.self) { f in
-                                Screw(size: 9)
-                                    .position(x: geo.size.width * f, y: geo.size.height + 8)
+                    let board = DotMatrixBoard(litLights: gantry.lit, pages: infoPages(session: session, remaining: remaining),
+                                               standby: gantry.lit == 0)
+                    if let ring {
+                        RingClock(remaining: remaining,
+                                  caption: session.map { "\($0.kind.rawValue.uppercased()) · \($0.date.formatted(.dateTime.weekday(.abbreviated).hour().minute()).uppercased())" } ?? "",
+                                  hot: session?.kind == .race, size: ring)
+                            .frame(maxWidth: .infinity)
+                        HStack(spacing: 10) {
+                            board.alignedToContent()
+                            if let label = gantry.label { gantryLabel(label).fixedSize() }
+                        }
+                    } else {
+                        board.alignedToContent()
+                        if let label = gantry.label {
+                            gantryLabel(label)
+                        }
+                        let parts = split(remaining)
+                        HStack(spacing: 10) {
+                            NeonTile(value: parts.days, label: "DAYS")
+                            NeonTile(value: parts.hours, label: "HRS")
+                            NeonTile(value: parts.minutes, label: "MIN")
+                            NeonTile(value: parts.seconds, label: "SEC", hot: true)
+                        }
+                        .padding(.top, 4)
+                        .overlay(alignment: .bottom) {
+                            // chassis screws between the tiles
+                            GeometryReader { geo in
+                                ForEach([0.25, 0.75], id: \.self) { f in
+                                    Screw(size: 9)
+                                        .position(x: geo.size.width * f, y: geo.size.height + 8)
+                                }
                             }
                         }
+                        .padding(.bottom, 10)
                     }
-                    .padding(.bottom, 10)
                 } else if let session, now < session.date.addingTimeInterval(session.kind.expectedDuration) {
                     // Race start = lights out; a live practice/quali keeps the weekend's lights.
                     DotMatrixBoard(litLights: session.kind == .race ? 0 : raceWeekend(now: now).lit)
@@ -83,28 +97,33 @@ struct CountdownView: View {
                         .padding(.vertical, 18)
                 }
 
-                if let session, session.date.addingTimeInterval(session.kind.expectedDuration) > now {
-                    pinButton(session: session)
-                }
+                autoCountdownLine
             }
-            .onAppear { pinned = LiveActivityManager.hasPinIntent }
+            // Settings may have changed while it was open.
+            .onAppear { readSettings() }
+            .onReceive(NotificationCenter.default.publisher(for: AppSettings.didChange)) { _ in readSettings() }
             // Updated in place when the race changes (the digits roll over):
             // start again from that race's next session.
-            .onChange(of: race.id) { _, _ in
-                selectedId = nil
-                pinned = LiveActivityManager.hasPinIntent
-            }
+            .onChange(of: race.id) { _, _ in selectedId = nil }
             #if DEBUG
             .onChange(of: DemoDirector.shared.sessionIndex) { _, i in
                 if let i, sessions.indices.contains(i) { selectedId = sessions[i].id }
-            }
-            .onChange(of: DemoDirector.shared.pinned) { _, on in
-                if let on { pinned = on }                    // demo: on screen only
             }
             #endif
             .padding(18)
             .background(
                 CarbonFiber()
+                    .overlay {
+                        // the race card's flag, with the race on top
+                        if showsRaceTitle {
+                            Text(Flags.emoji(for: race.circuit.location.country))
+                                .font(.system(size: 150))
+                                .opacity(0.08)
+                                .rotationEffect(.degrees(-12))
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                                .offset(x: 24, y: -10)
+                        }
+                    }
                     .clipShape(RoundedRectangle(cornerRadius: 20))
                     .overlay(
                         RoundedRectangle(cornerRadius: 20)
@@ -115,35 +134,84 @@ struct CountdownView: View {
         }
     }
 
-    /// Starts/stops the Wolt-style Live Activity on the Lock Screen and in
-    /// the Dynamic Island.
-    private func pinButton(session: WeekendSession) -> some View {
-        Button {
-            if pinned {
-                LiveActivityManager.unpin()
-                pinned = false
-            } else {
-                LiveActivityManager.start(race: race, session: session)
-                pinned = true
-                ReviewPrompt.goodMoment()
+    /// The round, the race and the circuit, as on the race card.
+    private var raceTitle: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("ROUND \(race.roundNumber)")
+                    .font(.f1(13).italic())
+                    .tracking(1)
+                    .foregroundStyle(Theme.onAccent)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Theme.accentGradient, in: RoundedRectangle(cornerRadius: 7))
+                Spacer()
+                Text(race.season).font(.f1(15).italic()).foregroundStyle(Theme.dimText)
             }
-        } label: {
+            Text(race.raceName.uppercased())
+                .font(.f1(28).italic())
+                .foregroundStyle(Theme.chromeText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            Text("\(Flags.emoji(for: race.circuit.location.country)) \(race.circuit.circuitName) · \(race.circuit.location.locality)")
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.dimText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// "RACE · SUNDAY 21:00"
+    private func sessionLine(_ session: WeekendSession) -> some View {
+        Text("\(session.kind.rawValue.uppercased()) · \(session.date.formatted(.dateTime.weekday(.wide).hour().minute()).uppercased())")
+            .font(.f1(12, weight: .bold))
+            .tracking(2)
+            .foregroundStyle(Theme.dimText)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+    }
+
+    /// "RACE WEEK", "LIGHTS OUT TOMORROW", "RACE DAY"
+    private func gantryLabel(_ label: String) -> some View {
+        Text(label)
+            .font(.f1(11, weight: .bold))
+            .tracking(3)
+            .foregroundStyle(Theme.live)
+            .shadow(color: Theme.live.opacity(0.7), radius: 6)
+            .lineLimit(1)
+    }
+
+    private func readSettings() {
+        countdownOn = PushSync.countdownOn
+        countdownHours = PushSync.countdownHours
+    }
+
+    /// What happens by itself (the server starts the Lock Screen countdown
+    /// before every session); tapping it opens Settings.
+    private var autoCountdownLine: some View {
+        let tint = countdownOn ? Theme.accent : Theme.dimText
+        return Button(action: onSettings) {
             HStack(spacing: 6) {
-                Image(systemName: pinned ? "pin.slash.fill" : "pin.fill")
-                    .font(.system(size: 11, weight: .bold))
-                Text(pinned ? "UNPIN FROM LOCK SCREEN" : "PIN \(session.kind.short) TO LOCK SCREEN")
+                Image(systemName: countdownOn ? "lock.iphone" : "lock.slash")
+                    .font(.system(size: 12, weight: .bold))
+                Text(countdownOn ? "ON YOUR LOCK SCREEN \(countdownHours) H BEFORE" : "LOCK SCREEN COUNTDOWN OFF")
                     .font(.f1(12, weight: .bold))
                     .tracking(1)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer(minLength: 4)
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 12))
             }
-            .foregroundStyle(pinned ? Theme.dimText : Theme.accent)
-            .frame(maxWidth: .infinity)
+            .foregroundStyle(tint)
+            .padding(.horizontal, 12)
             .padding(.vertical, 9)
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .strokeBorder(pinned ? Theme.cardStroke : Theme.accent.opacity(0.5), lineWidth: 1)
-            )
+            .background(RoundedRectangle(cornerRadius: 10).fill(tint.opacity(0.08)))
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityHint("Opens Settings")
     }
 
     private func sessionPicker(now: Date, selected: WeekendSession?) -> some View {

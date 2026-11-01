@@ -3,6 +3,7 @@
 included:
   - TeamRadio
   - TeamRadioWidgets
+  - TeamRadioNotificationService
   - Shared
 excluded:
   - build

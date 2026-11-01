@@ -86,6 +86,10 @@ struct GamesView: View {
     @State private var showLightsOut = false
     @State private var showWall = false
     @State private var showLeaderboard = false
+    /// An arcade game's full board (the iPhone Duo shows this week's beside the game).
+    @State private var fullBoard: ArcadeGame?
+    @State private var wide = false
+    @AppStorage("chatNickname") private var nickname = ""
 
     var body: some View {
         ZStack {
@@ -101,9 +105,9 @@ struct GamesView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     TimelineView(.periodic(from: .now, by: 30)) { context in
-                        content(now: context.date)
+                        if wide { wideContent(now: context.date) } else { content(now: context.date) }
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, wide ? 18 : 16)
                     .padding(.top, 8)
                     .padding(.bottom, 32)
                 }
@@ -116,12 +120,27 @@ struct GamesView: View {
                     try? await Task.sleep(for: .seconds(5))
                     proxy.scrollTo(id, anchor: .top)
                 }
+                .task {
+                    // -OpenGame lights|wall: opens that arcade game, for screenshots
+                    guard let id = UserDefaults.standard.string(forKey: "OpenGame") else { return }
+                    try? await Task.sleep(for: .seconds(1))
+                    if id == "wall" { showWall = true } else { showLightsOut = true }
+                }
                 #endif
             }
             .transition(.opacity)
             }
         }
         .animation(.easeOut(duration: 0.25), value: model.ready)
+        .onWideScreen($wide)
+        .sheet(isPresented: Binding(get: { fullBoard != nil }, set: { if !$0 { fullBoard = nil } })) {
+            if let fullBoard {
+                ArcadeFullBoard(game: fullBoard, userId: model.userId)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+                    .presentationBackground(Theme.background)
+            }
+        }
         .fullScreenCover(isPresented: $showWall, onDismiss: { Task { await model.loadArcadeBoards() } }) {
             ReactionWallView()
         }
@@ -171,6 +190,35 @@ struct GamesView: View {
                              players: model.lightsBoard?.total) { showLightsOut = true }
                 ArcadeBanner(kind: .wall, rank: model.wallBoard?.me?.rank,
                              players: model.wallBoard?.total) { showWall = true }
+            }
+        }
+    }
+
+    /// The iPhone Duo unfolded (approved draft A,
+    /// build/mockups/duo2/sheet-3-games-news.png): your season game in the
+    /// left half, the arcade in the right, each game with this week's board.
+    private func wideContent(now: Date) -> some View {
+        HStack(alignment: .top, spacing: 18) {
+            VStack(alignment: .leading, spacing: 16) {
+                title
+                RankBoard(board: model.seasonBoard, onOpen: { showLeaderboard = true })
+                PicksHero(game: game, state: game.cardState(at: now), now: now, seasonRounds: model.season.count,
+                          onPicks: { showPicks = true }, onResult: { showResult = true })
+            }
+            .frame(width: WideScreen.column)
+            VStack(alignment: .leading, spacing: 12) {
+                SectionTitle("ARCADE")
+                    .id("arcade")
+                    .padding(.top, 14)
+                ArcadeBanner(kind: .lightsOut, rank: model.lightsBoard?.me?.rank,
+                             players: model.lightsBoard?.total) { showLightsOut = true }
+                ArcadeBoardCard(game: .lightsOut, standing: model.lightsBoard.map { ArcadeGame.from($0) },
+                                loaded: model.ready, hasName: !nickname.isEmpty) { fullBoard = .lightsOut }
+                ArcadeBanner(kind: .wall, rank: model.wallBoard?.me?.rank,
+                             players: model.wallBoard?.total) { showWall = true }
+                    .padding(.top, 10)
+                ArcadeBoardCard(game: .wall, standing: model.wallBoard.map { ArcadeGame.from($0) },
+                                loaded: model.ready, hasName: !nickname.isEmpty) { fullBoard = .wall }
             }
         }
     }

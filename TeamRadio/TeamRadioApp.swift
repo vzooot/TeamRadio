@@ -75,6 +75,16 @@ struct RootView: View {
     @State private var showNotificationPrompt = false
     @State private var showIntro = false   // the lights intro is out; a designed clip replaces it
     #if DEBUG
+    // -ResultsPage standings: open on the standings, for screenshots
+    @State private var resultsPage: ResultsHubView.Page = UserDefaults.standard.string(forKey: "ResultsPage") == "standings" ? .standings : .results
+    #else
+    @State private var resultsPage: ResultsHubView.Page = .results
+    #endif
+    /// The season's champion once the title is settled, and its moment.
+    @State private var champion: Champion?
+    @State private var showChampion = false
+    @State private var checkingChampion = false
+    #if DEBUG
     private static let designLabOpen = UserDefaults.standard.string(forKey: "DesignLab") != nil
     #else
     private static let designLabOpen = false
@@ -88,7 +98,7 @@ struct RootView: View {
                 .tabItem { Image(systemName: "flag.checkered").environment(\.symbolVariants, .none).accessibilityLabel("Countdown") }
                 .tag(Tab.countdown)
             // Results and the standings, behind a RESULTS | STANDINGS switch.
-            ResultsHubView()
+            ResultsHubView(page: $resultsPage)
                 .tabItem { Image(systemName: "trophy").environment(\.symbolVariants, .none).accessibilityLabel("Results") }
                 .tag(Tab.results)
             GamesView(model: games)
@@ -116,6 +126,16 @@ struct RootView: View {
             }
         }
         .task { await games.load() }
+        .task { await loadChampion() }
+        .environment(\.champion, champion)
+        .fullScreenCover(isPresented: $showChampion) {
+            if let champion {
+                ChampionMoment(champion: champion) {
+                    selection = Tab.results
+                    resultsPage = .standings
+                }
+            }
+        }
         .environment(\.openProfile, OpenProfileAction { profile = $0 })
         .sheet(item: $profile) { target in
             ProfileSheet(target: target)
@@ -127,6 +147,9 @@ struct RootView: View {
                 .presentationBackground(Theme.background)
         }
         .task {
+            #if DEBUG
+            if UserDefaults.standard.bool(forKey: "ProvisionalPush") { await NotificationManager.provisionalPushCheck() }
+            #endif
             // First launch: ask for notifications once the app has settled.
             guard !Self.designLabOpen, await NotificationManager.shouldPrompt() else { return }
             try? await Task.sleep(for: .seconds(2.5))
@@ -143,9 +166,12 @@ struct RootView: View {
         .onOpenURL { url in
             let map = ["countdown": Tab.countdown, "results": Tab.results, "standings": Tab.results,
                        "games": Tab.games, "paddock": Tab.paddock, "news": Tab.news]
-            if let tab = map[(url.host ?? "").lowercased()] {
+            let host = (url.host ?? "").lowercased()
+            if let tab = map[host] {
                 selection = tab
             }
+            if host == "standings" { resultsPage = .standings }
+            if host == "results" { resultsPage = .results }
         }
         .onChange(of: selection) { _, tab in
             if tab == Tab.paddock {
@@ -188,10 +214,28 @@ struct RootView: View {
             if phase == .active {
                 LiveActivityManager.refresh()
                 chatBadge.start()
+                // the title can be settled while the app sits in the background
+                Task { await loadChampion() }
             } else {
                 chatBadge.stop()
             }
         }
+    }
+
+    /// Checks the title; the first time it's settled, the title moment shows
+    /// (once a season; not over the first-launch prompt or in spoiler mode).
+    private func loadChampion() async {
+        // launch and becoming active both ask; one check at a time
+        guard !Self.designLabOpen, !checkingChampion else { return }
+        checkingChampion = true
+        defer { checkingChampion = false }
+        champion = await Championship.load()
+        guard let champion, !showChampion, Championship.shouldCelebrate(champion),
+              await !NotificationManager.shouldPrompt() else { return }
+        try? await Task.sleep(for: .seconds(1))
+        guard !showNotificationPrompt else { return }
+        Championship.celebrated(champion)
+        showChampion = true
     }
 }
 

@@ -7,25 +7,39 @@ import SwiftUI
 struct ResultsHubView: View {
     enum Page { case results, standings }
 
-    #if DEBUG
-    // -ResultsPage standings: open on the standings, for screenshots
-    @State private var page: Page = UserDefaults.standard.string(forKey: "ResultsPage") == "standings" ? .standings : .results
-    #else
-    @State private var page: Page = .results
-    #endif
+    /// Held by the root, so links and the title moment can open the standings.
+    @Binding var page: Page
+    /// The round in view, shared with the standings beside it on the iPhone Duo.
+    @State private var results = ResultsViewModel()
+    @State private var wide = false
 
     var body: some View {
-        ZStack {
-            ResultsView()
-                .opacity(page == .results ? 1 : 0)
-                .allowsHitTesting(page == .results)
-                .accessibilityHidden(page != .results)
-            StandingsTabView()
-                .opacity(page == .standings ? 1 : 0)
-                .allowsHitTesting(page == .standings)
-                .accessibilityHidden(page != .standings)
+        Group {
+            if wide {
+                // The iPhone Duo unfolded (approved draft B,
+                // build/mockups/duo2/sheet-2-results.png): the results in the
+                // left half, the championship after that round in the right.
+                HStack(alignment: .top, spacing: 18) {
+                    ResultsView(model: results, showsConstructors: false)
+                        .frame(width: WideScreen.column + 34)
+                    StandingsAfterRound(model: results)
+                }
+                .padding(.trailing, 18)
+            } else {
+                ZStack {
+                    ResultsView(model: results)
+                        .opacity(page == .results ? 1 : 0)
+                        .allowsHitTesting(page == .results)
+                        .accessibilityHidden(page != .results)
+                    StandingsTabView()
+                        .opacity(page == .standings ? 1 : 0)
+                        .allowsHitTesting(page == .standings)
+                        .accessibilityHidden(page != .standings)
+                }
+                .environment(\.resultsPage, $page)
+            }
         }
-        .environment(\.resultsPage, $page)
+        .onWideScreen($wide)
         .background(Theme.background.ignoresSafeArea())
     }
 }
