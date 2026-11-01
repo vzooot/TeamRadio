@@ -14,9 +14,10 @@ struct ContentView: View {
 
     /// The schedule and circuit are on screen (false while a switch swaps them).
     @State private var sectionsShown = true
-    /// A screen too wide and too short for the phone column (the iPhone Duo
-    /// unfolded): two columns instead.
-    @State private var wide = false
+    /// The iPhone Duo's inner display: the race and the weekend, one each
+    /// side of the fold.
+    @State private var halves: Halves?
+    @State private var standings = StandingsViewModel()
 
     /// Switching race: the countdown stays and updates in place, its digits
     /// rolling to the new race; the schedule and circuit slip out, are
@@ -52,10 +53,10 @@ struct ContentView: View {
                     Task { await model.load() }
                 }
             case .loaded:
-                if wide { wideContent } else { loadedContent }
+                if let halves { duoContent(halves) } else { loadedContent }
             }
         }
-        .onWideScreen($wide)
+        .onHalves($halves)
         .task {
             await model.load()
             await NotificationManager.adoptDefault()
@@ -212,121 +213,120 @@ struct ContentView: View {
         }
     }
 
-    /// The iPhone Duo unfolded (approved draft B,
-    /// build/mockups/duo2/sheet-1-first-screen.png): the first screen is two
-    /// screens with two jobs, the time in the left half and the circuit
-    /// filling the right. Scrolling on, Emily and the weekend sit on the
-    /// left, the fan vote and the season on the right. The phone column
-    /// stays as it is.
-    private var wideContent: some View {
+    /// The iPhone Duo's inner display (approved, build/mockups/duo6/sheet-hub.png):
+    /// two screens, one each side of the fold, nothing across it. The race
+    /// half: the header, the countdown as a ring clock with the race on it,
+    /// Emily, the fan vote and the season. The weekend half: its own screen
+    /// with the circuit, the timetable and the standings. Side by side when
+    /// held like a book, one above the other standing like a laptop; the
+    /// phone column stays as it is.
+    @ViewBuilder
+    private func duoContent(_ halves: Halves) -> some View {
+        let gap: CGFloat = 28
+        Group {
+            if halves.axis == .horizontal {
+                HStack(alignment: .top, spacing: gap) {
+                    raceHalf(column: true)
+                        .frame(width: max(0, halves.fold - gap / 2 - 16))
+                    weekendHalf
+                }
+                .padding(.horizontal, 16)
+            } else {
+                VStack(spacing: gap) {
+                    raceHalf(column: false)
+                        .frame(height: max(0, halves.fold - gap / 2))
+                    weekendHalf
+                }
+                .padding(.horizontal, 16)
+            }
+        }
+        .background(alignment: .topTrailing) {
+            // the weekend half's own light, so the halves read as two screens
+            RadialGradient(colors: [Theme.violet.opacity(0.14), .clear], center: .topTrailing, startRadius: 0, endRadius: 420)
+                .ignoresSafeArea()
+        }
+        .task { await standings.load() }
+    }
+
+    /// The race and its countdown, then everything else for the weekend
+    /// ahead, scrolling. In a column (book pose) the countdown card carries
+    /// the race; across the top (laptop pose) the race card sits beside it.
+    private func raceHalf(column: Bool) -> some View {
         ScrollViewReader { proxy in
-        ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
-                if let race = model.displayRace {
-                    HStack(alignment: .top, spacing: 18) {
-                        timeHalf(race)
-                            .frame(width: WideScreen.column)
-                        VStack {
-                            if let map = model.trackMap {
-                                // fades only: the 3D scene is too heavy to slide
-                                TrackSectionView(map: map, circuit: race.circuit, fill: true)
-                                    .id(race.circuit.circuitId)
-                            } else if model.extrasLoading {
-                                TrackPlaceholder()
-                            }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 18) {
+                        if let race = model.nextRace {
+                            LiveSessionBanner(race: race)
                         }
-                        .frame(maxHeight: .infinity, alignment: .top)
-                        .cascade(sectionsShown, delay: 0.08)
+                        if column {
+                            HeaderView(onInfo: { showSettings = true })
+                        }
                     }
-                    .padding(.top, 8)
-                    .padding(.bottom, 12)
-                    .containerRelativeFrame(.vertical, alignment: .top)
+                    .padding(.bottom, column ? -6 : 0)
+                    .zIndex(1)
                     // where a pick from the season list glides back to
                     .id("top")
-                } else {
-                    SeasonOverBanner().id("top")
-                }
 
-                HStack(alignment: .top, spacing: 18) {
-                    VStack(alignment: .leading, spacing: 22) {
-                        if let race = model.displayRace {
-                            emilyBar
-                            schedule(race)
+                    if let race = model.displayRace {
+                        if column {
+                            if model.isBrowsing { nextRaceButton }
+                            CountdownView(race: race, onSettings: { showSettings = true }, ring: 246, showsRaceTitle: true)
+                        } else {
+                            HStack(alignment: .top, spacing: 16) {
+                                VStack(alignment: .leading, spacing: 16) {
+                                    HeaderView(onInfo: { showSettings = true }).padding(.bottom, -6).zIndex(1)
+                                    RaceHeroView(race: race, onBack: model.isBrowsing ? backToNextRace : nil)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                CountdownView(race: race, onSettings: { showSettings = true }, ring: 190)
+                                    .padding(.top, 8)
+                            }
                         }
-                    }
-                    .frame(width: WideScreen.column)
-                    VStack(alignment: .leading, spacing: 22) {
+                        emilyBar
                         fanVote
-                        InviteBanner()
-                        seasonList(proxy)
-                        FooterView()
+                        if !Self.demoMode {
+                            InviteBanner()
+                        }
+                    } else {
+                        SeasonOverBanner()
                     }
+                    seasonList(proxy)
+                    FooterView()
                 }
+                .padding(.top, 8)
+                .padding(.bottom, 24)
             }
-            .padding(.horizontal, 18)
-            .padding(.bottom, 32)
-        }
-        .scrollIndicators(.hidden)
-        .refreshable { await model.load() }
+            .scrollIndicators(.hidden)
+            .refreshable { await model.load() }
         }
     }
 
-    /// The first screen's left half: the race, then its countdown in big
-    /// tiles; the round's chip turns into a way back while browsing.
-    private func timeHalf(_ race: Race) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if let next = model.nextRace {
-                LiveSessionBanner(race: next)
-            }
-            HStack(spacing: 10) {
-                Image("HeaderWordmark")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(height: 34)
-                    .blendMode(.screen)
-                    .accessibilityLabel("Team Radio")
-                Spacer(minLength: 0)
-                if model.isBrowsing {
-                    Button(action: backToNextRace) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "arrow.uturn.backward").font(.system(size: 9, weight: .bold))
-                            Text("NEXT RACE").font(.f1(10, weight: .bold)).tracking(1)
-                        }
-                        .foregroundStyle(Theme.accent)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 6)
-                        .background(Capsule().fill(Theme.accent.opacity(0.1))
-                            .overlay(Capsule().strokeBorder(Theme.accent.opacity(0.5), lineWidth: 1)))
-                    }
-                    .buttonStyle(.plain)
-                }
-                Text("ROUND \(race.roundNumber) · \(race.season)")
-                    .font(.f1(12).italic())
-                    .tracking(1)
-                    .foregroundStyle(Theme.onAccent)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Theme.accentGradient, in: RoundedRectangle(cornerRadius: 7))
-                Button { showSettings = true } label: { CockpitButton() }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Settings")
-            }
-            VStack(alignment: .leading, spacing: 3) {
-                Text(race.raceName.uppercased())
-                    .font(.f1(34).italic())
-                    .foregroundStyle(Theme.chromeText)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.7)
-                Text("\(Flags.emoji(for: race.circuit.location.country)) \(race.circuit.location.locality.uppercased()) · \(race.circuit.circuitName.uppercased())")
-                    .font(.f1(11, weight: .bold))
-                    .tracking(1.5)
-                    .foregroundStyle(Theme.dimText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            }
-            CountdownView(race: race, onSettings: { showSettings = true }, big: true)
+    @ViewBuilder
+    private var weekendHalf: some View {
+        if let race = model.displayRace {
+            WeekendHub(race: race, model: model, standings: standings)
+                .cascade(sectionsShown, delay: 0.08)
+        } else {
+            Color.clear
         }
-        .padding(.top, 4)
+    }
+
+    /// While browsing another round: back to the next race.
+    private var nextRaceButton: some View {
+        Button(action: backToNextRace) {
+            HStack(spacing: 4) {
+                Image(systemName: "arrow.uturn.backward").font(.system(size: 9, weight: .bold))
+                Text("NEXT RACE").font(.f1(10, weight: .bold)).tracking(1)
+            }
+            .foregroundStyle(Theme.accent)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(Theme.accent.opacity(0.1))
+                .overlay(Capsule().strokeBorder(Theme.accent.opacity(0.5), lineWidth: 1)))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Back to next race")
     }
 
     private func schedule(_ race: Race) -> some View {

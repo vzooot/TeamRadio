@@ -7,6 +7,8 @@ struct WeekendScheduleView: View {
     var weather: [Date: WeatherPoint] = [:]
     /// The forecast is on its way: rows show a shimmer where it will go.
     var weatherLoading = false
+    /// Off where a switch above already names it (the iPhone Duo's weekend screen).
+    var showsTitle = true
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
@@ -15,7 +17,7 @@ struct WeekendScheduleView: View {
             let nextId = sessions.first(where: { $0.date > now })?.id
 
             VStack(alignment: .leading, spacing: 12) {
-                SectionTitle("RACE WEEKEND")
+                if showsTitle { SectionTitle("RACE WEEKEND") }
 
                 VStack(spacing: 0) {
                     ForEach(sessions) { session in

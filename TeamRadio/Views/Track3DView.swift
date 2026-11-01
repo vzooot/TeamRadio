@@ -199,31 +199,6 @@ struct Track3DView: UIViewRepresentable {
     }
 }
 
-/// The circuit filling a space of any shape (the iPhone Duo's first screen).
-/// The scene fits the track to its view's width and looks a little low, for
-/// the card's stats; here the view is drawn `zoom` times as wide as the
-/// space and moved down by that look, so a bigger circuit sits in the middle.
-/// At 1.3 the slowly turning track still clears the sides.
-struct TrackStage: View {
-    let map: TrackMap
-    var resetToken = 0
-    var selectedCorner: Int?
-    var onSelectCorner: ((Int?) -> Void)?
-    var zoom: CGFloat = 1.3
-
-    var body: some View {
-        GeometryReader { geo in
-            let width = geo.size.width * zoom
-            let shift = TrackSceneBuilder.centerShift(width: width)
-            Track3DView(map: map, resetToken: resetToken, selectedCorner: selectedCorner, onSelectCorner: onSelectCorner)
-                .frame(width: width, height: geo.size.height + 2 * shift)
-                .position(x: geo.size.width / 2, y: geo.size.height / 2 + shift)
-        }
-        .clipped()
-        .contentShape(Rectangle())
-    }
-}
-
 enum TrackSceneBuilder {
     static let spinKey = "spin"
     static var spin: SCNAction { .repeatForever(.rotateBy(x: 0, y: 2 * .pi, z: 0, duration: 45)) }
@@ -242,10 +217,6 @@ enum TrackSceneBuilder {
     /// The camera's "front" for look-at, pitched up by `tilt`, so the real
     /// view axis points that much below the target.
     static let front = SCNVector3(0, sin(tilt), -cos(tilt))
-
-    /// How far above the middle of a view `width` points wide the circuit
-    /// sits, from that `tilt` (half the bleed on a 390-wide card).
-    static func centerShift(width: CGFloat) -> CGFloat { width / 2 * bleed / 390 }
 
     static func lookAt(_ target: SCNNode) -> SCNLookAtConstraint {
         let constraint = SCNLookAtConstraint(target: target)

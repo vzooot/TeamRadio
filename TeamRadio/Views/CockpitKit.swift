@@ -81,8 +81,6 @@ struct NeonTile: View {
     var hot: Bool = false
     /// Digits roll to the next value (cheap: see `RollingDigit`).
     var rolls = true
-    /// Digit size; the iPhone Duo's first screen uses big tiles.
-    var digits: CGFloat = 38
 
     private var rim: Color { hot ? Theme.live : tint }
     /// Room around the tile for its outer glow (shadow radius 12).
@@ -95,17 +93,17 @@ struct NeonTile: View {
             // made the tab stutter once a second (measured on device).
             HStack(spacing: 0) {
                 ForEach(Array(String(format: "%02d", value).enumerated()), id: \.offset) { _, digit in
-                    RollingDigit(digit: digit, hot: hot, rolls: rolls, size: digits)
+                    RollingDigit(digit: digit, hot: hot, rolls: rolls)
                 }
             }
             .animation(rolls ? .snappy(duration: 0.3) : nil, value: value)
             Text(label)
-                .font(.f1(digits > 38 ? 12 : 11, weight: .bold))
-                .tracking(digits > 38 ? 3 : 2)
+                .font(.f1(11, weight: .bold))
+                .tracking(2)
                 .foregroundStyle(hot ? Theme.live.opacity(0.9) : Color.white.opacity(0.7))
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, digits > 38 ? 12 : 15)
+        .padding(.vertical, 15)
         .background(chrome)
     }
 
@@ -140,6 +138,88 @@ struct NeonTile: View {
                 .strokeBorder(rim.opacity(0.35), lineWidth: 1)
         }
         .shadow(color: rim.opacity(0.5), radius: 12)
+    }
+}
+
+/// The countdown as a ring clock (the iPhone Duo's race half): ticks round
+/// the rim, an arc in the trio colours that fills as the session nears
+/// (over its last week, then its last day) with a hot dot at its head, and
+/// the time in the tiles' rolling chrome digits.
+struct RingClock: View {
+    let remaining: TimeInterval
+    /// "PRACTICE 1 · FRI 16:30"
+    let caption: String
+    var hot = false
+    var size: CGFloat = 260
+
+    var body: some View {
+        let total = max(0, Int(remaining))
+        let days = total / 86400
+        let window: Double = days > 0 ? 7 * 86400 : 86400
+        let progress = 1 - min(max(remaining / window, 0), 1)
+        let head = hot ? Theme.live : Theme.violet
+        let time = String(format: "%02d:%02d:%02d", total % 86400 / 3600, total % 3600 / 60, total % 60)
+        ZStack {
+            ticks
+            Circle().stroke(Color.black.opacity(0.5), lineWidth: 12).padding(22)
+            Circle().stroke(Theme.accent.opacity(0.12), lineWidth: 12).padding(22)
+            Circle()
+                .trim(from: 0, to: progress)
+                .stroke(AngularGradient(colors: [Theme.accent.opacity(0.25), Theme.accent, Theme.violet, head],
+                                        center: .center, startAngle: .degrees(0), endAngle: .degrees(360 * max(progress, 0.01))),
+                        style: StrokeStyle(lineWidth: 12, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .padding(22)
+                .shadow(color: Theme.accent.opacity(0.6), radius: 10)
+            Circle()
+                .fill(head)
+                .frame(width: 15, height: 15)
+                .shadow(color: head, radius: 10)
+                .offset(y: -(size / 2 - 22))
+                .rotationEffect(.degrees(progress * 360))
+            Circle().stroke(Theme.accent.opacity(0.22), lineWidth: 1).padding(44)
+            Circle().stroke(Theme.accent.opacity(0.12), style: StrokeStyle(lineWidth: 1, dash: [2, 5])).padding(56)
+            VStack(spacing: 3) {
+                Text(days > 0 ? "\(days) DAY\(days == 1 ? "" : "S") +" : "T–")
+                    .font(.f1(12, weight: .bold))
+                    .tracking(2)
+                    .foregroundStyle(Theme.accent)
+                HStack(spacing: 0) {
+                    ForEach(Array(time.enumerated()), id: \.offset) { _, character in
+                        if character == ":" {
+                            Text(":").font(.f1Digits(size * 0.15)).foregroundStyle(Theme.chromeText)
+                        } else {
+                            RollingDigit(digit: character, hot: false, rolls: true, size: size * 0.15)
+                        }
+                    }
+                }
+                .animation(.snappy(duration: 0.3), value: total)
+                Text(caption)
+                    .font(.f1(11, weight: .bold))
+                    .tracking(2)
+                    .foregroundStyle(hot ? Theme.live : Theme.dimText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .frame(maxWidth: size - 90)
+            }
+        }
+        .frame(width: size, height: size)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(caption), in \(days) days and \(time)")
+    }
+
+    /// Drawn once (they never change), so the ticking clock doesn't redraw 72 marks.
+    private var ticks: some View {
+        ZStack {
+            ForEach(0..<72, id: \.self) { i in
+                Capsule()
+                    .fill(Theme.accent.opacity(i % 6 == 0 ? 0.55 : 0.18))
+                    .frame(width: i % 6 == 0 ? 2 : 1.5, height: i % 6 == 0 ? 10 : 5)
+                    .offset(y: -size / 2 + 5)
+                    .rotationEffect(.degrees(Double(i) * 5))
+            }
+        }
+        .drawingGroup()
     }
 }
 

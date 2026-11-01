@@ -6,10 +6,11 @@ struct CountdownView: View {
     let race: Race
     /// The status line under the countdown opens Settings.
     var onSettings: () -> Void = {}
-    /// The iPhone Duo's first screen (approved draft B,
-    /// build/mockups/duo2/sheet-1-first-screen.png): open on the page, the
-    /// time in four big tiles, two by two, the session chips under them.
-    var big = false
+    /// The iPhone Duo's inner display (approved, build/mockups/duo6/sheet-hub.png):
+    /// the time in a ring clock this wide instead of the four tiles.
+    var ring: CGFloat?
+    /// The race on top of the card (the Duo's race half, where no race card sits above).
+    var showsRaceTitle = false
 
     @State private var selectedId: String?
     @State private var countdownOn = PushSync.countdownOn
@@ -37,42 +38,34 @@ struct CountdownView: View {
             let target = session?.date ?? now
             let remaining = target.timeIntervalSince(now)
 
-            VStack(spacing: big ? 10 : 14) {
-                if !big { sessionPicker(now: now, selected: session) }
+            VStack(spacing: ring == nil ? 14 : 12) {
+                if showsRaceTitle { raceTitle }
 
-                // Big, the session and the race-week label share a line.
-                if big {
-                    HStack {
-                        if let session { sessionLine(session) }
-                        Spacer(minLength: 8)
-                        if remaining > 0, let label = raceWeekend(now: now).label { gantryLabel(label) }
-                    }
-                } else if let session {
+                sessionPicker(now: now, selected: session)
+
+                if ring == nil, let session {
                     sessionLine(session)
                 }
 
                 if remaining > 0 {
                     let gantry = raceWeekend(now: now)
-                    DotMatrixBoard(litLights: gantry.lit, pages: infoPages(session: session, remaining: remaining),
-                                   standby: gantry.lit == 0)
-                        .alignedToContent()
-                    if !big, let label = gantry.label {
-                        gantryLabel(label)
-                    }
-                    let parts = split(remaining)
-                    if big {
-                        Grid(horizontalSpacing: 12, verticalSpacing: 12) {
-                            GridRow {
-                                NeonTile(value: parts.days, label: "DAYS", digits: 54)
-                                NeonTile(value: parts.hours, label: "HOURS", digits: 54)
-                            }
-                            GridRow {
-                                NeonTile(value: parts.minutes, label: "MINUTES", digits: 54)
-                                NeonTile(value: parts.seconds, label: "SECONDS", hot: true, digits: 54)
-                            }
+                    let board = DotMatrixBoard(litLights: gantry.lit, pages: infoPages(session: session, remaining: remaining),
+                                               standby: gantry.lit == 0)
+                    if let ring {
+                        RingClock(remaining: remaining,
+                                  caption: session.map { "\($0.kind.rawValue.uppercased()) · \($0.date.formatted(.dateTime.weekday(.abbreviated).hour().minute()).uppercased())" } ?? "",
+                                  hot: session?.kind == .race, size: ring)
+                            .frame(maxWidth: .infinity)
+                        HStack(spacing: 10) {
+                            board.alignedToContent()
+                            if let label = gantry.label { gantryLabel(label).fixedSize() }
                         }
-                        .padding(.top, 4)
                     } else {
+                        board.alignedToContent()
+                        if let label = gantry.label {
+                            gantryLabel(label)
+                        }
+                        let parts = split(remaining)
                         HStack(spacing: 10) {
                             NeonTile(value: parts.days, label: "DAYS")
                             NeonTile(value: parts.hours, label: "HRS")
@@ -104,7 +97,6 @@ struct CountdownView: View {
                         .padding(.vertical, 18)
                 }
 
-                if big { sessionPicker(now: now, selected: session) }
                 autoCountdownLine
             }
             // Settings may have changed while it was open.
@@ -118,19 +110,56 @@ struct CountdownView: View {
                 if let i, sessions.indices.contains(i) { selectedId = sessions[i].id }
             }
             #endif
-            .padding(big ? 0 : 18)
-            .background {
-                if !big {
-                    CarbonFiber()
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 20)
-                                .strokeBorder(Theme.glassStroke, lineWidth: 1)
-                        )
-                        .trioGlow(cornerRadius: 20)
-                }
-            }
+            .padding(18)
+            .background(
+                CarbonFiber()
+                    .overlay {
+                        // the race card's flag, with the race on top
+                        if showsRaceTitle {
+                            Text(Flags.emoji(for: race.circuit.location.country))
+                                .font(.system(size: 150))
+                                .opacity(0.08)
+                                .rotationEffect(.degrees(-12))
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                                .offset(x: 24, y: -10)
+                        }
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .strokeBorder(Theme.glassStroke, lineWidth: 1)
+                    )
+                    .trioGlow(cornerRadius: 20)
+            )
         }
+    }
+
+    /// The round, the race and the circuit, as on the race card.
+    private var raceTitle: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("ROUND \(race.roundNumber)")
+                    .font(.f1(13).italic())
+                    .tracking(1)
+                    .foregroundStyle(Theme.onAccent)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Theme.accentGradient, in: RoundedRectangle(cornerRadius: 7))
+                Spacer()
+                Text(race.season).font(.f1(15).italic()).foregroundStyle(Theme.dimText)
+            }
+            Text(race.raceName.uppercased())
+                .font(.f1(28).italic())
+                .foregroundStyle(Theme.chromeText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            Text("\(Flags.emoji(for: race.circuit.location.country)) \(race.circuit.circuitName) · \(race.circuit.location.locality)")
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.dimText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// "RACE · SUNDAY 21:00"
