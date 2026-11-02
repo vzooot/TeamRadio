@@ -1,6 +1,6 @@
 Gjord för iPhone Duo
 
-Fäll ut den så blir Team Radio två skärmar. Den ena är displayen: loppet och nedräkningen, banan i 3D eller ställningen. På den andra väljer du vad den visar, med Ask Emily, helgens tidtabell och säsongen bredvid. Resultat, Nyheter, Spel och Paddock fungerar likadant: välj på den ena skärmen, se det på den andra.
+Fäll ut den så blir Team Radio två skärmar. Den ena är displayen: loppet och nedräkningen, banan i 3D eller ställningen. På den andra väljer du vad den visar, med Ask Emily, helgens tidtabell och säsongen bredvid. Resultat, Nyheter, Spel och Paddock fungerar likadant: välj på den ena skärmen, se det på den andra. Håll en iPad på sidan så får du samma två skärmar.
 
 Också nytt:
 • Inställningar bakom ratten: automatisk nedräkning på låsskärmen före varje session (1, 2, 4 eller 8 timmar innan) och en egen knapp för varje sorts notis

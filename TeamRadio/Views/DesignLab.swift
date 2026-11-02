@@ -53,6 +53,10 @@ struct DesignLab: View {
             case "duoB": DuoDraft(style: "B")
             case "duoC": DuoDraft(style: "C")
             case "duoLights": DuoLightsDraft()
+            // an iPad held sideways (13", 1376 × 1032 pt), scaled to fit an upright one
+            case "ipadLandscape0": ContentView().frame(width: 1376, height: 1032).clipped().scaleEffect(0.75).frame(width: 1032, height: 774)
+            case "ipadLandscape1": ResultsHubView(page: .constant(.results)).frame(width: 1376, height: 1032).clipped().scaleEffect(0.75).frame(width: 1032, height: 774)
+            case "ipadLandscape4": NewsView().frame(width: 1376, height: 1032).clipped().scaleEffect(0.75).frame(width: 1032, height: 774)
             case "championA": ChampionDraft(style: "A")
             case "championB": ChampionDraft(style: "B")
             case "championC": ChampionDraft(style: "C")

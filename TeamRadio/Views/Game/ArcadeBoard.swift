@@ -110,6 +110,8 @@ struct ArcadeBoardCard: View {
     /// Places just gained this week.
     var climb: Int? = nil
     let hasName: Bool
+    /// The column's full width (the Games tab's two screens) instead of a phone card's.
+    var fills = false
     let onOpen: () -> Void
 
     var body: some View {
@@ -151,7 +153,7 @@ struct ArcadeBoardCard: View {
             }
             .padding(.bottom, 12)
             .frame(height: 172)
-            .frame(maxWidth: 360)
+            .frame(maxWidth: fills ? .infinity : 360)
             .background(RoundedRectangle(cornerRadius: 16).fill(Theme.card))
             .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.glassStroke))
             .contentShape(Rectangle())

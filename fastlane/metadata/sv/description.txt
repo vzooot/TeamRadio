@@ -4,6 +4,7 @@ GJORD FÖR IPHONE DUO
 • Fäll ut den så blir Team Radio två skärmar: en display (loppet och nedräkningen, banan i 3D eller ställningen) och bredvid den skärmen där du väljer vad den visar
 • På sidan som en bok eller uppställd som en laptop följer skärmarna vecket och inget hamnar på det
 • Resultat, Nyheter, Spel och Paddock fungerar likadant: välj på den ena skärmen, se det på den andra
+• På iPad, liggande, samma två skärmar
 
 NEDRÄKNING
 • Live-nedräkning till varje session under kommande racehelg – träning, kval, sprint och lopp

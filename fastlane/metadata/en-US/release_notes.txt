@@ -1,6 +1,6 @@
 Made for iPhone Duo
 
-Unfold it and Team Radio becomes two screens. One is the display: the race and its countdown, the 3D circuit or the standings. The other is where you pick what it shows, with Ask Emily, the weekend's timetable and the season beside it. Results, News, Games and the Paddock work the same way: pick on one screen, see it on the other.
+Unfold it and Team Radio becomes two screens. One is the display: the race and its countdown, the 3D circuit or the standings. The other is where you pick what it shows, with Ask Emily, the weekend's timetable and the season beside it. Results, News, Games and the Paddock work the same way: pick on one screen, see it on the other. Hold an iPad sideways and you get the same two screens.
 
 Also new:
 • Settings behind the steering wheel: an automatic Lock Screen countdown before every session (1, 2, 4 or 8 hours ahead) and a switch for every kind of notification
