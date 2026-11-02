@@ -1,0 +1,27 @@
+{
+  "referenceName": "Made for iPhone Duo",
+  "badge": "MAJOR_UPDATE",
+  "deepLink": "teamradio://countdown",
+  "purpose": "APPROPRIATE_FOR_ALL_USERS",
+  "priority": "HIGH",
+  "publishStart": "2026-11-05T00:00:00Z",
+  "eventStart": "2026-11-05T00:00:00Z",
+  "eventEnd": "2026-11-19T22:59:00Z",
+  "previewFrame": "00:00:00:00",
+  "localizations": {
+    "en-US": {
+      "name": "Made for iPhone Duo",
+      "shortDescription": "Two screens: pick on one, see it on the other",
+      "longDescription": "Unfold Team Radio into two screens: the race, circuit or standings on one, everything you pick it with on the other."
+    },
+    "sv": {
+      "name": "Gjord för iPhone Duo",
+      "shortDescription": "Två skärmar: välj på den ena, se på den andra",
+      "longDescription": "Fäll ut Team Radio till två skärmar: loppet, banan eller ställningen på den ena, allt du väljer med på den andra."
+    }
+  },
+  "images": {
+    "EVENT_CARD": "Marketing/event-duo-card.png",
+    "EVENT_DETAILS_PAGE": "Marketing/event-duo-details.png"
+  }
+}

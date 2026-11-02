@@ -323,19 +323,29 @@ async function announceOnce(env, id, message) {
 const JOLPICA = "https://api.jolpi.ca/ergast/f1";
 
 /// The drivers' title: the standings, the rounds still to race and the most
-/// points each can give (25 a race, 8 more with a sprint).
+/// points each can give (25 a race, 8 more with a sprint). Counted from the
+/// last race with results, not from the standings' own round: Jolpica
+/// labelled Austin's table "round 19" before the Mexico race had run, which
+/// sent the champion message a race early.
 async function titleState() {
-  const [standings, schedule] = await Promise.all([
-    fetch(`${JOLPICA}/current/driverstandings.json?limit=40`, { cf: { cacheTtl: 300 } }).then((r) => r.json()),
-    fetch(`${JOLPICA}/current.json?limit=40`, { cf: { cacheTtl: 300 } }).then((r) => r.json()),
-  ]);
-  const list = standings?.MRData?.StandingsTable?.StandingsLists?.[0];
+  const get = (path) => fetch(`${JOLPICA}/${path}`, { cf: { cacheTtl: 300 } }).then((r) => r.json());
+  const [last, schedule] = await Promise.all([get("current/last/results.json?limit=1"), get("current.json?limit=40")]);
+  const latest = last?.MRData?.RaceTable?.Races?.[0];
   const races = schedule?.MRData?.RaceTable?.Races ?? [];
-  if (!list || !races.length) return null;
-  const drivers = list.DriverStandings.map((d) => ({
+  if (!latest || !races.length) return null;
+  const round = Number(latest.round);
+  const table = (r) => get(`current/${r}/driverstandings.json?limit=40`)
+    .then((j) => j?.MRData?.StandingsTable?.StandingsLists?.[0]?.DriverStandings);
+  const [list, before] = await Promise.all([table(round), round > 1 ? table(round - 1) : []]);
+  if (!list?.length || !before) return null;
+  // only a table that already holds that race's points: until it's updated,
+  // the standings add up to the same as the round before
+  const total = (l) => l.reduce((s, d) => s + Number(d.points), 0);
+  if (round > 1 && total(list) <= total(before)) return null;
+  const drivers = list.map((d) => ({
     name: `${d.Driver.givenName} ${d.Driver.familyName}`, points: Number(d.points), wins: Number(d.wins),
   }));
-  return { season: list.season, round: Number(list.round), drivers, races };
+  return { season: latest.season, round, drivers, races };
 }
 
 const maxPoints = (race) => 25 + (race.Sprint ? 8 : 0);

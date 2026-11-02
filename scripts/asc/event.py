@@ -3,8 +3,8 @@
 
   status                 the app's events and their states
   create SPEC.json       create the event from a spec (fastlane/events/*.json): texts per
-                         locale, the card and details-page videos, every territory the
-                         app is sold in; prints the event id
+                         locale, the card and details-page videos ("media") or images
+                         ("images"), every territory the app is sold in; prints the event id
   submit EVENT_ID        submit the event for review on its own (no app version needed)
 
 Credentials and helpers: scripts/asc/release.py.
@@ -17,7 +17,7 @@ from release import APP, ROOT, call, log  # noqa: E402
 
 def territories():
     avail = call("GET", f"/v1/apps/{APP}/appAvailabilityV2")["data"]["id"]
-    ids, path = [], f"/v2/appAvailabilities/{avail}/territoryAvailabilities?fields[territoryAvailabilities]=available&include=territory&limit=200"
+    ids, path = [], f"/v2/appAvailabilities/{avail}/territoryAvailabilities?fields[territoryAvailabilities]=available,territory&include=territory&limit=200"
     while path:
         page = call("GET", path)
         ids += [t["relationships"]["territory"]["data"]["id"] for t in page["data"] if t["attributes"].get("available")]
@@ -43,9 +43,29 @@ def upload_video(loc_id, kind, path, preview):
     return clip
 
 
+def upload_image(loc_id, kind, path):
+    data = open(os.path.join(ROOT, path), "rb").read()
+    res = call("POST", "/v1/appEventScreenshots", {"data": {"type": "appEventScreenshots",
+               "attributes": {"fileName": os.path.basename(path), "fileSize": len(data), "appEventAssetType": kind},
+               "relationships": {"appEventLocalization": {"data": {"type": "appEventLocalizations", "id": loc_id}}}}})
+    for op in res["data"]["attributes"]["uploadOperations"]:
+        up = urllib.request.Request(op["url"], method=op["method"], data=data[op["offset"]:op["offset"] + op["length"]])
+        for h in op.get("requestHeaders", []):
+            up.add_header(h["name"], h["value"])
+        urllib.request.urlopen(up).read()
+    shot = res["data"]["id"]
+    call("PATCH", f"/v1/appEventScreenshots/{shot}", {"data": {"type": "appEventScreenshots", "id": shot,
+         "attributes": {"uploaded": True}}})
+    return "screenshot:" + shot
+
+
 def wait_processed(clips):
+    def state(c):
+        kind, _, cid = c.rpartition(":")
+        path = f"/v1/appEventScreenshots/{cid}" if kind == "screenshot" else f"/v1/appEventVideoClips/{cid}"
+        return call("GET", path)["data"]["attributes"]["assetDeliveryState"]["state"]
     for _ in range(60):
-        states = {c: call("GET", f"/v1/appEventVideoClips/{c}")["data"]["attributes"]["assetDeliveryState"]["state"] for c in clips}
+        states = {c: state(c) for c in clips}
         if all(s == "COMPLETE" for s in states.values()):
             return
         if any(s == "FAILED" for s in states.values()):
@@ -68,11 +88,13 @@ def create(spec_path):
         loc = call("POST", "/v1/appEventLocalizations", {"data": {"type": "appEventLocalizations",
                    "attributes": {"locale": locale, **text},
                    "relationships": {"appEvent": {"data": {"type": "appEvents", "id": event}}}}})["data"]["id"]
-        for kind, path in spec["media"].items():
+        for kind, path in spec.get("media", {}).items():
             clips.append(upload_video(loc, kind, path, spec["previewFrame"]))
-        log(locale, "texts and videos uploaded")
+        for kind, path in spec.get("images", {}).items():
+            clips.append(upload_image(loc, kind, path))
+        log(locale, "texts and media uploaded")
     wait_processed(clips)
-    log("videos processed; event", event, "is ready for review")
+    log("media processed; event", event, "is ready for review")
     print(event)
 
 
