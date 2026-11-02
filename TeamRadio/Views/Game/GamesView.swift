@@ -227,12 +227,12 @@ struct GamesView: View {
                         ArcadeBanner(kind: .lightsOut, rank: model.lightsBoard?.me?.rank,
                                      players: model.lightsBoard?.total) { showLightsOut = true }
                         ArcadeBoardCard(game: .lightsOut, standing: model.lightsBoard.map { ArcadeGame.from($0) },
-                                        loaded: model.ready, hasName: !nickname.isEmpty) { fullBoard = .lightsOut }
+                                        loaded: model.ready, hasName: !nickname.isEmpty, fills: true) { fullBoard = .lightsOut }
                         ArcadeBanner(kind: .wall, rank: model.wallBoard?.me?.rank,
                                      players: model.wallBoard?.total) { showWall = true }
                             .padding(.top, 10)
                         ArcadeBoardCard(game: .wall, standing: model.wallBoard.map { ArcadeGame.from($0) },
-                                        loaded: model.ready, hasName: !nickname.isEmpty) { fullBoard = .wall }
+                                        loaded: model.ready, hasName: !nickname.isEmpty, fills: true) { fullBoard = .wall }
                     }
                     .padding(14)
                 }

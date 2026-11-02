@@ -4,6 +4,7 @@ MADE FOR IPHONE DUO
 • Unfold it and Team Radio becomes two screens: a display (the race and its countdown, the 3D circuit or the standings) and, beside it, the screen where you pick what it shows
 • Sideways like a book or propped up like a laptop, the screens follow the fold and nothing sits on it
 • Results, News, Games and the Paddock work the same way: pick on one screen, see it on the other
+• On iPad held sideways, the same two screens
 
 COUNTDOWN
 • Live countdown to every session of the upcoming race weekend — practice, qualifying, sprint, and race

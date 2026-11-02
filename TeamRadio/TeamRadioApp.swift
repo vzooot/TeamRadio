@@ -83,7 +83,7 @@ struct RootView: View {
     /// The iPhone Duo's inner display held like a book: our own rail
     /// replaces the system's tab bar (see DuoDock).
     @State private var halves: Halves?
-    private var docked: Bool { halves?.axis == .horizontal }
+    private var docked: Bool { halves?.axis == .horizontal && halves?.foldable == true }
     /// The season's champion once the title is settled, and its moment.
     @State private var champion: Champion?
     @State private var showChampion = false

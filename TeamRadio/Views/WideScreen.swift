@@ -15,13 +15,16 @@ extension View {
 struct Halves: Equatable {
     /// `.horizontal`: side by side; `.vertical`: one above the other.
     let axis: Axis
-    /// The fold's line in the view's own coordinates.
+    /// The fold's line in the view's own coordinates (the middle on an iPad).
     let fold: CGFloat
+    /// A real fold (the iPhone Duo), not just a screen big enough for two.
+    var foldable = true
 
     /// From the system's division region (iOS 27.1), which the inner
-    /// display reports even while it's flat (with no width); before that,
-    /// a screen wider than tall and too short for the phone column is split
-    /// down the middle.
+    /// display reports even while it's flat (with no width). Without one, a
+    /// screen held sideways and two phone columns wide (an iPad in
+    /// landscape) gets the same two screens, side by side; upright, or in a
+    /// narrow window, it keeps the phone layout.
     static func of(_ proxy: GeometryProxy) -> Halves? {
         if #available(iOS 27.1, *), let region = proxy.reservedRegions(kind: .division, options: .includeInactive).first {
             let frame = region.frame
@@ -30,6 +33,6 @@ struct Halves: Equatable {
                            : Halves(axis: .vertical, fold: frame.width > 0 || frame.height > 0 ? frame.midY : proxy.size.height / 2)
         }
         let size = proxy.size
-        return size.width > size.height && size.height < 760 ? Halves(axis: .horizontal, fold: size.width / 2) : nil
+        return size.width > size.height && size.width >= 740 ? Halves(axis: .horizontal, fold: size.width / 2, foldable: false) : nil
     }
 }
