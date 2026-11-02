@@ -17,7 +17,7 @@ from release import APP, ROOT, call, log  # noqa: E402
 
 def territories():
     avail = call("GET", f"/v1/apps/{APP}/appAvailabilityV2")["data"]["id"]
-    ids, path = [], f"/v2/appAvailabilities/{avail}/territoryAvailabilities?fields[territoryAvailabilities]=available&include=territory&limit=200"
+    ids, path = [], f"/v2/appAvailabilities/{avail}/territoryAvailabilities?fields[territoryAvailabilities]=available,territory&include=territory&limit=200"
     while path:
         page = call("GET", path)
         ids += [t["relationships"]["territory"]["data"]["id"] for t in page["data"] if t["attributes"].get("available")]
