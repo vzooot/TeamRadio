@@ -80,6 +80,10 @@ struct RootView: View {
     #else
     @State private var resultsPage: ResultsHubView.Page = .results
     #endif
+    /// The iPhone Duo's inner display held like a book: our own rail
+    /// replaces the system's tab bar (see DuoDock).
+    @State private var halves: Halves?
+    private var docked: Bool { halves?.axis == .horizontal }
     /// The season's champion once the title is settled, and its moment.
     @State private var champion: Champion?
     @State private var showChampion = false
@@ -97,22 +101,45 @@ struct RootView: View {
             ContentView()
                 .tabItem { Image(systemName: "flag.checkered").environment(\.symbolVariants, .none).accessibilityLabel("Countdown") }
                 .tag(Tab.countdown)
+                .toolbar(docked ? .hidden : .automatic, for: .tabBar)
             // Results and the standings, behind a RESULTS | STANDINGS switch.
             ResultsHubView(page: $resultsPage)
                 .tabItem { Image(systemName: "trophy").environment(\.symbolVariants, .none).accessibilityLabel("Results") }
                 .tag(Tab.results)
+                .toolbar(docked ? .hidden : .automatic, for: .tabBar)
             GamesView(model: games)
                 .tabItem { Image(systemName: "gamecontroller").environment(\.symbolVariants, .none).accessibilityLabel("Games") }
                 .tag(Tab.games)
+                .toolbar(docked ? .hidden : .automatic, for: .tabBar)
             ChatView()
                 .tabItem { Image(systemName: "bubble.left.and.bubble.right").environment(\.symbolVariants, .none).accessibilityLabel("Paddock") }
                 .badge(chatBadge.unread)
                 .tag(Tab.paddock)
+                .toolbar(docked ? .hidden : .automatic, for: .tabBar)
             NewsView()
                 .tabItem { Image(systemName: "newspaper").environment(\.symbolVariants, .none).accessibilityLabel("News") }
                 .tag(Tab.news)
+                .toolbar(docked ? .hidden : .automatic, for: .tabBar)
         }
         .tint(Theme.accent)
+        .onHalves($halves)
+        .overlay {
+            // in the side strip under the status bar, where the system bar stood
+            if docked {
+                DuoDock(selection: $selection, items: [
+                    .init(tag: Tab.countdown, symbol: "flag.checkered", name: "Countdown"),
+                    .init(tag: Tab.results, symbol: "trophy", name: "Results"),
+                    .init(tag: Tab.games, symbol: "gamecontroller", name: "Games"),
+                    .init(tag: Tab.paddock, symbol: "bubble.left.and.bubble.right", name: "Paddock"),
+                    .init(tag: Tab.news, symbol: "newspaper", name: "News"),
+                ], unread: chatBadge.unread, privateUnread: chatBadge.unreadDMs > 0)
+                .padding(.top, 104)
+                .padding(.bottom, 24)
+                .padding(.trailing, 16)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                .ignoresSafeArea()
+            }
+        }
         // No scroll bars anywhere (inherited by every scroll view and sheet).
         .scrollIndicators(.hidden)
         #if DEBUG

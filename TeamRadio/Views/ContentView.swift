@@ -213,120 +213,34 @@ struct ContentView: View {
         }
     }
 
-    /// The iPhone Duo's inner display (approved, build/mockups/duo6/sheet-hub.png):
-    /// two screens, one each side of the fold, nothing across it. The race
-    /// half: the header, the countdown as a ring clock with the race on it,
-    /// Emily, the fan vote and the season. The weekend half: its own screen
-    /// with the circuit, the timetable and the standings. Side by side when
-    /// held like a book, one above the other standing like a laptop; the
-    /// phone column stays as it is.
+    /// The iPhone Duo's inner display: two screens, one each side of the
+    /// fold, never one page cut in two. The left screen is a display (the
+    /// race and its countdown big, or what the deck puts there); the right
+    /// one is the deck (what the display shows, Emily, the weekend round a
+    /// ring clock, the championship, then the fan vote and the season).
+    /// Side by side when held like a book, one above the other standing
+    /// like a laptop; the phone column stays as it is.
     @ViewBuilder
     private func duoContent(_ halves: Halves) -> some View {
-        let gap: CGFloat = 28
-        Group {
-            if halves.axis == .horizontal {
-                HStack(alignment: .top, spacing: gap) {
-                    raceHalf(column: true)
-                        .frame(width: max(0, halves.fold - gap / 2 - 16))
-                    weekendHalf
-                }
-                .padding(.horizontal, 16)
-            } else {
-                VStack(spacing: gap) {
-                    raceHalf(column: false)
-                        .frame(height: max(0, halves.fold - gap / 2))
-                    weekendHalf
-                }
-                .padding(.horizontal, 16)
-            }
-        }
-        .background(alignment: .topTrailing) {
-            // the weekend half's own light, so the halves read as two screens
-            RadialGradient(colors: [Theme.violet.opacity(0.14), .clear], center: .topTrailing, startRadius: 0, endRadius: 420)
-                .ignoresSafeArea()
-        }
-        .task { await standings.load() }
-    }
-
-    /// The race and its countdown, then everything else for the weekend
-    /// ahead, scrolling. In a column (book pose) the countdown card carries
-    /// the race; across the top (laptop pose) the race card sits beside it.
-    private func raceHalf(column: Bool) -> some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    VStack(alignment: .leading, spacing: 18) {
-                        if let race = model.nextRace {
-                            LiveSessionBanner(race: race)
-                        }
-                        if column {
-                            HeaderView(onInfo: { showSettings = true })
-                        }
-                    }
-                    .padding(.bottom, column ? -6 : 0)
-                    .zIndex(1)
-                    // where a pick from the season list glides back to
-                    .id("top")
-
-                    if let race = model.displayRace {
-                        if column {
-                            if model.isBrowsing { nextRaceButton }
-                            CountdownView(race: race, onSettings: { showSettings = true }, ring: 246, showsRaceTitle: true)
-                        } else {
-                            HStack(alignment: .top, spacing: 16) {
-                                VStack(alignment: .leading, spacing: 16) {
-                                    HeaderView(onInfo: { showSettings = true }).padding(.bottom, -6).zIndex(1)
-                                    RaceHeroView(race: race, onBack: model.isBrowsing ? backToNextRace : nil)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                                CountdownView(race: race, onSettings: { showSettings = true }, ring: 190)
-                                    .padding(.top, 8)
-                            }
-                        }
-                        emilyBar
-                        fanVote
-                        if !Self.demoMode {
-                            InviteBanner()
-                        }
-                    } else {
-                        SeasonOverBanner()
-                    }
+        if let race = model.displayRace {
+            ScrollViewReader { proxy in
+                DuoCountdown(halves: halves, race: race, model: model, standings: standings,
+                             onSettings: { showSettings = true }, onEmily: { showEmily = true },
+                             onBack: model.isBrowsing ? backToNextRace : nil) {
+                    Color.clear.frame(height: 0).id("top")
+                    fanVote
                     seasonList(proxy)
+                    if !Self.demoMode {
+                        InviteBanner()
+                    }
                     FooterView()
                 }
-                .padding(.top, 8)
-                .padding(.bottom, 24)
             }
-            .scrollIndicators(.hidden)
             .refreshable { await model.load() }
-        }
-    }
-
-    @ViewBuilder
-    private var weekendHalf: some View {
-        if let race = model.displayRace {
-            WeekendHub(race: race, model: model, standings: standings)
-                .cascade(sectionsShown, delay: 0.08)
+            .task { await standings.load() }
         } else {
-            Color.clear
+            SeasonOverBanner().padding(16)
         }
-    }
-
-    /// While browsing another round: back to the next race.
-    private var nextRaceButton: some View {
-        Button(action: backToNextRace) {
-            HStack(spacing: 4) {
-                Image(systemName: "arrow.uturn.backward").font(.system(size: 9, weight: .bold))
-                Text("NEXT RACE").font(.f1(10, weight: .bold)).tracking(1)
-            }
-            .foregroundStyle(Theme.accent)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 6)
-            .background(Capsule().fill(Theme.accent.opacity(0.1))
-                .overlay(Capsule().strokeBorder(Theme.accent.opacity(0.5), lineWidth: 1)))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Back to next race")
     }
 
     private func schedule(_ race: Race) -> some View {

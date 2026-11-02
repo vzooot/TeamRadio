@@ -34,13 +34,11 @@ struct StandingsAfterRound: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                header
-                    // the rounds strip's height on the left, so the two
-                    // switches line up
-                    .padding(.bottom, 48)
-                picker
+        // its own screen: the header and the switch stay, the table scrolls
+        VStack(alignment: .leading, spacing: 14) {
+            header
+            picker
+            ScrollView {
                 VStack(spacing: 16) {
                     // the title is settled and this is the latest round
                     if !teams, let champion, model.selectedRound == model.pickerRaces.last?.round {
@@ -59,10 +57,10 @@ struct StandingsAfterRound: View {
                 .onTapGesture { if isShielded { revealed = true } }
                 .animation(.easeInOut(duration: 0.25), value: isShielded)
                 .opacity(model.isSwitching ? 0.35 : 1)
+                .padding(.bottom, 16)
             }
-            .padding(.bottom, 32)
+            .scrollIndicators(.hidden)
         }
-        .scrollIndicators(.hidden)
         .onChange(of: model.selectedRound) { _, _ in revealed = false }
         .onChange(of: spoilerMode) { _, _ in revealed = false }
         .task(id: after) {

@@ -88,7 +88,7 @@ struct GamesView: View {
     @State private var showLeaderboard = false
     /// An arcade game's full board (the iPhone Duo shows this week's beside the game).
     @State private var fullBoard: ArcadeGame?
-    @State private var wide = false
+    @State private var halves: Halves?
     @AppStorage("chatNickname") private var nickname = ""
 
     var body: some View {
@@ -101,13 +101,18 @@ struct GamesView: View {
 
             if !model.ready {
                 ProgressView().tint(Theme.accent)
+            } else if let halves, halves.axis == .horizontal {
+                TimelineView(.periodic(from: .now, by: 30)) { context in
+                    duoContent(fold: halves.fold, now: context.date)
+                }
+                .transition(.opacity)
             } else {
             ScrollViewReader { proxy in
                 ScrollView {
                     TimelineView(.periodic(from: .now, by: 30)) { context in
-                        if wide { wideContent(now: context.date) } else { content(now: context.date) }
+                        content(now: context.date)
                     }
-                    .padding(.horizontal, wide ? 18 : 16)
+                    .padding(.horizontal, 16)
                     .padding(.top, 8)
                     .padding(.bottom, 32)
                 }
@@ -132,7 +137,7 @@ struct GamesView: View {
             }
         }
         .animation(.easeOut(duration: 0.25), value: model.ready)
-        .onWideScreen($wide)
+        .onHalves($halves)
         .sheet(isPresented: Binding(get: { fullBoard != nil }, set: { if !$0 { fullBoard = nil } })) {
             if let fullBoard {
                 ArcadeFullBoard(game: fullBoard, userId: model.userId)
@@ -194,32 +199,43 @@ struct GamesView: View {
         }
     }
 
-    /// The iPhone Duo unfolded (approved draft A,
-    /// build/mockups/duo2/sheet-3-games-news.png): your season game in the
-    /// left half, the arcade in the right, each game with this week's board.
-    private func wideContent(now: Date) -> some View {
-        HStack(alignment: .top, spacing: 18) {
-            VStack(alignment: .leading, spacing: 16) {
-                title
-                RankBoard(board: model.seasonBoard, onOpen: { showLeaderboard = true })
-                PicksHero(game: game, state: game.cardState(at: now), now: now, seasonRounds: model.season.count,
-                          onPicks: { showPicks = true }, onResult: { showResult = true })
+    /// The iPhone Duo held like a book: two screens. Your season game (your
+    /// standing, your picks) on the race card's glass; the arcade on the
+    /// square monitor, each game with this week's board, its title staying put.
+    private func duoContent(fold: CGFloat, now: Date) -> some View {
+        DuoSideBySide(fold: fold) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    title
+                    RankBoard(board: model.seasonBoard, onOpen: { showLeaderboard = true })
+                    PicksHero(game: game, state: game.cardState(at: now), now: now, seasonRounds: model.season.count,
+                              onPicks: { showPicks = true }, onResult: { showResult = true })
+                }
+                .padding(16)
             }
-            .frame(width: WideScreen.column)
+            .scrollIndicators(.hidden)
+            .refreshable { await model.load() }
+            .duoDisplay()
+        } right: {
             VStack(alignment: .leading, spacing: 12) {
                 SectionTitle("ARCADE")
-                    .id("arcade")
-                    .padding(.top, 14)
-                ArcadeBanner(kind: .lightsOut, rank: model.lightsBoard?.me?.rank,
-                             players: model.lightsBoard?.total) { showLightsOut = true }
-                ArcadeBoardCard(game: .lightsOut, standing: model.lightsBoard.map { ArcadeGame.from($0) },
-                                loaded: model.ready, hasName: !nickname.isEmpty) { fullBoard = .lightsOut }
-                ArcadeBanner(kind: .wall, rank: model.wallBoard?.me?.rank,
-                             players: model.wallBoard?.total) { showWall = true }
-                    .padding(.top, 10)
-                ArcadeBoardCard(game: .wall, standing: model.wallBoard.map { ArcadeGame.from($0) },
-                                loaded: model.ready, hasName: !nickname.isEmpty) { fullBoard = .wall }
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ArcadeBanner(kind: .lightsOut, rank: model.lightsBoard?.me?.rank,
+                                     players: model.lightsBoard?.total) { showLightsOut = true }
+                        ArcadeBoardCard(game: .lightsOut, standing: model.lightsBoard.map { ArcadeGame.from($0) },
+                                        loaded: model.ready, hasName: !nickname.isEmpty) { fullBoard = .lightsOut }
+                        ArcadeBanner(kind: .wall, rank: model.wallBoard?.me?.rank,
+                                     players: model.wallBoard?.total) { showWall = true }
+                            .padding(.top, 10)
+                        ArcadeBoardCard(game: .wall, standing: model.wallBoard.map { ArcadeGame.from($0) },
+                                        loaded: model.ready, hasName: !nickname.isEmpty) { fullBoard = .wall }
+                    }
+                    .padding(.bottom, 8)
+                }
+                .scrollIndicators(.hidden)
             }
+            .duoDeck()
         }
     }
 

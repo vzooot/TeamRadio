@@ -108,6 +108,9 @@ def cmd_prepare(a):
     promo_path = os.path.join(ROOT, "fastlane", "metadata", "en-US", "promotional_text.txt")
     if os.path.exists(promo_path):
         attrs["promotionalText"] = open(promo_path).read().strip()
+    description_path = os.path.join(ROOT, "fastlane", "metadata", "en-US", "description.txt")
+    if os.path.exists(description_path):
+        attrs["description"] = open(description_path).read().strip()
     if a.keywords:
         assert len(a.keywords) <= 100, "keywords over 100 characters"
         attrs["keywords"] = a.keywords

@@ -15,12 +15,15 @@ struct ResultsView: View {
     /// The constructors' top five under the classification (off on the
     /// iPhone Duo, where the standings sit beside it).
     private let showsConstructors: Bool
+    /// No page background of its own (inside the iPhone Duo's glass screen).
+    private let plain: Bool
 
     /// `model`: shared with the standings beside it on the iPhone Duo.
     @MainActor
-    init(model: ResultsViewModel? = nil, showsConstructors: Bool = true) {
+    init(model: ResultsViewModel? = nil, showsConstructors: Bool = true, plain: Bool = false) {
         _model = State(initialValue: model ?? ResultsViewModel())
         self.showsConstructors = showsConstructors
+        self.plain = plain
     }
     /// Spoiler mode: classifications stay blurred until tapped.
     @AppStorage("spoilerMode") private var spoilerMode = false
@@ -45,25 +48,27 @@ struct ResultsView: View {
 
     var body: some View {
         ZStack {
-            Theme.background.ignoresSafeArea()
+            if !plain {
+                Theme.background.ignoresSafeArea()
 
-            RadialGradient(
-                colors: [Theme.accent.opacity(0.14), .clear],
-                center: .top, startRadius: 0, endRadius: 380
-            )
-            .ignoresSafeArea()
+                RadialGradient(
+                    colors: [Theme.accent.opacity(0.14), .clear],
+                    center: .top, startRadius: 0, endRadius: 380
+                )
+                .ignoresSafeArea()
 
-            RadialGradient(
-                colors: [Theme.live.opacity(0.10), .clear],
-                center: .bottomTrailing, startRadius: 0, endRadius: 460
-            )
-            .ignoresSafeArea()
+                RadialGradient(
+                    colors: [Theme.live.opacity(0.10), .clear],
+                    center: .bottomTrailing, startRadius: 0, endRadius: 460
+                )
+                .ignoresSafeArea()
 
-            RadialGradient(
-                colors: [Theme.violet.opacity(0.08), .clear],
-                center: .leading, startRadius: 0, endRadius: 420
-            )
-            .ignoresSafeArea()
+                RadialGradient(
+                    colors: [Theme.violet.opacity(0.08), .clear],
+                    center: .leading, startRadius: 0, endRadius: 420
+                )
+                .ignoresSafeArea()
+            }
 
             switch model.phase {
             case .loading:

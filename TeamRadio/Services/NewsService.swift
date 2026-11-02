@@ -57,6 +57,7 @@ final class RSSParser: NSObject, XMLParserDelegate {
     private var title = ""
     private var link = ""
     private var pubDate = ""
+    private var summary = ""
     private var imageURL: String?
 
     private init(source: String) {
@@ -79,7 +80,7 @@ final class RSSParser: NSObject, XMLParserDelegate {
         switch elementName {
         case "item":
             inItem = true
-            title = ""; link = ""; pubDate = ""; imageURL = nil
+            title = ""; link = ""; pubDate = ""; summary = ""; imageURL = nil
         case "enclosure", "media:thumbnail", "media:content":
             if inItem, imageURL == nil,
                let url = attributes["url"],
@@ -97,6 +98,7 @@ final class RSSParser: NSObject, XMLParserDelegate {
         case "title": title += string
         case "link": link += string
         case "pubDate": pubDate += string
+        case "description": summary += string
         default: break
         }
     }
@@ -106,8 +108,21 @@ final class RSSParser: NSObject, XMLParserDelegate {
         switch currentElement {
         case "title": title += string
         case "link": link += string
+        case "description": summary += string
         default: break
         }
+    }
+
+    /// Feed summaries can carry HTML: tags out, entities decoded, spaces tidied.
+    static func plainText(_ html: String) -> String? {
+        var text = html.replacingOccurrences(of: "<[^>]+>", with: " ", options: .regularExpression)
+        for (entity, character) in ["&amp;": "&", "&quot;": "\"", "&#39;": "'", "&apos;": "'", "&lt;": "<", "&gt;": ">", "&nbsp;": " ",
+                                    "&#8217;": "’", "&#8216;": "‘", "&#8220;": "“", "&#8221;": "”", "&#8211;": "–", "&#8212;": "—"] {
+            text = text.replacingOccurrences(of: entity, with: character)
+        }
+        text = text.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? nil : text
     }
 
     func parser(
@@ -129,7 +144,8 @@ final class RSSParser: NSObject, XMLParserDelegate {
                 source: source,
                 published: published,
                 sortDate: published ?? .distantPast,
-                imageURL: imageURL.flatMap(URL.init(string:))
+                imageURL: imageURL.flatMap(URL.init(string:)),
+                summary: Self.plainText(summary)
             ))
         }
     }

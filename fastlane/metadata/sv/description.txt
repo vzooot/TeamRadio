@@ -1,4 +1,9 @@
-Team Radio är en snabb och snygg följeslagare för racehelgen.
+Team Radio är en snabb och snygg följeslagare för racehelgen, och den är gjord för iPhone Duo.
+
+GJORD FÖR IPHONE DUO
+• Fäll ut den så blir Team Radio två skärmar: loppet och nedräkningen på den ena, helgens bana, schema och ställning på den andra
+• På sidan som en bok eller uppställd som en laptop följer skärmarna vecket och inget hamnar på det
+• Resultat, Spel, Nyheter och arkadspelen använder också båda halvorna
 
 NEDRÄKNING
 • Live-nedräkning till varje session under kommande racehelg – träning, kval, sprint och lopp
@@ -17,7 +22,7 @@ RESULTAT OCH STÄLLNING
 
 ALLTID PÅ LÅSSKÄRMEN
 • Widgetar för låsskärm och hemskärm med nedräkning som uppdaterar sig själv
-• Fäst en session som Live Activity: en tickande nedräkning i Dynamic Island som slår om till LIVE vid grönt ljus
+• En automatisk Live Activity före varje session: en tickande nedräkning på låsskärmen och i Dynamic Island som slår om till LIVE vid grönt ljus (du väljer hur tidigt)
 • Valfria påminnelser 15 minuter före varje session
 
 PADDOCK-CHATT
