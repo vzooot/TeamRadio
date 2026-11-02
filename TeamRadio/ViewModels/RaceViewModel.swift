@@ -41,7 +41,7 @@ final class RaceViewModel {
             async let top = F1API.driverStandings(limit: 5)
 
             let (race, races, drivers) = try await (next, calendar, top)
-            nextRace = race
+            nextRace = Self.upcoming(race, in: races, now: .now)
             season = races
             standings = drivers
             phase = .loaded
@@ -59,6 +59,15 @@ final class RaceViewModel {
                 phase = .failed(error.localizedDescription)
             }
         }
+    }
+
+    /// The results service moves on to the next round only a while after a
+    /// race; the countdown moves on as soon as the weekend's last session
+    /// is over, instead of showing "race complete" until then.
+    static func upcoming(_ race: Race?, in season: [Race], now: Date) -> Race? {
+        guard let race, let last = race.sessions.last,
+              now >= last.date.addingTimeInterval(last.kind.expectedDuration) else { return race }
+        return season.first { $0.roundNumber > race.roundNumber } ?? race
     }
 
     /// Browse another round (nil returns to the next race).

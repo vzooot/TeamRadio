@@ -1,6 +1,5 @@
 import SwiftUI
 import UIKit
-import WebKit
 
 /// Paddock news, broadcast style: a live ticker of headlines, the lead story
 /// as a giant headline, teams in the news (tap one to filter), trending
@@ -9,7 +8,7 @@ struct NewsView: View {
     @State private var model = NewsViewModel()
     @State private var team: NewsTeam?
     @Environment(\.openURL) private var openURL
-    @State private var wide = false
+    @State private var halves: Halves?
     /// The story open in the reader (iPhone Duo); the lead until one's tapped.
     @State private var open: NewsItem?
 
@@ -32,8 +31,8 @@ struct NewsView: View {
                         .font(.subheadline)
                         .foregroundStyle(Theme.dimText)
                 }
-            } else if wide {
-                reader
+            } else if let halves, halves.axis == .horizontal {
+                reader(fold: halves.fold)
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
@@ -47,7 +46,7 @@ struct NewsView: View {
                 .refreshable { await model.load() }
             }
         }
-        .onWideScreen($wide)
+        .onHalves($halves)
         .task { await model.load() }
     }
 
@@ -112,11 +111,11 @@ struct NewsView: View {
 
     /// The iPhone Duo unfolded (approved draft B,
     /// build/mockups/duo2/sheet-3-games-news.png): the stories in the left
-    /// half; the one tapped opens in the right, without leaving the app.
-    private var reader: some View {
+    /// half; the one tapped is previewed in the right, read in Safari.
+    private func reader(fold: CGFloat) -> some View {
         let list = stories
         let current = list.first { $0.id == open?.id } ?? list.first
-        return HStack(alignment: .top, spacing: 18) {
+        return DuoSideBySide(fold: fold) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     header
@@ -147,36 +146,19 @@ struct NewsView: View {
                             .foregroundStyle(Theme.dimText)
                     }
                 }
-                .padding(.bottom, 32)
+                .padding(16)
             }
             .scrollIndicators(.hidden)
             .refreshable { await model.load() }
-            .frame(width: WideScreen.column)
-
+            .duoDisplay()
+        } right: {
             if let current {
-                VStack(spacing: 0) {
-                    HStack(spacing: 10) {
-                        NewsMeta(item: current)
-                        Spacer()
-                        Button { openURL(current.link) } label: {
-                            Label("SAFARI", systemImage: "safari")
-                                .font(.f1(10, weight: .heavy))
-                                .foregroundStyle(Theme.accent)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Open in Safari")
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(Theme.card)
-                    NewsWebView(url: current.link)
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 18))
-                .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Theme.glassStroke, lineWidth: 1))
-                .padding(.vertical, 10)
+                StoryPreview(item: current) { openURL(current.link) }
+                    .id(current.id)
+                    .transition(.opacity)
+                    .duoDeck(padding: 0)
             }
         }
-        .padding(.horizontal, 18)
     }
 
     private var openBadge: some View {
@@ -429,56 +411,55 @@ private struct NewsArt: View {
     }
 }
 
-/// The reader's page (iPhone Duo): the story's site, with a spinner until
-/// it has loaded.
-private struct NewsWebView: View {
-    let url: URL
-    @State private var loading = true
+/// The story the reader has open (iPhone Duo): our own preview of it, the
+/// photo, the source and age, the headline and the feed's summary, and a
+/// button to read the whole piece in Safari. No web page inside the app:
+/// news sites open on cookie walls and ads, and keep their own sign-ins.
+private struct StoryPreview: View {
+    let item: NewsItem
+    let onRead: () -> Void
 
     var body: some View {
-        Site(url: url, loading: $loading)
-            .overlay { if loading { ProgressView().tint(Theme.accent) } }
-            .background(Theme.card)
-    }
-
-    private struct Site: UIViewRepresentable {
-        let url: URL
-        @Binding var loading: Bool
-
-        func makeUIView(context: Context) -> WKWebView {
-            let web = WKWebView()
-            web.isOpaque = false
-            web.backgroundColor = .clear
-            web.navigationDelegate = context.coordinator
-            web.load(URLRequest(url: url))
-            return web
-        }
-
-        func updateUIView(_ web: WKWebView, context: Context) {
-            context.coordinator.page = self
-            guard context.coordinator.requested != url else { return }
-            context.coordinator.requested = url
-            web.load(URLRequest(url: url))
-        }
-
-        func makeCoordinator() -> Coordinator { Coordinator(page: self) }
-
-        final class Coordinator: NSObject, WKNavigationDelegate {
-            var page: Site
-            var requested: URL?
-
-            init(page: Site) {
-                self.page = page
-                requested = page.url
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                NewsArt(item: item)
+                    .frame(height: 220)
+                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                    .overlay(LinearGradient(colors: [.clear, Theme.background.opacity(0.85)], startPoint: .center, endPoint: .bottom)
+                        .clipShape(RoundedRectangle(cornerRadius: 18)))
+                NewsMeta(item: item)
+                Text(item.title.uppercased())
+                    .font(.f1(24).italic())
+                    .foregroundStyle(Theme.chromeText)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let summary = item.summary {
+                    Text(summary)
+                        .font(.system(size: 16))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Button(action: onRead) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "safari").font(.system(size: 15, weight: .semibold))
+                        Text("READ ON \(item.source.uppercased())").font(.f1(13, weight: .heavy)).tracking(1)
+                        Spacer(minLength: 4)
+                        Image(systemName: "arrow.up.right").font(.system(size: 13, weight: .bold))
+                    }
+                    .foregroundStyle(Theme.onAccent)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 13)
+                    .background(Capsule().fill(Theme.accentGradient))
+                    .shadow(color: Theme.accent.opacity(0.4), radius: 10)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Read on \(item.source) in Safari")
+                .padding(.top, 4)
             }
-
-            func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) { page.loading = true }
-            func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { page.loading = false }
-            func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { page.loading = false }
-            func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-                page.loading = false
-            }
+            .padding(16)
         }
+        .scrollIndicators(.hidden)
     }
 }
 

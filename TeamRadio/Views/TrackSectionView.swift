@@ -6,8 +6,6 @@ import SwiftUI
 struct TrackSectionView: View {
     let map: TrackMap
     let circuit: Circuit
-    /// Off where a switch above already names it (the iPhone Duo's weekend screen).
-    var showsTitle = true
 
     @State private var resetToken = 0
     @State private var showRealWorld = false
@@ -16,9 +14,11 @@ struct TrackSectionView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if showsTitle {
-                SectionTitle("THE CIRCUIT")
-            }
+            SectionTitle("THE CIRCUIT")
+                .task(id: circuit.circuitId) {
+                    guard GameFeature.isEnabled else { return }
+                    guide = await GuideService.guide(circuitId: circuit.circuitId, corners: map.corners.count)
+                }
 
             VStack(spacing: 0) {
                 // The 3D map runs behind the whole card (see the background
@@ -119,10 +119,6 @@ struct TrackSectionView: View {
                 }
                 .padding(.leading, 4)
             }
-        }
-        .task(id: circuit.circuitId) {
-            guard GameFeature.isEnabled else { return }
-            guide = await GuideService.guide(circuitId: circuit.circuitId, corners: map.corners.count)
         }
     }
 

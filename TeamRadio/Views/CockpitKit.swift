@@ -49,7 +49,7 @@ struct Screw: View {
 /// One countdown digit: drawn once (glow included) as a flattened image;
 /// a new digit slides in from above while the old one slides down and
 /// fades, like a counter rolling back. Moving finished images is nearly free.
-private struct RollingDigit: View {
+struct RollingDigit: View {
     let digit: Character
     let hot: Bool
     let rolls: Bool
@@ -199,8 +199,8 @@ struct RingClock: View {
                     .tracking(2)
                     .foregroundStyle(hot ? Theme.live : Theme.dimText)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .frame(maxWidth: size - 90)
+                    .minimumScaleFactor(0.6)
+                    .frame(maxWidth: size - 64)
             }
         }
         .frame(width: size, height: size)

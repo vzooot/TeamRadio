@@ -11,6 +11,8 @@ struct NewsItem: Identifiable, Equatable {
     /// `published` is missing, so undated feeds still interleave sensibly.
     var sortDate: Date
     let imageURL: URL?
+    /// The feed's own summary, as plain text (the iPhone Duo's story preview).
+    var summary: String?
 
     var id: String { link.absoluteString }
 

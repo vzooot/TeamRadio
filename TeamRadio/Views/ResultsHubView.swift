@@ -11,20 +11,21 @@ struct ResultsHubView: View {
     @Binding var page: Page
     /// The round in view, shared with the standings beside it on the iPhone Duo.
     @State private var results = ResultsViewModel()
-    @State private var wide = false
+    @State private var halves: Halves?
 
     var body: some View {
         Group {
-            if wide {
-                // The iPhone Duo unfolded (approved draft B,
-                // build/mockups/duo2/sheet-2-results.png): the results in the
-                // left half, the championship after that round in the right.
-                HStack(alignment: .top, spacing: 18) {
-                    ResultsView(model: results, showsConstructors: false)
-                        .frame(width: WideScreen.column + 34)
+            if let halves, halves.axis == .horizontal {
+                // The iPhone Duo held like a book: two screens. The results
+                // on the race card's glass; the championship after that
+                // round on the square monitor.
+                DuoSideBySide(fold: halves.fold) {
+                    ResultsView(model: results, showsConstructors: false, plain: true)
+                        .padding(.top, 4).duoDisplay()
+                } right: {
                     StandingsAfterRound(model: results)
+                        .duoDeck()
                 }
-                .padding(.trailing, 18)
             } else {
                 ZStack {
                     ResultsView(model: results)
@@ -39,7 +40,7 @@ struct ResultsHubView: View {
                 .environment(\.resultsPage, $page)
             }
         }
-        .onWideScreen($wide)
+        .onHalves($halves)
         .background(Theme.background.ignoresSafeArea())
     }
 }
