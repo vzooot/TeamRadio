@@ -116,59 +116,98 @@ struct NewsView: View {
         let list = stories
         let current = list.first { $0.id == open?.id } ?? list.first
         return DuoSideBySide(fold: fold) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    header
-                    NewsTicker(headlines: model.items.prefix(8).map(\.title))
-                    if let lead = list.first {
-                        Button { open = lead } label: { LeadStory(item: lead) }
-                            .buttonStyle(.plain)
-                            .overlay(alignment: .topLeading) {
-                                if current?.id == lead.id { openBadge.padding(10) }
-                            }
-                    }
-                    teams
-                    if list.count > 1 { NewsSection(title: "LATEST") }
-                    ForEach(list.dropFirst()) { item in
-                        let on = current?.id == item.id
-                        Button { open = item } label: {
-                            WireRow(item: item)
-                                .padding(8)
-                                .background(RoundedRectangle(cornerRadius: 14).fill(on ? Theme.accent.opacity(0.12) : .clear)
-                                    .overlay(RoundedRectangle(cornerRadius: 14)
-                                        .strokeBorder(on ? Theme.accent.opacity(0.7) : .clear, lineWidth: 1.2)))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    if list.isEmpty {
-                        Text("No stories about \(team?.name.capitalized ?? "this team") right now.")
-                            .font(.subheadline)
-                            .foregroundStyle(Theme.dimText)
-                    }
+            // the story on the display
+            DuoScreen {
+                header
+            } content: {
+                if let current {
+                    StoryPreview(item: current) { openURL(current.link) }
+                        .id(current.id)
+                        .transition(.opacity)
                 }
-                .padding(16)
             }
-            .scrollIndicators(.hidden)
-            .refreshable { await model.load() }
-            .duoDisplay()
         } right: {
-            if let current {
-                StoryPreview(item: current) { openURL(current.link) }
-                    .id(current.id)
-                    .transition(.opacity)
-                    .duoDeck(padding: 0)
+            // the stories to pick from, and the teams to filter them by
+            DuoScreen {
+                DuoTitle(title: "THE WIRE", subtitle: "\(list.count) STORIES · TAP ONE")
+            } content: {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        NewsTicker(headlines: model.items.prefix(8).map(\.title))
+                        teams
+                        if let lead = list.first {
+                            NewsSection(title: "LEAD STORY")
+                            pickable(lead, current: current) { WireRow(item: lead) }
+                        }
+                        let trending = Array(list.dropFirst().prefix(5))
+                        if !trending.isEmpty {
+                            NewsSection(title: "TRENDING")
+                            ForEach(Array(trending.enumerated()), id: \.element.id) { index, item in
+                                pickable(item, current: current) { trendingRow(index, item) }
+                            }
+                        }
+                        let extra = quoteAndRest(list)
+                        if let quote = extra.quote {
+                            pickable(quote, current: current) { PullQuote(item: quote) }
+                        }
+                        if !extra.rest.isEmpty {
+                            NewsSection(title: "THE WIRE")
+                            ForEach(extra.rest) { item in
+                                pickable(item, current: current) { WireRow(item: item) }
+                            }
+                        }
+                        if list.isEmpty {
+                            Text("No stories about \(team?.name.capitalized ?? "this team") right now.")
+                                .font(.subheadline)
+                                .foregroundStyle(Theme.dimText)
+                        }
+                    }
+                    .padding(14)
+                }
+                .scrollIndicators(.hidden)
+                .refreshable { await model.load() }
             }
         }
     }
 
-    private var openBadge: some View {
-        Text("OPEN →")
-            .font(.f1(10, weight: .heavy))
-            .tracking(1)
-            .foregroundStyle(Theme.onAccent)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(Capsule().fill(Theme.accentGradient))
+    /// A trending story under its big number.
+    private func trendingRow(_ index: Int, _ item: NewsItem) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            Text("\(index + 1)")
+                .font(.f1Digits(44))
+                .foregroundStyle(LinearGradient(colors: [Theme.accent, Theme.violet], startPoint: .top, endPoint: .bottom))
+                .frame(width: 34)
+            VStack(alignment: .leading, spacing: 4) {
+                NewsMeta(item: item)
+                Text(item.title)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(3)
+            }
+            Spacer(minLength: 0)
+        }
+        .contentShape(Rectangle())
+    }
+
+    /// The story the phone page would pull-quote, and the wire after it.
+    private func quoteAndRest(_ list: [NewsItem]) -> (quote: NewsItem?, rest: [NewsItem]) {
+        let quote = list.dropFirst(6).first(where: { $0.hasQuote }) ?? list.first(where: { $0.hasQuote && $0.id != list.first?.id })
+        let rest = list.dropFirst(6).filter { !$0.hasQuote || $0.id != list.dropFirst(6).first(where: { $0.hasQuote })?.id }
+        return (quote, Array(rest))
+    }
+
+    /// On the Duo, a story in the list: tap it to show it on the display.
+    private func pickable<Label: View>(_ item: NewsItem, current: NewsItem?, @ViewBuilder label: () -> Label) -> some View {
+        let on = current?.id == item.id
+        return Button { withAnimation(.easeInOut(duration: 0.2)) { open = item } } label: {
+            label()
+                .padding(8)
+                .background(RoundedRectangle(cornerRadius: 14).fill(on ? Theme.accent.opacity(0.12) : .clear)
+                    .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(on ? Theme.accent.opacity(0.7) : .clear, lineWidth: 1.2)))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(on ? .isSelected : [])
     }
 
     @ViewBuilder
@@ -185,25 +224,8 @@ struct NewsView: View {
         if !trending.isEmpty {
             NewsSection(title: "TRENDING")
             ForEach(Array(trending.enumerated()), id: \.element.id) { index, item in
-                Button { openURL(item.link) } label: {
-                    HStack(alignment: .top, spacing: 14) {
-                        Text("\(index + 1)")
-                            .font(.f1Digits(44))
-                            .foregroundStyle(LinearGradient(colors: [Theme.accent, Theme.violet], startPoint: .top, endPoint: .bottom))
-                            .frame(width: 34)
-                        VStack(alignment: .leading, spacing: 4) {
-                            NewsMeta(item: item)
-                            Text(item.title)
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundStyle(.white)
-                                .multilineTextAlignment(.leading)
-                                .lineLimit(3)
-                        }
-                        Spacer(minLength: 0)
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
+                Button { openURL(item.link) } label: { trendingRow(index, item) }
+                    .buttonStyle(.plain)
             }
         }
 

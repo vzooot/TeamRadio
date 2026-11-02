@@ -1,22 +1,21 @@
 import SwiftUI
 
-/// The iPhone Duo's Countdown tab as two screens. The left one is a display:
-/// a framed screen with bright corners that shows the race and its countdown
-/// big, or whatever the deck puts on it (the circuit, the start lights, the
-/// standings). The right one is the deck: panels that pick what the display
-/// shows, Ask Emily, the weekend's sessions round a ring clock, the
-/// championship, then the rest of the weekend. One panel shape throughout:
-/// a cut corner, a thin edge, a lit bar on the side.
+/// The iPhone Duo's Countdown tab as two screens, each its title on top and
+/// its box below. The left screen is the display: the race and its countdown
+/// (the session chips, the ring clock, the start lights, the weather), or
+/// the circuit, or the standings. Swipe it, or tap its arrows, to go
+/// through the season's races. The right screen picks what the display
+/// shows, and holds Ask Emily, the Lock Screen line, the weekend's
+/// timetable, then the fan vote and the season.
 struct DuoCountdown<Extras: View>: View {
     enum Show: String, CaseIterable {
-        case countdown = "COUNTDOWN", circuit = "CIRCUIT", lights = "LIGHTS", standings = "STANDINGS"
+        case countdown = "COUNTDOWN", circuit = "CIRCUIT", standings = "STANDINGS"
 
-        var symbol: String {
+        var option: GlowSelector.Option {
             switch self {
-            case .countdown: "timer"
-            case .circuit: "point.topleft.down.to.point.bottomright.curvepath"
-            case .lights: "circle.grid.3x3"
-            case .standings: "trophy"
+            case .countdown: .init(id: rawValue, title: rawValue, symbol: "timer", tint: Theme.accent)
+            case .circuit: .init(id: rawValue, title: rawValue, symbol: "point.topleft.down.to.point.bottomright.curvepath", tint: Theme.violet)
+            case .standings: .init(id: rawValue, title: rawValue, symbol: "trophy", tint: Theme.live)
             }
         }
     }
@@ -27,30 +26,36 @@ struct DuoCountdown<Extras: View>: View {
     let standings: StandingsViewModel
     let onSettings: () -> Void
     let onEmily: () -> Void
-    /// Set while browsing another round: back to the next race.
-    let onBack: (() -> Void)?
+    /// Go to another race of the season (nil: back to the next one).
+    let onSelectRace: (Race?) -> Void
     @ViewBuilder let extras: Extras
 
+    #if DEBUG
+    // -DuoShow CIRCUIT|STANDINGS: open the display on it, for screenshots
+    @State private var show: Show = Show(rawValue: UserDefaults.standard.string(forKey: "DuoShow") ?? "") ?? .countdown
+    #else
     @State private var show: Show = .countdown
-    /// The session the countdown runs to (picked in the deck; nil = the next one).
+    #endif
+    /// The session the countdown runs to (picked on the display; nil = the next one).
     @State private var selectedId: String?
     @AppStorage("spoilerMode") private var spoilerMode = false
+    @State private var revealed = false
 
     var body: some View {
         Group {
             if halves.axis == .horizontal {
                 DuoSideBySide(fold: halves.fold) {
-                    display
+                    display(wide: false)
                 } right: {
-                    deck(wide: false)
+                    deck
                 }
             } else {
-                // standing like a laptop: the display on top, the deck below
+                // standing like a laptop: the display on top, the rest below
                 GeometryReader { geo in
                     let first = max(0, halves.fold - 14)
                     VStack(spacing: 28) {
-                        display.frame(height: first)
-                        deck(wide: true).frame(height: max(0, geo.size.height - 8 - 28 - first))
+                        display(wide: true).frame(height: first)
+                        deck.frame(height: max(0, geo.size.height - 8 - 28 - first))
                     }
                     .padding(.horizontal, 16)
                     .padding(.bottom, 8)
@@ -58,16 +63,19 @@ struct DuoCountdown<Extras: View>: View {
             }
         }
         .onChange(of: race.id) { _, _ in selectedId = nil }
+        .onChange(of: spoilerMode) { _, _ in revealed = false }
     }
 
-    // MARK: Sessions
+    // MARK: Sessions and races
 
     private func target(now: Date) -> WeekendSession? {
         if let selectedId, let chosen = race.sessions.first(where: { $0.id == selectedId }) { return chosen }
-        if let live = race.sessions.first(where: { $0.date <= now && now < $0.date.addingTimeInterval($0.kind.expectedDuration) }) {
-            return live
-        }
+        if let live = race.sessions.first(where: { isLive($0, now) }) { return live }
         return race.sessions.first { $0.date > now } ?? race.sessions.last
+    }
+
+    private func isLive(_ session: WeekendSession, _ now: Date) -> Bool {
+        session.date <= now && now < session.date.addingTimeInterval(session.kind.expectedDuration)
     }
 
     private static func tint(_ kind: WeekendSession.Kind) -> Color {
@@ -78,151 +86,192 @@ struct DuoCountdown<Extras: View>: View {
         }
     }
 
+    private var index: Int? { model.season.firstIndex { $0.id == race.id } }
+
+    private func step(_ by: Int) {
+        guard let index, model.season.indices.contains(index + by) else { return }
+        let next = model.season[index + by]
+        onSelectRace(next.id == model.nextRace?.id ? nil : next)
+    }
+
     // MARK: The display
 
-    private var display: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            let now = context.date
-            Group {
-                switch show {
-                case .countdown: countdownFace(now: now)
-                case .circuit: circuitFace
-                case .lights: lightsFace(now: now)
-                case .standings: standingsFace
+    private func display(wide: Bool) -> some View {
+        DuoScreen(flag: show == .countdown ? Flags.emoji(for: race.circuit.location.country) : nil) {
+            HeaderView(onInfo: onSettings)
+                .padding(.bottom, -6)
+        } content: {
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                Group {
+                    switch show {
+                    case .countdown: countdownFace(now: context.date, wide: wide)
+                    case .circuit: circuitFace
+                    case .standings: standingsFace
+                    }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .duoDisplay(flag: Flags.emoji(for: race.circuit.location.country))
-        .overlay(alignment: .bottom) {
-            Text("TEAM RADIO  //  \(show.rawValue)")
-                .font(.f1(10, weight: .bold))
-                .tracking(3)
-                .foregroundStyle(Theme.accent)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 6)
-                .background(Capsule().fill(Theme.background))
-                .overlay(Capsule().strokeBorder(Theme.accent.opacity(0.6), lineWidth: 1))
-                .offset(y: 12)
-        }
-        .padding(.bottom, 12)
         .animation(.easeInOut(duration: 0.25), value: show)
     }
 
-    /// The race and its countdown, big, the helmet rising out of the corner.
-    private func countdownFace(now: Date) -> some View {
+    /// The race, its sessions, the ring clock, the start lights and the
+    /// weather; swipe sideways for the previous or next race.
+    private func countdownFace(now: Date, wide: Bool) -> some View {
         let session = target(now: now)
-        let remaining = max(0, session.map { $0.date.timeIntervalSince(now) } ?? 0)
-        let live = session.map { $0.date <= now && now < $0.date.addingTimeInterval($0.kind.expectedDuration) } ?? false
-        let weather = session.flatMap { WeatherAPI.point(for: $0.date, in: model.weather) }
-        return ZStack(alignment: .topLeading) {
-            Image("HeaderHelmet")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 300)
-                .background(
-                    ZStack {
-                        Circle().fill(Theme.accent.opacity(0.35)).frame(width: 220).offset(x: -50, y: 10).blur(radius: 50)
-                        Circle().fill(Theme.live.opacity(0.3)).frame(width: 180).offset(x: 70).blur(radius: 46)
+        return GeometryReader { geo in
+            let board = (geo.size.width - 32) / 4.3
+            if wide {
+                HStack(alignment: .center, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        if let next = model.nextRace { LiveSessionBanner(race: next) }
+                        raceTitle
+                        sessionChips(now: now, selected: session)
+                        lights(now: now, session: session)
+                        weatherLine(session)
                     }
-                )
-                .shadow(color: Theme.accent.opacity(0.4), radius: 20)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                .offset(x: 56, y: 24)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 10) {
-                Text(now.formatted(.dateTime.weekday(.wide).month(.abbreviated).day()).uppercased())
-                    .font(.f1(13, weight: .semibold))
-                    .tracking(4)
-                    .foregroundStyle(Theme.dimText)
-                HStack(spacing: 8) {
-                    Text("ROUND \(race.roundNumber)")
-                        .font(.f1(12).italic())
-                        .tracking(1)
-                        .foregroundStyle(Theme.onAccent)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 4)
-                        .background(Theme.accentGradient, in: RoundedRectangle(cornerRadius: 6))
-                    if let onBack {
-                        Button(action: onBack) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "arrow.uturn.backward").font(.system(size: 9, weight: .bold))
-                                Text("NEXT RACE").font(.f1(10, weight: .bold)).tracking(1)
-                            }
-                            .foregroundStyle(Theme.accent)
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 5)
-                            .overlay(Capsule().strokeBorder(Theme.accent.opacity(0.6), lineWidth: 1))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Back to next race")
-                    }
+                    clock(now: now, session: session, size: min(geo.size.height - 36, geo.size.width * 0.42))
                 }
+                .padding(16)
+            } else {
+                // the room the rest takes: title, chips, lights, weather
+                let ring = max(150, min(geo.size.width - 60, geo.size.height - 236 - board))
+                VStack(spacing: 10) {
+                    // the broadcast LIVE bar while a session is on track
+                    if let next = model.nextRace { LiveSessionBanner(race: next) }
+                    raceTitle
+                    sessionChips(now: now, selected: session)
+                    Spacer(minLength: 0)
+                    clock(now: now, session: session, size: ring)
+                    Spacer(minLength: 0)
+                    lights(now: now, session: session)
+                    weatherLine(session)
+                }
+                .padding(16)
+            }
+        }
+        .contentShape(Rectangle())
+        .gesture(DragGesture(minimumDistance: 30).onEnded { drag in
+            guard abs(drag.translation.width) > abs(drag.translation.height) * 1.5 else { return }
+            step(drag.translation.width < 0 ? 1 : -1)
+        })
+    }
+
+    /// The round with arrows to the races either side, the season or the
+    /// way back, then the race. The header's helmet hangs over the middle
+    /// of the first row, as over the race card on the phone.
+    private var raceTitle: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(spacing: 6) {
+                arrow("chevron.left", enabled: (index ?? 0) > 0, label: "Previous race") { step(-1) }
+                Text("ROUND \(race.roundNumber)")
+                    .font(.f1(13).italic())
+                    .tracking(1)
+                    .foregroundStyle(Theme.onAccent)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Theme.accentGradient, in: RoundedRectangle(cornerRadius: 7))
+                arrow("chevron.right", enabled: (index ?? 0) < model.season.count - 1, label: "Next race") { step(1) }
+                Spacer()
+                if model.isBrowsing {
+                    Button { onSelectRace(nil) } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.uturn.backward").font(.system(size: 9, weight: .bold))
+                            Text("NEXT RACE").font(.f1(10, weight: .bold)).tracking(1)
+                        }
+                        .foregroundStyle(Theme.accent)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 6)
+                        .background(Capsule().fill(Theme.accent.opacity(0.1))
+                            .overlay(Capsule().strokeBorder(Theme.accent.opacity(0.5), lineWidth: 1)))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Back to next race")
+                } else {
+                    Text(race.season).font(.f1(15).italic()).foregroundStyle(Theme.dimText)
+                }
+            }
+            VStack(alignment: .leading, spacing: 2) {
                 Text(race.raceName.uppercased())
                     .font(.f1(26).italic())
                     .foregroundStyle(Theme.chromeText)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.7)
-                if live, let session {
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 8) {
-                            Circle().fill(Theme.live).frame(width: 12, height: 12).shadow(color: Theme.live, radius: 6)
-                            Text("LIVE").font(.f1Digits(64)).foregroundStyle(Theme.live).shadow(color: Theme.live.opacity(0.6), radius: 12)
-                        }
-                        SessionClock(start: session.date)
-                            .font(.f1Digits(28))
-                            .foregroundStyle(Theme.chromeText)
-                    }
-                    .padding(.top, 6)
-                } else {
-                    bigClock(remaining)
-                        .padding(.top, 6)
-                }
-                if let session {
-                    Text("\(live ? "ON TRACK" : "NEXT")  ·  \(session.kind.rawValue.uppercased())  ·  \(session.date.formatted(.dateTime.weekday(.abbreviated).hour().minute()).uppercased())")
-                        .font(.f1(13, weight: .bold))
-                        .tracking(3)
-                        .foregroundStyle(session.kind == .race ? Theme.live : Theme.accent)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                }
-                // the start lights, drawn (not an image), so any size stays sharp
-                startLights(now: now, session: session, remaining: remaining)
-                    .padding(.top, 10)
-                Spacer(minLength: 0)
-                HStack(spacing: 6) {
-                    Image(systemName: "location.fill").font(.system(size: 11))
-                    Text(race.circuit.location.locality.uppercased()).font(.f1(12, weight: .bold)).tracking(3)
-                }
-                .foregroundStyle(Theme.dimText)
-                if let weather {
-                    HStack(alignment: .firstTextBaseline, spacing: 10) {
-                        Text(weather.symbol).font(.system(size: 30))
-                        Text("\(Int(weather.temperature.rounded()))°").font(.f1Digits(44)).foregroundStyle(Theme.chromeText)
-                    }
-                    Text("\(weather.precipProbability)% CHANCE OF RAIN")
-                        .font(.f1(12, weight: .bold))
-                        .tracking(3)
-                        .foregroundStyle(weather.precipProbability >= 40 ? Theme.accent : Theme.dimText)
-                }
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                Text("\(race.circuit.circuitName) · \(race.circuit.location.locality)")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.dimText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
-            .padding(.horizontal, 22)
-            .padding(.top, 22)
-            .padding(.bottom, 30)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func arrow(_ symbol: String, enabled: Bool, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(Theme.accent)
+                .frame(width: 28, height: 28)
+                .background(Circle().fill(Theme.accent.opacity(0.1)).overlay(Circle().strokeBorder(Theme.accent.opacity(0.45), lineWidth: 1)))
+        }
+        .buttonStyle(.plain)
+        .opacity(enabled ? 1 : 0.3)
+        .disabled(!enabled)
+        .accessibilityLabel(label)
+    }
+
+    /// The countdown card's session chips: tap one to count down to it.
+    private func sessionChips(now: Date, selected: WeekendSession?) -> some View {
+        HStack(spacing: 6) {
+            ForEach(race.sessions) { session in
+                let on = session.id == selected?.id
+                Button { selectedId = session.id } label: {
+                    NeonChip(title: session.kind.short, tint: Self.tint(session.kind), selected: on)
+                        .opacity(session.date <= now && !on ? 0.45 : 1)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(session.kind.rawValue), \(session.date.formatted(.dateTime.weekday(.wide).hour().minute()))")
+                .accessibilityAddTraits(on ? .isSelected : [])
+            }
         }
     }
 
-    /// The countdown card's LED board at the display's width: a light a day
-    /// through race week, then the session's time, date and days in turn.
-    private func startLights(now: Date, session: WeekendSession?, remaining: TimeInterval) -> some View {
+    /// The ring clock, or LIVE with the session clock, or complete.
+    @ViewBuilder
+    private func clock(now: Date, session: WeekendSession?, size: CGFloat) -> some View {
+        if let session, isLive(session, now) {
+            VStack(spacing: 6) {
+                HStack(spacing: 10) {
+                    Circle().fill(Theme.live).frame(width: 12, height: 12).shadow(color: Theme.live, radius: 6)
+                    Text("\(session.kind.rawValue.uppercased()) IS LIVE").font(.f1(22).italic()).foregroundStyle(.white)
+                }
+                SessionClock(start: session.date).font(.f1Digits(30)).foregroundStyle(Theme.chromeText)
+            }
+            .frame(width: size, height: size)
+        } else if let session, session.date > now {
+            RingClock(remaining: session.date.timeIntervalSince(now),
+                      caption: "\(session.kind.rawValue.uppercased()) · \(session.date.formatted(.dateTime.weekday(.abbreviated).hour().minute()).uppercased())",
+                      hot: session.kind == .race, size: size)
+        } else {
+            Text("🏁 \(session?.kind.rawValue.uppercased() ?? "SESSION") COMPLETE")
+                .font(.f1(20).italic())
+                .foregroundStyle(Theme.dimText)
+                .frame(width: size, height: size)
+        }
+    }
+
+    /// The countdown card's LED board at the display's width (drawn, so it
+    /// stays sharp at any size): a light a day through race week, then the
+    /// session's time, date, days and round in turn.
+    private func lights(now: Date, session: WeekendSession?) -> some View {
         let raceStart = race.sessions.last { $0.kind == .race }?.date
         let cal = Calendar.current
         let days = raceStart.map { cal.dateComponents([.day], from: cal.startOfDay(for: now), to: cal.startOfDay(for: $0)).day ?? 99 } ?? 99
         let lit = raceStart.map { now < $0 && days <= 4 ? 5 - days : 0 } ?? 0
         var pages: [String] = []
-        if let session, remaining > 0 {
-            let left = Int(remaining)
+        if let session, session.date > now {
+            let left = Int(session.date.timeIntervalSince(now))
             pages = [
                 session.date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits)),
                 session.date.formatted(.dateTime.day().month(.abbreviated)).uppercased(),
@@ -230,334 +279,138 @@ struct DuoCountdown<Extras: View>: View {
                 "RND \(race.round)",
             ]
         }
-        return DotMatrixBoard(litLights: lit, pages: pages, standby: lit == 0).alignedToContent()
-    }
-
-    /// "4 DAYS" over the hours, minutes and seconds in rolling chrome digits.
-    private func bigClock(_ remaining: TimeInterval) -> some View {
-        let total = Int(remaining)
-        let days = total / 86400
-        let time = String(format: "%02d:%02d:%02d", total % 86400 / 3600, total % 3600 / 60, total % 60)
-        return VStack(alignment: .leading, spacing: 0) {
-            Text(days > 0 ? "\(days) DAY\(days == 1 ? "" : "S")  +" : "T–")
-                .font(.f1(14, weight: .bold))
-                .tracking(3)
-                .foregroundStyle(Theme.accent)
-            HStack(spacing: 0) {
-                ForEach(Array(time.enumerated()), id: \.offset) { _, character in
-                    if character == ":" {
-                        Text(":").font(.f1Digits(68)).foregroundStyle(Theme.chromeText)
-                    } else {
-                        RollingDigit(digit: character, hot: false, rolls: true, size: 68)
-                    }
-                }
+        return VStack(spacing: 4) {
+            DotMatrixBoard(litLights: lit, pages: pages, standby: lit == 0).alignedToContent()
+            if lit > 0 {
+                Text(days == 0 ? "RACE DAY" : days == 1 ? "LIGHTS OUT TOMORROW" : "RACE WEEK")
+                    .font(.f1(11, weight: .bold))
+                    .tracking(3)
+                    .foregroundStyle(Theme.live)
+                    .shadow(color: Theme.live.opacity(0.7), radius: 6)
             }
-            .animation(.snappy(duration: 0.3), value: total)
-            .shadow(color: Theme.accent.opacity(0.45), radius: 14)
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(days) days and \(time) to go")
     }
 
-    /// The 3D circuit with its numbers.
-    @ViewBuilder
-    private var circuitFace: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("THE CIRCUIT").font(.f1(12, weight: .bold)).tracking(3).foregroundStyle(Theme.accent)
-            Text(race.circuit.circuitName.uppercased())
-                .font(.f1(20).italic())
-                .foregroundStyle(Theme.chromeText)
+    /// Where, and the weather for the session picked.
+    private func weatherLine(_ session: WeekendSession?) -> some View {
+        let weather = session.flatMap { WeatherAPI.point(for: $0.date, in: model.weather) }
+        return HStack(spacing: 8) {
+            Image(systemName: "location.fill").font(.system(size: 11)).foregroundStyle(Theme.dimText)
+            Text(race.circuit.location.locality.uppercased())
+                .font(.f1(12, weight: .bold))
+                .tracking(2)
+                .foregroundStyle(Theme.dimText)
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
-            Spacer(minLength: 0)
-            if let map = model.trackMap {
-                HStack(spacing: 0) {
-                    stat(String(format: "%.2f", map.lengthKm), "KM")
-                    stat("\(map.corners.count)", "TURNS")
-                    stat(map.isClockwise ? "CW" : "ACW", "DIRECTION")
-                    if let pit = map.pitLossSeconds { stat(String(format: "%.0fs", pit), "PIT LOSS") }
-                }
+            Spacer(minLength: 6)
+            if let weather {
+                Text(weather.symbol).font(.system(size: 16))
+                Text("\(Int(weather.temperature.rounded()))°").font(.f1Digits(17)).foregroundStyle(.white)
+                Text("\(weather.precipProbability)% RAIN")
+                    .font(.f1(11, weight: .bold))
+                    .tracking(1)
+                    .foregroundStyle(weather.precipProbability >= 40 ? Theme.accent : Theme.dimText)
             }
         }
-        .padding(.horizontal, 22)
-        .padding(.top, 22)
-        .padding(.bottom, 30)
-        .background(alignment: .top) {
+    }
+
+    /// The circuit card, with its turns and corner guide.
+    private var circuitFace: some View {
+        ScrollView {
             if let map = model.trackMap {
-                Track3DView(map: map)
-                    .frame(height: TrackSceneBuilder.framed + TrackSceneBuilder.bleed)
-                    .padding(.top, 70)
-                    .mask(LinearGradient(stops: [.init(color: .black, location: 0), .init(color: .black, location: 0.6),
-                                                 .init(color: .clear, location: 0.95)],
-                                         startPoint: .top, endPoint: .bottom))
+                TrackSectionView(map: map, circuit: race.circuit, compact: true)
+                    .id(race.circuit.circuitId)
             } else if model.extrasLoading {
-                ProgressView().tint(Theme.accent).padding(.top, 200)
+                TrackPlaceholder()
             }
         }
+        .scrollIndicators(.hidden)
+        .padding(.horizontal, 14)
+        .padding(.top, 70)
     }
 
-    private func stat(_ value: String, _ label: String) -> some View {
-        VStack(spacing: 2) {
-            Text(value).font(.f1Digits(20)).foregroundStyle(.white)
-            Text(label).font(.f1(9, weight: .bold)).tracking(2).foregroundStyle(Theme.dimText)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    /// The countdown card's own instruments, big: the start lights and the tiles.
-    private func lightsFace(now: Date) -> some View {
-        let session = target(now: now)
-        let remaining = max(0, session.map { $0.date.timeIntervalSince(now) } ?? 0)
-        let raceStart = race.sessions.last { $0.kind == .race }?.date
-        let days = raceStart.map { Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: now),
-                                                                   to: Calendar.current.startOfDay(for: $0)).day ?? 99 } ?? 99
-        let lit = raceStart.map { now < $0 && days <= 4 ? 5 - days : 0 } ?? 0
-        let total = Int(remaining)
-        return VStack(spacing: 18) {
-            Text("START LIGHTS").font(.f1(12, weight: .bold)).tracking(3).foregroundStyle(Theme.live)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Spacer(minLength: 0)
-            DotMatrixBoard(litLights: lit, standby: lit == 0).alignedToContent()
-            Text(lit == 5 ? "RACE DAY" : lit > 0 ? "RACE WEEK" : "\(days) DAYS TO THE RACE")
-                .font(.f1(13, weight: .bold)).tracking(4).foregroundStyle(Theme.live)
-                .shadow(color: Theme.live.opacity(0.7), radius: 6)
-            HStack(spacing: 10) {
-                NeonTile(value: total / 86400, label: "DAYS")
-                NeonTile(value: total % 86400 / 3600, label: "HRS")
-                NeonTile(value: total % 3600 / 60, label: "MIN")
-                NeonTile(value: total % 60, label: "SEC", hot: true)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 22)
-        .padding(.top, 22)
-        .padding(.bottom, 30)
-    }
-
-    /// The championship, in the Standings tab's rows.
+    /// The championship in the Standings tab's rows; hidden in spoiler mode.
     private var standingsFace: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("CHAMPIONSHIP").font(.f1(12, weight: .bold)).tracking(3).foregroundStyle(Theme.accent)
-            ScrollView {
+        let shielded = spoilerMode && !revealed
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                SectionTitle("CHAMPIONSHIP")
                 VStack(spacing: 0) {
                     let leader = Double(standings.drivers.first?.points ?? "") ?? 0
                     ForEach(standings.drivers) { entry in
                         FullDriverRow(entry: entry, leaderPoints: leader)
                             .opensProfile(.driver(entry.id))
-                        Divider().overlay(Color.white.opacity(0.06))
-                    }
-                }
-                .blur(radius: spoilerMode ? 16 : 0)
-            }
-            .scrollIndicators(.hidden)
-        }
-        .padding(.horizontal, 12)
-        .padding(.top, 22)
-        .padding(.bottom, 30)
-    }
-
-    // MARK: The deck
-
-    private func deck(wide: Bool) -> some View {
-        VStack(spacing: 10) {
-            HStack {
-                Image("HeaderWordmark")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(height: 26)
-                    .blendMode(.screen)
-                    .accessibilityLabel("Team Radio")
-                Spacer()
-                Button(action: onSettings) { CockpitButton() }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Settings")
-            }
-            showPanel
-            ScrollView {
-                Group {
-                    if wide {
-                        HStack(alignment: .top, spacing: 10) {
-                            VStack(spacing: 10) { emilyPanel; championshipPanel }
-                            weekendPanel
-                        }
-                    } else {
-                        VStack(spacing: 10) {
-                            emilyPanel
-                            weekendPanel
-                            championshipPanel
+                        if entry.id != standings.drivers.last?.id {
+                            Divider().overlay(Color.white.opacity(0.06))
                         }
                     }
                 }
-                VStack(alignment: .leading, spacing: 18) {
-                    extras
-                }
-                .padding(.top, 16)
-                .padding(.bottom, 12)
-            }
-            .scrollIndicators(.hidden)
-        }
-    }
-
-    /// What the display shows.
-    private var showPanel: some View {
-        HStack(spacing: 6) {
-            ForEach(Show.allCases, id: \.self) { candidate in
-                let on = show == candidate
-                Button { show = candidate } label: {
-                    VStack(spacing: 6) {
-                        Image(systemName: candidate.symbol).font(.system(size: 17, weight: .semibold))
-                        Text(candidate.rawValue).font(.f1(8.5, weight: .bold)).tracking(1).lineLimit(1).minimumScaleFactor(0.7)
-                    }
-                    .foregroundStyle(on ? Color.white : Theme.dimText)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(DeckShape(cut: 8).fill(on ? Theme.accent.opacity(0.16) : Color.white.opacity(0.03)))
-                    .overlay(DeckShape(cut: 8).stroke(on ? Theme.accent : Color.white.opacity(0.1), lineWidth: on ? 1.5 : 1))
-                    .shadow(color: on ? Theme.accent.opacity(0.5) : .clear, radius: 6)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Show \(candidate.rawValue.lowercased()) on the left")
-                .accessibilityAddTraits(on ? .isSelected : [])
-            }
-        }
-        .deckPanel("SHOW ON LEFT")
-    }
-
-    private var emilyPanel: some View {
-        Button(action: onEmily) {
-            HStack(spacing: 12) {
-                Color.clear
-                    .overlay(Image("EmilyAvatar").resizable().scaledToFill())
-                    .frame(width: 56, height: 56)
-                    .clipShape(DeckShape(cut: 10))
-                    .overlay(DeckShape(cut: 10).stroke(Theme.violet, lineWidth: 1.5))
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("ASK EMILY").font(.f1(17).italic()).foregroundStyle(Theme.chromeText)
-                    Text("AI race engineer").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.dimText)
-                    RadioWave().frame(height: 16)
-                }
-                Image(systemName: "mic.fill")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(Theme.onAccent)
-                    .frame(width: 44, height: 44)
-                    .background(Circle().fill(Theme.accentGradient))
-                    .shadow(color: Theme.accent.opacity(0.6), radius: 8)
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Ask Emily, AI race engineer")
-        .deckPanel("TEAM RADIO", bar: Theme.violet)
-    }
-
-    /// The weekend round a ring clock: tap a session to count down to it.
-    private var weekendPanel: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            let now = context.date
-            let session = target(now: now)
-            VStack(spacing: 12) {
-                HStack(alignment: .center, spacing: 10) {
-                    RingClock(remaining: max(0, session.map { $0.date.timeIntervalSince(now) } ?? 0),
-                              caption: session?.kind.short ?? "", hot: session?.kind == .race, size: 132)
-                    VStack(spacing: 5) {
-                        ForEach(race.sessions) { item in
-                            let on = item.id == session?.id
-                            Button { selectedId = item.id } label: {
-                                HStack(spacing: 8) {
-                                    Text(item.kind.short)
-                                        .font(.f1(13).italic())
-                                        .foregroundStyle(on ? Color.white : Self.tint(item.kind))
-                                        .frame(width: 40, alignment: .leading)
-                                    Spacer(minLength: 2)
-                                    Text(item.date.formatted(.dateTime.weekday(.abbreviated).hour().minute()).uppercased())
-                                        .font(.system(size: 11, weight: .semibold).monospacedDigit())
-                                        .foregroundStyle(on ? Color.white : Theme.dimText)
-                                }
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(DeckShape(cut: 6).fill(on ? Self.tint(item.kind).opacity(0.18) : Color.white.opacity(0.03)))
-                                .overlay(DeckShape(cut: 6).stroke(on ? Self.tint(item.kind) : Color.white.opacity(0.08), lineWidth: on ? 1.4 : 1))
-                                .opacity(item.date.addingTimeInterval(item.kind.expectedDuration) <= now && !on ? 0.45 : 1)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("\(item.kind.rawValue), \(item.date.formatted(.dateTime.weekday(.wide).hour().minute()))")
-                            .accessibilityAddTraits(on ? .isSelected : [])
-                        }
-                    }
-                }
-                LockScreenLine(onSettings: onSettings)
-            }
-        }
-        .deckPanel("THIS WEEKEND", bar: Theme.accent)
-    }
-
-    /// The top three, tap one for the driver's profile.
-    private var championshipPanel: some View {
-        let top = Array(standings.drivers.prefix(3))
-        let leader = Double(top.first?.points ?? "") ?? 0
-        return VStack(spacing: 6) {
-            ForEach(top) { entry in
-                let points = Double(entry.points) ?? 0
-                HStack(spacing: 8) {
-                    Text(entry.position).font(.f1Digits(15)).foregroundStyle(entry.position == "1" ? Theme.accent : .white)
-                        .frame(width: 16)
-                    RoundedRectangle(cornerRadius: 1.5).fill(Theme.teamColor(entry.teamId)).frame(width: 3, height: 20)
-                    Text(entry.driver.shortCode).font(.f1(15).italic()).foregroundStyle(.white)
-                    Text(entry.driver.familyName).font(.system(size: 12)).foregroundStyle(Theme.dimText).lineLimit(1)
-                    Spacer(minLength: 4)
-                    if entry.position != "1" {
-                        Text("-\(Int(leader - points))").font(.system(size: 11, weight: .semibold).monospacedDigit()).foregroundStyle(Theme.faintText)
-                    }
-                    Text(entry.points).font(.f1Digits(14)).foregroundStyle(entry.position == "1" ? Theme.accent : .white)
+                .background(RoundedRectangle(cornerRadius: 18).fill(Theme.card)
+                    .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Theme.glassStroke, lineWidth: 1)))
+                .clipShape(RoundedRectangle(cornerRadius: 18))
+                .blur(radius: shielded ? 18 : 0)
+                .allowsHitTesting(!shielded)
+                .overlay(alignment: .top) {
+                    if shielded { SpoilerShield(text: "Tap to reveal the standings").frame(height: 300) }
                 }
                 .contentShape(Rectangle())
-                .opensProfile(.driver(entry.id))
+                .onTapGesture { if shielded { revealed = true } }
             }
+            .padding(.bottom, 16)
         }
-        .blur(radius: spoilerMode ? 10 : 0)
-        .deckPanel("CHAMPIONSHIP", bar: Theme.live)
+        .scrollIndicators(.hidden)
+        .padding(.horizontal, 14)
+        .padding(.top, 70)
     }
-}
 
-/// The deck's panel shape: a rectangle with its top-trailing corner cut.
-struct DeckShape: Shape {
-    var cut: CGFloat = 14
+    // MARK: The other screen
 
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX - cut, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + cut))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
-        path.closeSubpath()
-        return path
-    }
-}
-
-extension View {
-    /// A deck panel: dark glass in the cut-corner shape, a thin accent edge,
-    /// an optional lit bar down the leading side, a label on top.
-    func deckPanel(_ label: String, bar: Color? = nil) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(label)
-                .font(.f1(10, weight: .bold))
-                .tracking(2.5)
-                .foregroundStyle(Theme.dimText)
-            self
-        }
-        .padding(14)
-        .padding(.leading, bar == nil ? 0 : 4)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(DeckShape().fill(LinearGradient(colors: [Color(white: 0.075), Color(white: 0.03)], startPoint: .top, endPoint: .bottom)))
-        .overlay(DeckShape().stroke(Theme.accent.opacity(0.22), lineWidth: 1))
-        .overlay(alignment: .leading) {
-            if let bar {
-                Rectangle()
-                    .fill(bar)
-                    .frame(width: 3)
-                    .padding(.vertical, 14)
-                    .shadow(color: bar.opacity(0.9), radius: 5)
+    private var deck: some View {
+        DuoScreen {
+            DuoTitle(title: "WEEKEND",
+                     subtitle: "\(Flags.emoji(for: race.circuit.location.country)) \(race.circuit.location.locality.uppercased()) · ROUND \(race.roundNumber)") {
+                forecastBadge
             }
+        } content: {
+            VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("ON THE DISPLAY")
+                        .font(.f1(10, weight: .bold))
+                        .tracking(2.5)
+                        .foregroundStyle(Theme.dimText)
+                    GlowSelector(options: Show.allCases.map(\.option), selected: show.rawValue) {
+                        show = Show(rawValue: $0) ?? .countdown
+                    }
+                }
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        EmilyBar(onTap: onEmily)
+                        LockScreenLine(onSettings: onSettings)
+                        WeekendScheduleView(race: race, weather: model.weather, weatherLoading: model.extrasLoading,
+                                            showsCountdowns: false)
+                            .id(race.id)
+                        extras
+                    }
+                    .padding(.bottom, 12)
+                }
+                .scrollIndicators(.hidden)
+            }
+            .padding(14)
+        }
+    }
+
+    @ViewBuilder
+    private var forecastBadge: some View {
+        let raceSession = race.sessions.last { $0.kind == .race }
+        if let forecast = raceSession.flatMap({ WeatherAPI.point(for: $0.date, in: model.weather) }) {
+            VStack(spacing: 0) {
+                Text(forecast.symbol).font(.system(size: 20))
+                Text("\(Int(forecast.temperature.rounded()))°").font(.f1Digits(14)).foregroundStyle(.white)
+            }
+            .frame(width: 52, height: 52)
+            .background(Circle().fill(Color.white.opacity(0.05))
+                .overlay(Circle().strokeBorder(Theme.cardStroke, lineWidth: 1)))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Race forecast \(Int(forecast.temperature.rounded())) degrees, \(forecast.precipProbability)% chance of rain")
         }
     }
 }

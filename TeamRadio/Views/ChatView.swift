@@ -16,6 +16,8 @@ struct ChatView: View {
     @State private var inbox = InboxViewModel()
     @State private var mode: Mode = .room
     @State private var dmPath: [InboxView.DMTarget] = []
+    /// The iPhone Duo's inner display: the room and the messages side by side.
+    @State private var halves: Halves?
 
     enum Mode { case room, messages }
 
@@ -100,6 +102,7 @@ struct ChatView: View {
             }
         }
         .task { await model.start() }
+        .onHalves($halves)
         .messageMenu($pressed, mine: { model.reactions.mine(on: $0) }) { emoji, id in model.react(emoji, to: id) }
         // Keep the MESSAGES chip honest while the Paddock is open: a private
         // message may land without a push (same device, muted, or none yet).
@@ -287,98 +290,123 @@ struct ChatView: View {
 
     // MARK: - Chat room
 
-    private var chatRoom: some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(alignment: .top, spacing: 9) {
-                        TrioSlashes(height: 24)
-                            .padding(.top, 6)   // centred on the first line when the title wraps
-                        Text("PADDOCK CHAT")
-                    }
-                        .font(.f1(30).italic())
-                        .foregroundStyle(Theme.chromeText)
-                    Text(model.roundTitle.uppercased())
-                        .font(.f1(12, weight: .semibold))
-                        .tracking(2)
-                        .foregroundStyle(Theme.dimText)
+    /// The room's title, Emily, the room's bell and your paddock name.
+    private var roomHeader: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .top, spacing: 9) {
+                    TrioSlashes(height: 24)
+                        .padding(.top, 6)   // centred on the first line when the title wraps
+                    Text("PADDOCK CHAT")
                 }
+                    .font(.f1(30).italic())
+                    .foregroundStyle(Theme.chromeText)
+                Text(model.roundTitle.uppercased())
+                    .font(.f1(12, weight: .semibold))
+                    .tracking(2)
+                    .foregroundStyle(Theme.dimText)
+            }
 
-                Spacer()
+            Spacer()
 
-                // Ask the race engineer (AI).
-                if GameFeature.isEnabled {
-                    Button { showEmily = true } label: {
-                        Image("EmilyAvatar")
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 36, height: 36)
-                            .clipShape(Circle())
-                            .overlay(Circle().strokeBorder(Theme.accent, lineWidth: 1.5))
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.trailing, 6)
-                    .accessibilityLabel("Ask Emily, the AI race engineer")
-                    .sheet(isPresented: $showEmily) {
-                        AskEmilyView()
-                            .presentationDetents([.large])
-                            .presentationBackground(Theme.background)
-                    }
-                }
-
-                // Room notifications on/off.
-                Button {
-                    model.setRoomPush(!model.roomPushEnabled)
-                } label: {
-                    Image(systemName: model.roomPushEnabled ? "bell.fill" : "bell.slash")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(model.roomPushEnabled ? Theme.accent : Theme.dimText)
-                        .frame(width: 30, height: 30)
-                        .background(
-                            Circle()
-                                .fill(Color.white.opacity(0.05))
-                                .overlay(Circle().strokeBorder(Theme.glassStroke, lineWidth: 1))
-                        )
+            // Ask the race engineer (AI).
+            if GameFeature.isEnabled {
+                Button { showEmily = true } label: {
+                    Image("EmilyAvatar")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 36, height: 36)
+                        .clipShape(Circle())
+                        .overlay(Circle().strokeBorder(Theme.accent, lineWidth: 1.5))
                 }
                 .buttonStyle(.plain)
                 .padding(.trailing, 6)
-                .accessibilityLabel(model.roomPushEnabled ? "Mute paddock notifications" : "Unmute paddock notifications")
-
-                // Current paddock name; tap to change it.
-                Button {
-                    nicknameDraft = model.nickname
-                    editingName = true
-                } label: {
-                    HStack(spacing: 5) {
-                        Text(model.nickname)
-                            .font(.f1(13).italic())
-                            .foregroundStyle(Theme.accent)
-                            .lineLimit(1)
-                        Image(systemName: "pencil")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(Theme.dimText)
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(
-                        Capsule()
-                            .fill(Color.white.opacity(0.05))
-                            .overlay(Capsule().strokeBorder(Theme.glassStroke, lineWidth: 1))
-                    )
+                .accessibilityLabel("Ask Emily, the AI race engineer")
+                .sheet(isPresented: $showEmily) {
+                    AskEmilyView()
+                        .presentationDetents([.large])
+                        .presentationBackground(Theme.background)
                 }
-                .buttonStyle(.plain)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-            .padding(.bottom, 10)
 
-            modeChips
+            // Room notifications on/off.
+            Button {
+                model.setRoomPush(!model.roomPushEnabled)
+            } label: {
+                Image(systemName: model.roomPushEnabled ? "bell.fill" : "bell.slash")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(model.roomPushEnabled ? Theme.accent : Theme.dimText)
+                    .frame(width: 30, height: 30)
+                    .background(
+                        Circle()
+                            .fill(Color.white.opacity(0.05))
+                            .overlay(Circle().strokeBorder(Theme.glassStroke, lineWidth: 1))
+                    )
+            }
+            .buttonStyle(.plain)
+            .padding(.trailing, 6)
+            .accessibilityLabel(model.roomPushEnabled ? "Mute paddock notifications" : "Unmute paddock notifications")
 
-            if mode == .messages {
-                InboxView(model: inbox, myName: model.nickname, suggestions: recentMembers, path: $dmPath)
-            } else {
-                roomBody
+            // Current paddock name; tap to change it.
+            Button {
+                nicknameDraft = model.nickname
+                editingName = true
+            } label: {
+                HStack(spacing: 5) {
+                    Text(model.nickname)
+                        .font(.f1(13).italic())
+                        .foregroundStyle(Theme.accent)
+                        .lineLimit(1)
+                    Image(systemName: "pencil")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Theme.dimText)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(Color.white.opacity(0.05))
+                        .overlay(Capsule().strokeBorder(Theme.glassStroke, lineWidth: 1))
+                )
+            }
+            .buttonStyle(.plain)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var chatRoom: some View {
+        if let halves, halves.axis == .horizontal {
+            // The iPhone Duo held like a book: the room on one screen, your
+            // private messages on the other ("Message privately" in the room
+            // opens the conversation there).
+            DuoSideBySide(fold: halves.fold) {
+                DuoScreen {
+                    roomHeader
+                } content: {
+                    roomBody.padding(.top, 8)
+                }
+            } right: {
+                DuoScreen {
+                    DuoTitle(title: "MESSAGES", subtitle: "PRIVATE · END-TO-END ENCRYPTED")
+                } content: {
+                    InboxView(model: inbox, myName: model.nickname, suggestions: recentMembers, path: $dmPath)
+                }
+            }
+        } else {
+            VStack(spacing: 0) {
+                roomHeader
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 10)
+
+                modeChips
+
+                if mode == .messages {
+                    InboxView(model: inbox, myName: model.nickname, suggestions: recentMembers, path: $dmPath)
+                } else {
+                    roomBody
+                }
             }
         }
     }

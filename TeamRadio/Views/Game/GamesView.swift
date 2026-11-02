@@ -199,26 +199,29 @@ struct GamesView: View {
         }
     }
 
-    /// The iPhone Duo held like a book: two screens. Your season game (your
-    /// standing, your picks) on the race card's glass; the arcade on the
-    /// square monitor, each game with this week's board, its title staying put.
+    /// The iPhone Duo held like a book: two screens, each its title on top
+    /// and its box below. Your season game (your standing, your picks) on
+    /// one; the arcade on the other, each game with this week's board.
     private func duoContent(fold: CGFloat, now: Date) -> some View {
         DuoSideBySide(fold: fold) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    title
-                    RankBoard(board: model.seasonBoard, onOpen: { showLeaderboard = true })
-                    PicksHero(game: game, state: game.cardState(at: now), now: now, seasonRounds: model.season.count,
-                              onPicks: { showPicks = true }, onResult: { showResult = true })
+            DuoScreen {
+                title
+            } content: {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        RankBoard(board: model.seasonBoard, onOpen: { showLeaderboard = true })
+                        PicksHero(game: game, state: game.cardState(at: now), now: now, seasonRounds: model.season.count,
+                                  onPicks: { showPicks = true }, onResult: { showResult = true })
+                    }
+                    .padding(14)
                 }
-                .padding(16)
+                .scrollIndicators(.hidden)
+                .refreshable { await model.load() }
             }
-            .scrollIndicators(.hidden)
-            .refreshable { await model.load() }
-            .duoDisplay()
         } right: {
-            VStack(alignment: .leading, spacing: 12) {
-                SectionTitle("ARCADE")
+            DuoScreen {
+                DuoTitle(title: "ARCADE", subtitle: "PLAY · THIS WEEK'S BOARDS")
+            } content: {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
                         ArcadeBanner(kind: .lightsOut, rank: model.lightsBoard?.me?.rank,
@@ -231,11 +234,10 @@ struct GamesView: View {
                         ArcadeBoardCard(game: .wall, standing: model.wallBoard.map { ArcadeGame.from($0) },
                                         loaded: model.ready, hasName: !nickname.isEmpty) { fullBoard = .wall }
                     }
-                    .padding(.bottom, 8)
+                    .padding(14)
                 }
                 .scrollIndicators(.hidden)
             }
-            .duoDeck()
         }
     }
 

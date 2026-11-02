@@ -1,68 +1,43 @@
 import SwiftUI
 
-/// The iPhone Duo's right half beside the results (approved draft B,
-/// build/mockups/duo2/sheet-2-results.png): the championship as it stood
-/// after the round picked on the left, with the places each driver or team
-/// gained or lost in that round and the points it brought. A round whose
-/// race hasn't run yet shows the table it goes into.
+/// The championship as it stood after a round (the iPhone Duo's Results
+/// display): the places each driver or team gained or lost in that round
+/// and the points it brought. A round whose race hasn't run yet shows the
+/// table it goes into.
 struct StandingsAfterRound: View {
     let model: ResultsViewModel
+    let teams: Bool
 
-    @State private var teams = false
     @State private var drivers: [DriverStanding] = []
     @State private var driversBefore: [DriverStanding] = []
     @State private var constructors: [ConstructorStanding] = []
     @State private var constructorsBefore: [ConstructorStanding] = []
-    /// Spoiler mode (shared with the results): blurred until tapped.
-    @AppStorage("spoilerMode") private var spoilerMode = false
-    @State private var revealed = false
     @Environment(\.champion) private var champion
 
-    private var isShielded: Bool { spoilerMode && !revealed }
-
     /// The last round whose race is in, up to the one picked.
-    private var after: Int? {
+    static func after(_ model: ResultsViewModel) -> Int? {
         guard let round = model.calendarRace?.roundNumber else { return nil }
         return model.raceResults?.isEmpty == false ? round : round - 1
     }
 
-    private var subtitle: String {
-        guard let after, after > 0 else { return "BEFORE THE FIRST RACE" }
+    /// "AFTER ROUND 18 · AUSTIN", "GOING IN · AFTER ROUND 18 · AUSTIN"
+    static func subtitle(_ model: ResultsViewModel) -> String {
+        guard let after = after(model), after > 0 else { return "BEFORE THE FIRST RACE" }
         let place = model.pickerRaces.first { $0.roundNumber == after }?.circuit.location.locality.uppercased() ?? ""
         let prefix = after == model.calendarRace?.roundNumber ? "AFTER" : "GOING IN · AFTER"
         return "\(prefix) ROUND \(after) · \(place)"
     }
 
+    private var after: Int? { Self.after(model) }
+
     var body: some View {
-        // its own screen: the header and the switch stay, the table scrolls
-        VStack(alignment: .leading, spacing: 14) {
-            header
-            picker
-            ScrollView {
-                VStack(spacing: 16) {
-                    // the title is settled and this is the latest round
-                    if !teams, let champion, model.selectedRound == model.pickerRaces.last?.round {
-                        ChampionCrown(champion: champion)
-                    }
-                    table
-                }
-                .blur(radius: isShielded ? 18 : 0)
-                .allowsHitTesting(!isShielded)
-                .overlay(alignment: .top) {
-                    if isShielded {
-                        SpoilerShield(text: "Tap to reveal the standings").frame(height: 300)
-                    }
-                }
-                .contentShape(Rectangle())
-                .onTapGesture { if isShielded { revealed = true } }
-                .animation(.easeInOut(duration: 0.25), value: isShielded)
-                .opacity(model.isSwitching ? 0.35 : 1)
-                .padding(.bottom, 16)
+        VStack(spacing: 16) {
+            // the title is settled and this is the latest round
+            if !teams, let champion, model.selectedRound == model.pickerRaces.last?.round {
+                ChampionCrown(champion: champion)
             }
-            .scrollIndicators(.hidden)
+            table
         }
-        .onChange(of: model.selectedRound) { _, _ in revealed = false }
-        .onChange(of: spoilerMode) { _, _ in revealed = false }
         .task(id: after) {
             guard let after, after > 0 else { return }
             async let d = try? F1API.driverStandings(limit: 40, after: "\(after)")
@@ -75,43 +50,6 @@ struct StandingsAfterRound: View {
                 constructors = nc ?? []
                 driversBefore = ndb ?? []
                 constructorsBefore = ncb ?? []
-            }
-        }
-    }
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(alignment: .top, spacing: 9) {
-                TrioSlashes(height: 24).padding(.top, 6)
-                Text("STANDINGS")
-            }
-            .font(.f1(30).italic())
-            .foregroundStyle(Theme.chromeText)
-            Text(subtitle)
-                .font(.f1(12, weight: .semibold))
-                .tracking(2)
-                .foregroundStyle(Theme.dimText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-        }
-        .padding(.top, 8)
-    }
-
-    private var picker: some View {
-        HStack(spacing: 6) {
-            ForEach(["DRIVERS", "CONSTRUCTORS"], id: \.self) { title in
-                let isSelected = (title == "CONSTRUCTORS") == teams
-                Button { teams = title == "CONSTRUCTORS" } label: {
-                    Text(title)
-                        .font(.f1(14).italic())
-                        .tracking(1)
-                        .foregroundStyle(isSelected ? Theme.onAccent : Theme.dimText)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 9)
-                        .background(RoundedRectangle(cornerRadius: 10)
-                            .fill(isSelected ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Color.white.opacity(0.06))))
-                }
-                .buttonStyle(.plain)
             }
         }
     }

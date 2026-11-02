@@ -6,6 +6,9 @@ import SwiftUI
 struct TrackSectionView: View {
     let map: TrackMap
     let circuit: Circuit
+    /// The iPhone Duo's display: no title (the button that shows it names
+    /// it) and a shorter map, so the corner guide fits on screen.
+    var compact = false
 
     @State private var resetToken = 0
     @State private var showRealWorld = false
@@ -15,6 +18,9 @@ struct TrackSectionView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionTitle("THE CIRCUIT")
+                .frame(height: compact ? 0 : nil)
+                .opacity(compact ? 0 : 1)
+                .padding(.bottom, compact ? -12 : 0)
                 .task(id: circuit.circuitId) {
                     guard GameFeature.isEnabled else { return }
                     guide = await GuideService.guide(circuitId: circuit.circuitId, corners: map.corners.count)
@@ -30,7 +36,7 @@ struct TrackSectionView: View {
                         Color.clear
                     }
                 }
-                .frame(height: TrackSceneBuilder.framed)
+                .frame(height: compact ? TrackSceneBuilder.framed - 50 : TrackSceneBuilder.framed)
                 .overlay(alignment: .topTrailing) {
                     HStack(spacing: 8) {
                         if circuit.coordinate != nil {

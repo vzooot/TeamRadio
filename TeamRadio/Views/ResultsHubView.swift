@@ -9,26 +9,19 @@ struct ResultsHubView: View {
 
     /// Held by the root, so links and the title moment can open the standings.
     @Binding var page: Page
-    /// The round in view, shared with the standings beside it on the iPhone Duo.
+    /// The iPhone Duo's two-screen results (the phone pages keep their own).
     @State private var results = ResultsViewModel()
     @State private var halves: Halves?
 
     var body: some View {
         Group {
             if let halves, halves.axis == .horizontal {
-                // The iPhone Duo held like a book: two screens. The results
-                // on the race card's glass; the championship after that
-                // round on the square monitor.
-                DuoSideBySide(fold: halves.fold) {
-                    ResultsView(model: results, showsConstructors: false, plain: true)
-                        .padding(.top, 4).duoDisplay()
-                } right: {
-                    StandingsAfterRound(model: results)
-                        .duoDeck()
-                }
+                // The iPhone Duo held like a book: the preview on the left,
+                // the selections and the rounds on the right.
+                DuoResults(fold: halves.fold, model: results, page: $page)
             } else {
                 ZStack {
-                    ResultsView(model: results)
+                    ResultsView()
                         .opacity(page == .results ? 1 : 0)
                         .allowsHitTesting(page == .results)
                         .accessibilityHidden(page != .results)

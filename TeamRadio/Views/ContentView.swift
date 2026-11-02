@@ -226,7 +226,10 @@ struct ContentView: View {
             ScrollViewReader { proxy in
                 DuoCountdown(halves: halves, race: race, model: model, standings: standings,
                              onSettings: { showSettings = true }, onEmily: { showEmily = true },
-                             onBack: model.isBrowsing ? backToNextRace : nil) {
+                             onSelectRace: { picked in
+                                 raceEdge = picked.map { r in (model.season.firstIndex { $0.id == r.id } ?? 0) >= (model.season.firstIndex { $0.id == race.id } ?? 0) } ?? false ? .trailing : .leading
+                                 switchRace(to: picked)
+                             }) {
                     Color.clear.frame(height: 0).id("top")
                     fanVote
                     seasonList(proxy)
