@@ -1,13 +1,9 @@
 Gjord för iPhone Duo
 
-Fäll ut den så blir Team Radio två skärmar:
-• Loppet på den ena: nedräkningen som en lysande ringklocka, startljusen, Ask Emily och säsongen
-• Helgen på den andra: banan i 3D, schemat med vädret och ställningen
-• Håll den på sidan som en bok eller ställ upp den som en laptop: de två skärmarna följer vecket och inget hamnar på det
-• Resultaten står bredvid ställningen efter varje omgång, Spel visar dina tips bredvid arkaden och Nyheter öppnar artikeln bredvid listan
-• Lights Out och Reaction Wall spelas med topplistan bredvid spelet
+Fäll ut den så blir Team Radio två skärmar. Den ena är displayen: loppet och nedräkningen, banan i 3D eller ställningen. På den andra väljer du vad den visar, med Ask Emily, helgens tidtabell och säsongen bredvid. Resultat, Nyheter, Spel och Paddock fungerar likadant: välj på den ena skärmen, se det på den andra.
 
 Också nytt:
 • Inställningar bakom ratten: automatisk nedräkning på låsskärmen före varje session (1, 2, 4 eller 8 timmar innan) och en egen knapp för varje sorts notis
 • Ett mästarögonblick när mästerskapet är avgjort, och en krona över ställningen
+• Nedräkningen går vidare till nästa lopp så fort en racehelg är slut
 • Rättelser för en krasch i låsskärmens nedräkning och två ovanliga krascher

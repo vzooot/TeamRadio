@@ -1,9 +1,9 @@
 Team Radio is a fast, beautiful companion app for motorsport race weekends, and it's made for iPhone Duo.
 
 MADE FOR IPHONE DUO
-• Unfold it and Team Radio becomes two screens: the race and its countdown on one, the weekend's circuit, schedule and standings on the other
+• Unfold it and Team Radio becomes two screens: a display (the race and its countdown, the 3D circuit or the standings) and, beside it, the screen where you pick what it shows
 • Sideways like a book or propped up like a laptop, the screens follow the fold and nothing sits on it
-• Results, Games, News and the arcade games use both halves too
+• Results, News, Games and the Paddock work the same way: pick on one screen, see it on the other
 
 COUNTDOWN
 • Live countdown to every session of the upcoming race weekend — practice, qualifying, sprint, and race

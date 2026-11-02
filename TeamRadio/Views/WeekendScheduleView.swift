@@ -7,6 +7,8 @@ struct WeekendScheduleView: View {
     var weather: [Date: WeatherPoint] = [:]
     /// The forecast is on its way: rows show a shimmer where it will go.
     var weatherLoading = false
+    /// Each session's "IN 4D 17H" (off beside a countdown that already shows it).
+    var showsCountdowns = true
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
@@ -24,7 +26,8 @@ struct WeekendScheduleView: View {
                             now: now,
                             isNext: session.id == nextId,
                             weather: WeatherAPI.point(for: session.date, in: weather),
-                            weatherLoading: weatherLoading
+                            weatherLoading: weatherLoading,
+                            showsCountdown: showsCountdowns
                         )
                         if session.id != sessions.last?.id {
                             Divider().overlay(Color.white.opacity(0.06))
@@ -57,6 +60,7 @@ struct SessionRow: View {
     let isNext: Bool
     var weather: WeatherPoint?
     var weatherLoading = false
+    var showsCountdown = true
 
     private var isLive: Bool {
         session.date <= now && now < session.date.addingTimeInterval(session.kind.expectedDuration)
@@ -69,7 +73,7 @@ struct SessionRow: View {
     /// e.g. "IN 2D 04H", "IN 3H 12M", "IN 42M"
     private var miniCountdown: String? {
         let seconds = Int(session.date.timeIntervalSince(now))
-        guard seconds > 0 else { return nil }
+        guard showsCountdown, seconds > 0 else { return nil }
         let d = seconds / 86400
         let h = (seconds % 86400) / 3600
         let m = (seconds % 3600) / 60
