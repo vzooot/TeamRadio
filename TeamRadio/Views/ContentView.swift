@@ -16,8 +16,29 @@ struct ContentView: View {
     @State private var sectionsShown = true
     /// The iPhone Duo's inner display: the race and the weekend, one each
     /// side of the fold.
-    @State private var halves: Halves?
+    @Environment(\.halves) private var halves
     @State private var standings = StandingsViewModel()
+    @State private var panel: Panel = {
+        #if DEBUG
+        // -CountdownPanel CIRCUIT: open on the circuit, for screenshots
+        if let panel = Panel(rawValue: UserDefaults.standard.string(forKey: "CountdownPanel") ?? "") { return panel }
+        #endif
+        return .weekend
+    }()
+
+    /// What the page shows under Emily, one at a time: the weekend's
+    /// timetable, or the circuit (so the heavy 3D scene is only built when
+    /// it's asked for). Picked like the iPhone Duo's display.
+    enum Panel: String, CaseIterable {
+        case weekend = "WEEKEND", circuit = "CIRCUIT"
+
+        var option: GlowSelector.Option {
+            switch self {
+            case .weekend: .init(id: rawValue, title: rawValue, symbol: "calendar", tint: Theme.accent)
+            case .circuit: .init(id: rawValue, title: rawValue, symbol: "point.topleft.down.to.point.bottomright.curvepath", tint: Theme.violet)
+            }
+        }
+    }
 
     /// Switching race: the countdown stays and updates in place, its digits
     /// rolling to the new race; the schedule and circuit slip out, are
@@ -56,7 +77,6 @@ struct ContentView: View {
                 if let halves { duoContent(halves) } else { loadedContent }
             }
         }
-        .onHalves($halves)
         .task {
             await model.load()
             await NotificationManager.adoptDefault()
@@ -138,10 +158,15 @@ struct ContentView: View {
                     CountdownView(race: race, onSettings: { showSettings = true })
                     emilyBar
 
-                    // The weekend's sessions always right under the countdown,
-                    // and the circuit right after them.
-                    schedule(race)
-                    track(race)
+                    // The weekend's sessions or the circuit, right under the countdown.
+                    GlowSelector(options: Panel.allCases.map(\.option), selected: panel.rawValue) { id in
+                        withAnimation(.snappy(duration: 0.25)) { panel = Panel(rawValue: id) ?? .weekend }
+                    }
+                    .id("panel")
+                    switch panel {
+                    case .weekend: schedule(race)
+                    case .circuit: track(race)
+                    }
 
                     #if DEBUG
                     if BlendDraft.gameZoneInApp {
@@ -159,9 +184,8 @@ struct ContentView: View {
                     SeasonOverBanner()
                 }
 
-                // (The championship lives in the Standings tab, not here.)
-
-                seasonList(proxy)
+                // (The championship lives in the Standings tab, not here; the
+                // other rounds are on the race card: swipe it, or hold it.)
 
                 FooterView()
             }
@@ -178,16 +202,6 @@ struct ContentView: View {
             guard let id = UserDefaults.standard.string(forKey: "ScrollTo") else { return }
             try? await Task.sleep(for: .seconds(4))
             proxy.scrollTo(id, anchor: .top)
-        }
-        .task {
-            // -SeasonTap N: scroll to the season list and pick round N there
-            let n = UserDefaults.standard.integer(forKey: "SeasonTap")
-            guard n > 0 else { return }
-            try? await Task.sleep(for: .seconds(4))
-            guard model.season.indices.contains(n - 1) else { return }
-            proxy.scrollTo("season", anchor: .bottom)
-            try? await Task.sleep(for: .seconds(1.5))
-            pickFromSeason(model.season[n - 1], proxy: proxy)
         }
         .task {
             // -RaceCycle N: switch race N times (ahead, ahead, back to the
@@ -232,7 +246,8 @@ struct ContentView: View {
                              }) {
                     Color.clear.frame(height: 0).id("top")
                     fanVote
-                    seasonList(proxy)
+                    // side by side, the season runs along the display's foot
+                    if halves.axis == .vertical { seasonList(proxy) }
                     if !Self.demoMode {
                         InviteBanner()
                     }
@@ -320,7 +335,7 @@ struct ContentView: View {
     }
 
     /// Shown while looking at a round other than the next one.
-    /// A race tapped in the season list at the bottom of the page.
+    /// A race tapped in the iPhone Duo's season list.
     private func pickFromSeason(_ race: Race, proxy: ScrollViewProxy) {
         let from = model.season.firstIndex { $0.id == model.displayRace?.id } ?? 0
         raceEdge = (model.season.firstIndex { $0.id == race.id } ?? 0) >= from ? .trailing : .leading

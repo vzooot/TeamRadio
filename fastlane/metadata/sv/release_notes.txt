@@ -1,9 +1,9 @@
-Gjord för iPhone Duo
+En lättare Nedräkning-flik
+• Under Ask Emily väljer du racehelgen eller banan: banan i 3D laddas bara när du vill se den
+• Alla Grand Prix finns på racekortet: svep det till nästa eller föregående race, eller håll inne för hela säsongen
 
-Fäll ut den så blir Team Radio två skärmar. Den ena är displayen: loppet och nedräkningen, banan i 3D eller ställningen. På den andra väljer du vad den visar, med Ask Emily, helgens tidtabell och säsongen bredvid. Resultat, Nyheter, Spel och Paddock fungerar likadant: välj på den ena skärmen, se det på den andra. Håll en iPad på sidan så får du samma två skärmar.
-
-Också nytt:
-• Inställningar bakom ratten: automatisk nedräkning på låsskärmen före varje session (1, 2, 4 eller 8 timmar innan) och en egen knapp för varje sorts notis
-• Ett mästarögonblick när mästerskapet är avgjort, och en krona över ställningen
-• Nedräkningen går vidare till nästa lopp så fort en racehelg är slut
-• Rättelser för en krasch i låsskärmens nedräkning och två ovanliga krascher
+Två skärmar, finslipade
+På iPhone Duo och på iPad som hålls på sidan:
+• Nedräkningen står bredvid vädret för nästa session
+• Hela säsongen löper längs nederkanten: tryck på en runda för att se den, eller svep mellan loppen
+• På iPad flyttar flikraden till en egen list vid sidan, precis som på iPhone Duo, och banan i 3D är större

@@ -80,10 +80,10 @@ struct RootView: View {
     #else
     @State private var resultsPage: ResultsHubView.Page = .results
     #endif
-    /// The iPhone Duo's inner display held like a book: our own rail
-    /// replaces the system's tab bar (see DuoDock).
+    /// Two screens side by side (the iPhone Duo held like a book, an iPad
+    /// held sideways): our own rail replaces the system's tab bar (see DuoDock).
     @State private var halves: Halves?
-    private var docked: Bool { halves?.axis == .horizontal && halves?.foldable == true }
+    private var docked: Bool { halves?.axis == .horizontal }
     /// The season's champion once the title is settled, and its moment.
     @State private var champion: Champion?
     @State private var showChampion = false
@@ -122,6 +122,7 @@ struct RootView: View {
                 .toolbar(docked ? .hidden : .automatic, for: .tabBar)
         }
         .tint(Theme.accent)
+        .environment(\.halves, halves)
         .onHalves($halves)
         .overlay {
             // in the side strip under the status bar, where the system bar stood

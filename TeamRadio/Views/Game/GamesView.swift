@@ -88,7 +88,7 @@ struct GamesView: View {
     @State private var showLeaderboard = false
     /// An arcade game's full board (the iPhone Duo shows this week's beside the game).
     @State private var fullBoard: ArcadeGame?
-    @State private var halves: Halves?
+    @Environment(\.halves) private var halves
     @AppStorage("chatNickname") private var nickname = ""
 
     var body: some View {
@@ -103,7 +103,7 @@ struct GamesView: View {
                 ProgressView().tint(Theme.accent)
             } else if let halves, halves.axis == .horizontal {
                 TimelineView(.periodic(from: .now, by: 30)) { context in
-                    duoContent(fold: halves.fold, now: context.date)
+                    duoContent(halves, now: context.date)
                 }
                 .transition(.opacity)
             } else {
@@ -137,7 +137,6 @@ struct GamesView: View {
             }
         }
         .animation(.easeOut(duration: 0.25), value: model.ready)
-        .onHalves($halves)
         .sheet(isPresented: Binding(get: { fullBoard != nil }, set: { if !$0 { fullBoard = nil } })) {
             if let fullBoard {
                 ArcadeFullBoard(game: fullBoard, userId: model.userId)
@@ -202,8 +201,8 @@ struct GamesView: View {
     /// The iPhone Duo held like a book: two screens, each its title on top
     /// and its box below. Your season game (your standing, your picks) on
     /// one; the arcade on the other, each game with this week's board.
-    private func duoContent(fold: CGFloat, now: Date) -> some View {
-        DuoSideBySide(fold: fold) {
+    private func duoContent(_ halves: Halves, now: Date) -> some View {
+        DuoSideBySide(halves: halves) {
             DuoScreen {
                 title
             } content: {

@@ -8,6 +8,7 @@ they're asset library images placed with the IPHONE_DUO_PROFILE group.
   scripts/asc/duo_screenshots.py VERSION
 """
 import glob
+import hashlib
 import os
 import sys
 import time
@@ -19,11 +20,16 @@ from release import APP, ROOT, call, en_us, log, version_id  # noqa: E402
 GROUP = "IPHONE_DUO_PROFILE"
 
 
-def upload(library, path):
+def upload(library, path, known):
     data = open(path, "rb").read()
+    # Reference names are unique in the library: the content's hash in the
+    # name reuses a panel already there and gives a changed one its own.
+    name = "iPhone Duo · " + os.path.splitext(os.path.basename(path))[0] + " · " + hashlib.sha1(data).hexdigest()[:7]
+    if name in known:
+        return known[name]
     res = call("POST", "/v1/appAssetLibraryImages", {"data": {"type": "appAssetLibraryImages",
                "attributes": {"category": "APP_SCREENSHOTS_AND_PREVIEWS", "fileName": os.path.basename(path), "fileSize": len(data),
-                              "referenceName": "iPhone Duo · " + os.path.splitext(os.path.basename(path))[0]},
+                              "referenceName": name},
                "relationships": {"assetLibrary": {"data": {"type": "appAssetLibraries", "id": library}}}}})
     image = res["data"]
     for op in image["attributes"].get("uploadOperations") or []:
@@ -46,8 +52,10 @@ def main(version):
     files = sorted(glob.glob(os.path.join(ROOT, "fastlane", "screenshots", "duo", "*.png")))
     if not files:
         sys.exit("no files in fastlane/screenshots/duo")
+    known = {i["attributes"].get("referenceName"): i["id"]
+             for i in call("GET", f"/v1/appAssetLibraries/{library}/images?limit=200")["data"]}
     for path in files:
-        image = upload(library, path)
+        image = upload(library, path, known)
         # the image has to finish processing before it can be placed
         for _ in range(40):
             st = call("GET", f"/v1/appAssetLibraryImages/{image}?fields[appAssetLibraryImages]=state")["data"]["attributes"]["state"]

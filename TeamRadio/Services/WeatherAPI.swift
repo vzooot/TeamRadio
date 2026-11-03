@@ -20,6 +20,21 @@ struct WeatherPoint {
         default: "🌥️"
         }
     }
+
+    /// WMO weather code → a word or two.
+    var label: String {
+        switch code {
+        case 0: "CLEAR"
+        case 1, 2: "PARTLY CLOUDY"
+        case 3: "OVERCAST"
+        case 45, 48: "FOG"
+        case 51...57: "DRIZZLE"
+        case 61...67, 80...82: "RAIN"
+        case 71...77, 85, 86: "SNOW"
+        case 95...99: "THUNDERSTORMS"
+        default: "CLOUDY"
+        }
+    }
 }
 
 /// Free hourly forecasts from Open-Meteo — no API key needed.

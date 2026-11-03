@@ -11,14 +11,14 @@ struct ResultsHubView: View {
     @Binding var page: Page
     /// The iPhone Duo's two-screen results (the phone pages keep their own).
     @State private var results = ResultsViewModel()
-    @State private var halves: Halves?
+    @Environment(\.halves) private var halves
 
     var body: some View {
         Group {
             if let halves, halves.axis == .horizontal {
                 // The iPhone Duo held like a book: the preview on the left,
                 // the selections and the rounds on the right.
-                DuoResults(fold: halves.fold, model: results, page: $page)
+                DuoResults(halves: halves, model: results, page: $page)
             } else {
                 ZStack {
                     ResultsView()
@@ -33,7 +33,6 @@ struct ResultsHubView: View {
                 .environment(\.resultsPage, $page)
             }
         }
-        .onHalves($halves)
         .background(Theme.background.ignoresSafeArea())
     }
 }

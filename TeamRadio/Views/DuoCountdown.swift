@@ -1,12 +1,13 @@
 import SwiftUI
 
-/// The iPhone Duo's Countdown tab as two screens, each its title on top and
-/// its box below. The left screen is the display: the race and its countdown
-/// (the session chips, the ring clock, the start lights, the weather), or
-/// the circuit, or the standings. Swipe it, or tap its arrows, to go
-/// through the season's races. The right screen picks what the display
-/// shows, and holds Ask Emily, the Lock Screen line, the weekend's
-/// timetable, then the fan vote and the season.
+/// The iPhone Duo's Countdown tab as two screens (an iPad held sideways
+/// gets the same), each its title on top and its box below. The left screen
+/// is the display: the race and its countdown (the session chips, the ring
+/// clock beside the weather, the start lights, the season's Grands Prix
+/// along the foot), or the circuit, or the standings. Swipe it, tap its
+/// arrows or a Grand Prix to go through the season. The right screen picks
+/// what the display shows, and holds Ask Emily, the Lock Screen line, the
+/// weekend's timetable, then the fan vote.
 struct DuoCountdown<Extras: View>: View {
     enum Show: String, CaseIterable {
         case countdown = "COUNTDOWN", circuit = "CIRCUIT", standings = "STANDINGS"
@@ -44,7 +45,7 @@ struct DuoCountdown<Extras: View>: View {
     var body: some View {
         Group {
             if halves.axis == .horizontal {
-                DuoSideBySide(fold: halves.fold) {
+                DuoSideBySide(halves: halves) {
                     display(wide: false)
                 } right: {
                     deck
@@ -133,28 +134,42 @@ struct DuoCountdown<Extras: View>: View {
                     clock(now: now, session: session, size: min(geo.size.height - 36, geo.size.width * 0.42))
                 }
                 .padding(16)
+                .contentShape(Rectangle())
+                .gesture(swipe)
             } else {
-                // the room the rest takes: title, chips, lights, weather
-                let ring = max(150, min(geo.size.width - 60, geo.size.height - 236 - board))
+                // the ring beside the weather, half the width at most; the
+                // rest is the title, chips, lights and the season strip
+                let ring = max(150, min((geo.size.width - 46) / 2, geo.size.height - 268 - board))
                 VStack(spacing: 10) {
-                    // the broadcast LIVE bar while a session is on track
-                    if let next = model.nextRace { LiveSessionBanner(race: next) }
-                    raceTitle
-                    sessionChips(now: now, selected: session)
-                    Spacer(minLength: 0)
-                    clock(now: now, session: session, size: ring)
-                    Spacer(minLength: 0)
-                    lights(now: now, session: session)
-                    weatherLine(session)
+                    VStack(spacing: 10) {
+                        // the broadcast LIVE bar while a session is on track
+                        if let next = model.nextRace { LiveSessionBanner(race: next) }
+                        raceTitle
+                        sessionChips(now: now, selected: session)
+                        Spacer(minLength: 0)
+                        HStack(spacing: 14) {
+                            clock(now: now, session: session, size: ring)
+                            weatherPanel(session, size: ring)
+                                .frame(height: ring)
+                        }
+                        Spacer(minLength: 0)
+                        lights(now: now, session: session)
+                    }
+                    .contentShape(Rectangle())
+                    .gesture(swipe)
+                    seasonStrip
                 }
                 .padding(16)
             }
         }
-        .contentShape(Rectangle())
-        .gesture(DragGesture(minimumDistance: 30).onEnded { drag in
+    }
+
+    /// Sideways across the display: the previous or next race.
+    private var swipe: some Gesture {
+        DragGesture(minimumDistance: 30).onEnded { drag in
             guard abs(drag.translation.width) > abs(drag.translation.height) * 1.5 else { return }
             step(drag.translation.width < 0 ? 1 : -1)
-        })
+        }
     }
 
     /// The round with arrows to the races either side, the season or the
@@ -313,17 +328,127 @@ struct DuoCountdown<Extras: View>: View {
         }
     }
 
-    /// The circuit card, with its turns and corner guide.
-    private var circuitFace: some View {
-        ScrollView {
-            if let map = model.trackMap {
-                TrackSectionView(map: map, circuit: race.circuit, compact: true)
-                    .id(race.circuit.circuitId)
-            } else if model.extrasLoading {
-                TrackPlaceholder()
+    /// The weather for the session picked, beside the ring clock (as tall
+    /// as it, its figures sized to it): what it will be like, the
+    /// temperature and the chance of rain, and where.
+    private func weatherPanel(_ session: WeekendSession?, size: CGFloat) -> some View {
+        let weather = session.flatMap { WeatherAPI.point(for: $0.date, in: model.weather) }
+        return VStack(alignment: .leading, spacing: 6) {
+            Text("WEATHER · \(session?.kind.short ?? "RACE")")
+                .font(.f1(10, weight: .bold))
+                .tracking(2.5)
+                .foregroundStyle(Theme.dimText)
+            Spacer(minLength: 0)
+            if let weather {
+                HStack(spacing: 8) {
+                    Text(weather.symbol).font(.system(size: size * 0.16))
+                    Text("\(Int(weather.temperature.rounded()))°")
+                        .font(.f1Digits(size * 0.2))
+                        .foregroundStyle(Theme.chromeText)
+                }
+                Text(weather.label)
+                    .font(.f1(11, weight: .bold))
+                    .tracking(1.5)
+                    .foregroundStyle(.white.opacity(0.85))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                HStack(spacing: 4) {
+                    Image(systemName: "drop.fill").font(.system(size: 10))
+                    Text("\(weather.precipProbability)% RAIN").font(.f1(11, weight: .bold)).tracking(1)
+                }
+                .foregroundStyle(weather.precipProbability >= 40 ? Theme.accent : Theme.dimText)
+            } else {
+                Image(systemName: "cloud.sun").font(.system(size: 30)).foregroundStyle(Theme.dimText)
+                Text(model.extrasLoading ? "LOADING" : "FORECAST\nCLOSER TO THE DAY")
+                    .font(.f1(11, weight: .bold))
+                    .tracking(1.5)
+                    .foregroundStyle(Theme.dimText)
             }
+            Spacer(minLength: 0)
+            HStack(spacing: 5) {
+                Image(systemName: "location.fill").font(.system(size: 9))
+                Text(race.circuit.location.locality.uppercased())
+                    .font(.f1(10, weight: .bold))
+                    .tracking(1.5)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            .foregroundStyle(Theme.dimText)
         }
-        .scrollIndicators(.hidden)
+        .padding(14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 18).fill(Theme.card)
+            .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Theme.glassStroke, lineWidth: 1)))
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Every Grand Prix of the season, the one on the display lit: tap one
+    /// to show it.
+    private var seasonStrip: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal) {
+                HStack(spacing: 8) {
+                    ForEach(model.season) { round in
+                        Button { onSelectRace(round.id == model.nextRace?.id ? nil : round) } label: {
+                            roundChip(round)
+                        }
+                        .buttonStyle(.plain)
+                        .id(round.id)
+                    }
+                }
+                .padding(.horizontal, 1)
+                .padding(.vertical, 2)
+            }
+            .scrollIndicators(.hidden)
+            .onAppear { proxy.scrollTo(race.id, anchor: .center) }
+            .onChange(of: race.id) { _, id in withAnimation { proxy.scrollTo(id, anchor: .center) } }
+        }
+    }
+
+    private func roundChip(_ round: Race) -> some View {
+        let on = round.id == race.id
+        let isNext = round.id == model.nextRace?.id
+        let tint = isNext ? Theme.accent : Theme.violet
+        let past = (round.startDate.map { $0 <= .now } ?? false) && !isNext
+        return VStack(spacing: 3) {
+            HStack(spacing: 4) {
+                Text(Flags.emoji(for: round.circuit.location.country)).font(.system(size: 13))
+                Text("R\(round.roundNumber)")
+                    .font(.f1(13).italic())
+                    .foregroundStyle(on ? .white : isNext ? Theme.accent : Theme.dimText)
+            }
+            Text(round.circuit.location.locality.uppercased())
+                .font(.f1(8, weight: .bold))
+                .tracking(1)
+                .foregroundStyle(on ? .white.opacity(0.85) : Theme.faintText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(width: 76)
+        .padding(.vertical, 8)
+        .background(RoundedRectangle(cornerRadius: 10).fill(on ? tint.opacity(0.16) : Color.white.opacity(0.04))
+            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(on ? tint : Theme.cardStroke, lineWidth: on ? 1.5 : 1))
+            .shadow(color: tint.opacity(on ? 0.4 : 0), radius: 8))
+        .opacity(past && !on ? 0.55 : 1)
+        .accessibilityLabel("Round \(round.roundNumber), \(round.raceName)")
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
+    /// The circuit card, with its turns and corner guide; the map takes
+    /// the height the display has.
+    private var circuitFace: some View {
+        GeometryReader { geo in
+            ScrollView {
+                if let map = model.trackMap {
+                    TrackSectionView(map: map, circuit: race.circuit, compact: true,
+                                     mapHeight: max(TrackSceneBuilder.framed - 50, geo.size.height - 210))
+                        .id(race.circuit.circuitId)
+                } else if model.extrasLoading {
+                    TrackPlaceholder()
+                }
+            }
+            .scrollIndicators(.hidden)
+        }
         .padding(.horizontal, 14)
         .padding(.top, 70)
     }
