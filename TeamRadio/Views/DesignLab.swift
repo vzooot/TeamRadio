@@ -66,6 +66,17 @@ struct DesignLab: View {
                     .frame(width: 951, height: 669)
                     .background(Theme.background)
                     .clipped()
+            // the whole phone Countdown tab at a glance (402 pt wide, -PageHeight
+            // tall), shrunk to the screen's height
+            case "countdownPage":
+                let height = CGFloat(UserDefaults.standard.string(forKey: "PageHeight").flatMap(Int.init) ?? 4200)
+                let scale = 874 / height
+                ContentView()
+                    .frame(width: 402, height: height)
+                    .background(Theme.background)
+                    .clipped()
+                    .scaleEffect(scale)
+                    .frame(width: 402 * scale, height: 874)
             case "championA": ChampionDraft(style: "A")
             case "championB": ChampionDraft(style: "B")
             case "championC": ChampionDraft(style: "C")

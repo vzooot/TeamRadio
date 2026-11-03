@@ -1,5 +1,8 @@
-Two screens, refined
+A lighter Countdown tab
+• Under Ask Emily, pick the race weekend or the circuit: the 3D circuit only loads when you want it
+• Every Grand Prix is on the race card: swipe it to the next or previous race, or hold it for the whole season
 
+Two screens, refined
 On iPhone Duo and on iPad held sideways:
 • The countdown sits beside the weather for the next session
 • The whole season runs along the bottom: tap a round to see it, or swipe between races
