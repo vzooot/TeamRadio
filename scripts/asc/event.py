@@ -80,7 +80,8 @@ def create(spec_path):
                 "eventStart": spec["eventStart"], "eventEnd": spec["eventEnd"]}
     event = call("POST", "/v1/appEvents", {"data": {"type": "appEvents",
                  "attributes": {k: spec[k] for k in ("referenceName", "badge", "deepLink", "purpose", "priority")}
-                 | {"primaryLocale": "en-US", "territorySchedules": [schedule]},
+                 | {"primaryLocale": "en-US", "territorySchedules": [schedule],
+                    "purchaseRequirement": spec.get("purchaseRequirement", "NO_COST_ASSOCIATED")},
                  "relationships": {"app": {"data": {"type": "apps", "id": APP}}}}})["data"]["id"]
     log("event", event, "in", len(schedule["territories"]), "territories")
     clips = []
