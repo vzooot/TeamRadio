@@ -16,7 +16,7 @@ struct ContentView: View {
     @State private var sectionsShown = true
     /// The iPhone Duo's inner display: the race and the weekend, one each
     /// side of the fold.
-    @State private var halves: Halves?
+    @Environment(\.halves) private var halves
     @State private var standings = StandingsViewModel()
 
     /// Switching race: the countdown stays and updates in place, its digits
@@ -56,7 +56,6 @@ struct ContentView: View {
                 if let halves { duoContent(halves) } else { loadedContent }
             }
         }
-        .onHalves($halves)
         .task {
             await model.load()
             await NotificationManager.adoptDefault()
@@ -232,7 +231,8 @@ struct ContentView: View {
                              }) {
                     Color.clear.frame(height: 0).id("top")
                     fanVote
-                    seasonList(proxy)
+                    // side by side, the season runs along the display's foot
+                    if halves.axis == .vertical { seasonList(proxy) }
                     if !Self.demoMode {
                         InviteBanner()
                     }

@@ -5,7 +5,7 @@ import SwiftUI
 /// qualifying) or the championship after that round (drivers or teams).
 /// The right screen holds the selections and the season's rounds.
 struct DuoResults: View {
-    let fold: CGFloat
+    let halves: Halves
     let model: ResultsViewModel
     /// Results or standings on the display (the root's, so links and the
     /// title moment can open the standings).
@@ -41,7 +41,7 @@ struct DuoResults: View {
             case .failed(let message):
                 ErrorView(message: message) { Task { await model.load() } }
             case .loaded:
-                DuoSideBySide(fold: fold) {
+                DuoSideBySide(halves: halves) {
                     preview
                 } right: {
                     selections

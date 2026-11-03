@@ -17,7 +17,7 @@ struct ChatView: View {
     @State private var mode: Mode = .room
     @State private var dmPath: [InboxView.DMTarget] = []
     /// The iPhone Duo's inner display: the room and the messages side by side.
-    @State private var halves: Halves?
+    @Environment(\.halves) private var halves
 
     enum Mode { case room, messages }
 
@@ -102,7 +102,6 @@ struct ChatView: View {
             }
         }
         .task { await model.start() }
-        .onHalves($halves)
         .messageMenu($pressed, mine: { model.reactions.mine(on: $0) }) { emoji, id in model.react(emoji, to: id) }
         // Keep the MESSAGES chip honest while the Paddock is open: a private
         // message may land without a push (same device, muted, or none yet).
@@ -380,7 +379,7 @@ struct ChatView: View {
             // The iPhone Duo held like a book: the room on one screen, your
             // private messages on the other ("Message privately" in the room
             // opens the conversation there).
-            DuoSideBySide(fold: halves.fold) {
+            DuoSideBySide(halves: halves) {
                 DuoScreen {
                     roomHeader
                 } content: {

@@ -136,19 +136,24 @@ struct DuoCornerBrackets: Shape {
 /// display held like a book), with a gap over the fold. Both get fixed
 /// widths: content too wide for its half never pushes the pair across it.
 struct DuoSideBySide<Left: View, Right: View>: View {
-    /// The fold's line, in this view's coordinates (`Halves.fold`).
-    let fold: CGFloat
+    /// Where the fold divides this view; without a real fold (an iPad held
+    /// sideways) the two screens share the width equally.
+    let halves: Halves
     @ViewBuilder let left: Left
     @ViewBuilder let right: Right
 
     private let gap: CGFloat = 28
+    /// The rail's strip on the right (DuoDock); the iPhone Duo has its own
+    /// there already, under the status bar.
+    static var railStrip: CGFloat { 78 }
 
     var body: some View {
         GeometryReader { geo in
-            let first = max(0, fold - gap / 2 - 16)
+            let width = geo.size.width - (halves.foldable ? 0 : Self.railStrip)
+            let first = halves.foldable ? max(0, halves.fold - gap / 2 - 16) : (width - 32 - gap) / 2
             HStack(alignment: .top, spacing: gap) {
                 left.frame(width: first)
-                right.frame(width: max(0, geo.size.width - 32 - gap - first))
+                right.frame(width: max(0, width - 32 - gap - first))
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)

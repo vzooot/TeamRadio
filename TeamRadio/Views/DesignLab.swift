@@ -54,9 +54,18 @@ struct DesignLab: View {
             case "duoC": DuoDraft(style: "C")
             case "duoLights": DuoLightsDraft()
             // an iPad held sideways (13", 1376 × 1032 pt), scaled to fit an upright one
-            case "ipadLandscape0": ContentView().frame(width: 1376, height: 1032).clipped().scaleEffect(0.75).frame(width: 1032, height: 774)
-            case "ipadLandscape1": ResultsHubView(page: .constant(.results)).frame(width: 1376, height: 1032).clipped().scaleEffect(0.75).frame(width: 1032, height: 774)
-            case "ipadLandscape4": NewsView().frame(width: 1376, height: 1032).clipped().scaleEffect(0.75).frame(width: 1032, height: 774)
+            case "ipadLandscape0": ipadLandscape(ContentView())
+            case "ipadLandscape1": ipadLandscape(ResultsHubView(page: .constant(.results)))
+            case "ipadLandscape4": ipadLandscape(NewsView())
+            // the iPhone Duo unfolded like a book (951 × 669 pt, the status
+            // and rail strip on the right), when its simulator stays folded
+            case "duoUnfolded0":
+                ContentView()
+                    .safeAreaPadding(.trailing, 92)
+                    .environment(\.halves, Halves(axis: .horizontal, fold: 475))
+                    .frame(width: 951, height: 669)
+                    .background(Theme.background)
+                    .clipped()
             case "championA": ChampionDraft(style: "A")
             case "championB": ChampionDraft(style: "B")
             case "championC": ChampionDraft(style: "C")
@@ -79,6 +88,24 @@ struct DesignLab: View {
             default: Text("unknown draft \(id)").foregroundStyle(.white)
             }
         }
+    }
+
+    /// A tab as an iPad held sideways shows it (13", 1376 × 1032 pt, under
+    /// the status bar, the rail's strip on the right), scaled to fit an
+    /// upright one.
+    private func ipadLandscape(_ tab: some View) -> some View {
+        tab
+            .environment(\.halves, Halves(axis: .horizontal, fold: 688, foldable: false))
+            .padding(.top, 24)
+            .frame(width: 1376, height: 1032)
+            .background(Theme.background)
+            .overlay(alignment: .topTrailing) {
+                RoundedRectangle(cornerRadius: 31).strokeBorder(.white.opacity(0.25), lineWidth: 2)
+                    .frame(width: 62, height: 420).padding(.top, 104).padding(.trailing, 16)
+            }
+            .clipped()
+            .scaleEffect(0.75)
+            .frame(width: 1032, height: 774)
     }
 }
 

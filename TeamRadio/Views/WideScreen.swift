@@ -8,6 +8,13 @@ extension View {
     }
 }
 
+extension EnvironmentValues {
+    /// The window's halves, measured once at the root (TeamRadioApp), so
+    /// every tab follows a rotation at once, even one that was off screen
+    /// when it happened.
+    @Entry var halves: Halves? = nil
+}
+
 /// The two halves of the iPhone Duo's inner display: side by side when it's
 /// held like a book (the fold upright), one above the other when it stands
 /// like a laptop. Nothing is laid across the fold (Apple's iPhone Duo

@@ -9,6 +9,11 @@ struct TrackSectionView: View {
     /// The iPhone Duo's display: no title (the button that shows it names
     /// it) and a shorter map, so the corner guide fits on screen.
     var compact = false
+    /// The map's height when the screen sets it (a taller one fills an
+    /// iPad's display); the 3D scene runs as far below it as ever.
+    var mapHeight: CGFloat?
+
+    private var mapArea: CGFloat { mapHeight ?? (compact ? TrackSceneBuilder.framed - 50 : TrackSceneBuilder.framed) }
 
     @State private var resetToken = 0
     @State private var showRealWorld = false
@@ -36,7 +41,7 @@ struct TrackSectionView: View {
                         Color.clear
                     }
                 }
-                .frame(height: compact ? TrackSceneBuilder.framed - 50 : TrackSceneBuilder.framed)
+                .frame(height: mapArea)
                 .overlay(alignment: .topTrailing) {
                     HStack(spacing: 8) {
                         if circuit.coordinate != nil {
@@ -86,10 +91,10 @@ struct TrackSectionView: View {
             // of being cut off at the map's edge.
             .background(alignment: .top) {
                 if !showRealWorld {
-                    Track3DView(map: map, resetToken: resetToken, selectedCorner: selectedCorner) { number in
+                    Track3DView(map: map, resetToken: resetToken, selectedCorner: selectedCorner, onSelectCorner: { number in
                         withAnimation(.easeOut(duration: 0.2)) { selectedCorner = number }
-                    }
-                    .frame(height: TrackSceneBuilder.framed + TrackSceneBuilder.bleed)
+                    }, zoom: mapArea > TrackSceneBuilder.framed ? 1.4 : 1)
+                    .frame(height: mapArea + (compact ? 50 : 0) + TrackSceneBuilder.bleed)
                     .mask(LinearGradient(stops: [.init(color: .black, location: 0),
                                                  .init(color: .black, location: 0.48),
                                                  .init(color: .black.opacity(0.3), location: 0.68),

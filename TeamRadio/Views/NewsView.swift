@@ -8,7 +8,7 @@ struct NewsView: View {
     @State private var model = NewsViewModel()
     @State private var team: NewsTeam?
     @Environment(\.openURL) private var openURL
-    @State private var halves: Halves?
+    @Environment(\.halves) private var halves
     /// The story open in the reader (iPhone Duo); the lead until one's tapped.
     @State private var open: NewsItem?
 
@@ -32,7 +32,7 @@ struct NewsView: View {
                         .foregroundStyle(Theme.dimText)
                 }
             } else if let halves, halves.axis == .horizontal {
-                reader(fold: halves.fold)
+                reader(halves)
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
@@ -46,7 +46,6 @@ struct NewsView: View {
                 .refreshable { await model.load() }
             }
         }
-        .onHalves($halves)
         .task { await model.load() }
     }
 
@@ -112,10 +111,10 @@ struct NewsView: View {
     /// The iPhone Duo unfolded (approved draft B,
     /// build/mockups/duo2/sheet-3-games-news.png): the stories in the left
     /// half; the one tapped is previewed in the right, read in Safari.
-    private func reader(fold: CGFloat) -> some View {
+    private func reader(_ halves: Halves) -> some View {
         let list = stories
         let current = list.first { $0.id == open?.id } ?? list.first
-        return DuoSideBySide(fold: fold) {
+        return DuoSideBySide(halves: halves) {
             // the story on the display
             DuoScreen {
                 header

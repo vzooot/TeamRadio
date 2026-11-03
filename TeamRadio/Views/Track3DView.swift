@@ -14,6 +14,8 @@ struct Track3DView: UIViewRepresentable {
     var selectedCorner: Int? = nil
     /// A corner number was tapped on the map (nil when tapped again).
     var onSelectCorner: ((Int?) -> Void)? = nil
+    /// The circuit larger than its usual framing (a tall view has the room).
+    var zoom: CGFloat = 1
 
     func makeUIView(context: Context) -> SCNView {
         let view = SCNView()
@@ -23,7 +25,7 @@ struct Track3DView: UIViewRepresentable {
         // A slow spin and a ghost car need no more than 30 frames a second;
         // the default (up to 120 with bloom) kept the GPU busy on the whole tab.
         view.preferredFramesPerSecond = 30
-        view.scene = TrackSceneBuilder.build(map: map)
+        view.scene = TrackSceneBuilder.build(map: map, zoom: zoom)
         context.coordinator.circuitName = map.circuitName
         context.coordinator.resetToken = resetToken
         context.coordinator.onSelectCorner = onSelectCorner
@@ -126,7 +128,7 @@ struct Track3DView: UIViewRepresentable {
         if context.coordinator.circuitName != map.circuitName || context.coordinator.resetToken != resetToken {
             context.coordinator.circuitName = map.circuitName
             context.coordinator.resetToken = resetToken
-            view.scene = TrackSceneBuilder.build(map: map)
+            view.scene = TrackSceneBuilder.build(map: map, zoom: zoom)
             // Drop any free camera the user's gestures created.
             view.pointOfView = view.scene?.rootNode.childNodes.first { $0.camera != nil }
             context.coordinator.selectedCorner = selectedCorner
@@ -224,7 +226,8 @@ enum TrackSceneBuilder {
         return constraint
     }
 
-    static func build(map: TrackMap) -> SCNScene {
+    /// `zoom` above 1 narrows the lens: the circuit larger in a tall view.
+    static func build(map: TrackMap, zoom: CGFloat = 1) -> SCNScene {
         let scene = SCNScene()
         scene.background.contents = UIColor.clear
 
@@ -372,7 +375,7 @@ enum TrackSceneBuilder {
         // the default 1-unit near plane sliced it off in a straight line.
         camera.zNear = 0.02
         camera.projectionDirection = .horizontal
-        camera.fieldOfView = fieldOfView
+        camera.fieldOfView = 2 * atan(tan(fieldOfView / 2 * .pi / 180) / zoom) * 180 / .pi
         // The camera looks at a focus point: the circuit's centre, or the
         // tapped corner (Track3DView.focus moves both).
         let focus = SCNNode()
