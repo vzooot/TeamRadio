@@ -54,6 +54,15 @@ def main(version):
         sys.exit("no files in fastlane/screenshots/duo")
     known = {i["attributes"].get("referenceName"): i["id"]
              for i in call("GET", f"/v1/appAssetLibraries/{library}/images?limit=200")["data"]}
+    # The panels replace the version's iPhone Duo screenshots (a new version
+    # starts with the previous one's). The old ones go first: the group holds
+    # ten at most.
+    old = [p["id"] for p in call("GET", f"/v1/appStoreVersionLocalizations/{loc}/placements?limit=50")["data"]
+           if p["attributes"].get("placementGroup") == GROUP]
+    for placement in old:
+        call("DELETE", f"/v1/appAssetLibraryPlacements/{placement}")
+    if old:
+        log("removed", len(old), "earlier iPhone Duo screenshots")
     for path in files:
         image = upload(library, path, known)
         # the image has to finish processing before it can be placed
