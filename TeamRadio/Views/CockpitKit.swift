@@ -159,6 +159,10 @@ struct RingClock: View {
         let progress = 1 - min(max(remaining / window, 0), 1)
         let head = hot ? Theme.live : Theme.violet
         let time = String(format: "%02d:%02d:%02d", total % 86400 / 3600, total % 3600 / 60, total % 60)
+        // the time inside the ring (the row runs about five digit sizes wide),
+        // so a small ring beside the weather doesn't push it over the arc
+        let digit = min(size * 0.15, (size - 68) / 5)
+        let small = size < 200
         ZStack {
             ticks
             Circle().stroke(Color.black.opacity(0.5), lineWidth: 12).padding(22)
@@ -187,20 +191,21 @@ struct RingClock: View {
                 HStack(spacing: 0) {
                     ForEach(Array(time.enumerated()), id: \.offset) { _, character in
                         if character == ":" {
-                            Text(":").font(.f1Digits(size * 0.15)).foregroundStyle(Theme.chromeText)
+                            Text(":").font(.f1Digits(digit)).foregroundStyle(Theme.chromeText)
                         } else {
-                            RollingDigit(digit: character, hot: false, rolls: true, size: size * 0.15)
+                            RollingDigit(digit: character, hot: false, rolls: true, size: digit)
                         }
                     }
                 }
                 .animation(.snappy(duration: 0.3), value: total)
-                Text(caption)
+                // a small ring (beside the weather) has room for the session alone
+                Text(small ? caption.components(separatedBy: " · ")[0] : caption)
                     .font(.f1(11, weight: .bold))
                     .tracking(2)
                     .foregroundStyle(hot ? Theme.live : Theme.dimText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
-                    .frame(maxWidth: size - 64)
+                    .frame(maxWidth: small ? size - 90 : size - 64)
             }
         }
         .frame(width: size, height: size)
