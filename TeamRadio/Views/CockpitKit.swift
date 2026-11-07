@@ -249,6 +249,9 @@ struct DotMatrixBoard: View, Equatable {
     var infoColor: Color = Color(red: 0.45, green: 0.9, blue: 1.0)
 
     @State private var page = 0
+    /// The page on the board. The pages can shrink under `page` (a session
+    /// that has started or a race that's been run has none): the lights then.
+    private var shown: Int { page <= pages.count ? page : 0 }
     @State private var transitionStart: Date?
     @State private var settle: Task<Void, Never>?
 
@@ -333,7 +336,7 @@ struct DotMatrixBoard: View, Equatable {
 
     private func advance() {
         guard !pages.isEmpty else { return }
-        page = (page + 1) % (pages.count + 1)
+        page = (shown + 1) % (pages.count + 1)
         transitionStart = Date()
         schedule()
     }
@@ -346,14 +349,14 @@ struct DotMatrixBoard: View, Equatable {
                 guard !Task.isCancelled else { return }
                 transitionStart = nil
             }
-            try? await Task.sleep(for: .seconds(page == 0 ? Self.lightsHold : Self.pageHold))
+            try? await Task.sleep(for: .seconds(shown == 0 ? Self.lightsHold : Self.pageHold))
             guard !Task.isCancelled else { return }
             advance()
         }
     }
 
     var body: some View {
-        let breathing = standby && litLights == 0 && page == 0
+        let breathing = standby && litLights == 0 && shown == 0
         let settled = transitionStart == nil
         ZStack {
             // Only what changes is redrawn (redrawing the whole board 30
@@ -378,6 +381,8 @@ struct DotMatrixBoard: View, Equatable {
         .onTapGesture { advance() }
         .onAppear { schedule() }
         .onDisappear { settle?.cancel() }
+        // no pages stop the cycle: it picks up again when they're back
+        .onChange(of: pages) { old, _ in if old.isEmpty { schedule() } }
         #if DEBUG
         .onChange(of: DemoDirector.shared.boardPageSeq) {
             guard !pages.isEmpty else { return }
@@ -416,8 +421,8 @@ struct DotMatrixBoard: View, Equatable {
         }
 
         // what's lit right now: the page, or the scramble resolving into it
-        let goal = target(for: page)
-        let color = page == 0 ? lightColor : infoColor
+        let goal = target(for: shown)
+        let color = shown == 0 ? lightColor : infoColor
         var lit: [Int: Double] = [:]
         var armed: Set<Int> = []
         if let start = transitionStart {
@@ -490,7 +495,7 @@ struct DotMatrixBoard: View, Equatable {
         // disc with a slightly darker edge, a thin dark gap, the cavity wall
         // lit as a thin ring, a dark bevel line, then a thin glow outside
         let glowing = lit.map { (center($0.key % 1000, $0.key / 1000), $0.value) }
-        let warm = page == 0
+        let warm = shown == 0
         let rimColor = warm ? Color(red: 0.95, green: 0.25, blue: 0.08) : Color(red: 0.12, green: 0.68, blue: 0.78)
         let wallColor = warm ? Color(red: 0.38, green: 0.08, blue: 0.02) : Color(red: 0.04, green: 0.3, blue: 0.38)
         let edgeColor = warm ? Color(red: 0.62, green: 0.2, blue: 0.05) : Color(red: 0.12, green: 0.6, blue: 0.72)
