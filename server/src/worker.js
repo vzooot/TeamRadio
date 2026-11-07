@@ -63,7 +63,8 @@ export default {
       return new Response("ok");
     }
     // Announcement to every device: {title, body, link?, env?}. Guarded by
-    // the ADMIN_KEY secret; scripts/push/announce.sh sends one.
+    // the ADMIN_KEY secret; scripts/push/announce.sh sends one. With "at"
+    // (a time) it's kept and the 5-minute cron sends it then.
     if (request.method === "POST" && url.pathname === "/announce") {
       if (!env.ADMIN_KEY || request.headers.get("x-admin-key") !== env.ADMIN_KEY) {
         return new Response("no", { status: 403 });
@@ -71,7 +72,30 @@ export default {
       let body;
       try { body = await request.json(); } catch { return new Response("bad json", { status: 400 }); }
       if (!body.title || !body.body) return new Response("title and body required", { status: 400 });
+      if (body.at) {
+        const at = Date.parse(body.at);
+        if (Number.isNaN(at)) return new Response("bad at", { status: 400 });
+        // keyed by its time, so the list comes out in order
+        const id = `${new Date(at).toISOString()}-${crypto.randomUUID().slice(0, 8)}`;
+        await env.TOKENS.put("sched:" + id, JSON.stringify(body));
+        return Response.json({ scheduled: id });
+      }
       return Response.json(await announce(env, body));
+    }
+    // The scheduled announcements: GET lists them, DELETE ?id= cancels one.
+    if (url.pathname === "/scheduled" && (request.method === "GET" || request.method === "DELETE")) {
+      if (!env.ADMIN_KEY || request.headers.get("x-admin-key") !== env.ADMIN_KEY) {
+        return new Response("no", { status: 403 });
+      }
+      if (request.method === "DELETE") {
+        await env.TOKENS.delete("sched:" + url.searchParams.get("id"));
+        return new Response("ok");
+      }
+      const list = [];
+      for (const key of (await env.TOKENS.list({ prefix: "sched:" })).keys) {
+        list.push({ id: key.name.slice(6), ...JSON.parse(await env.TOKENS.get(key.name) || "{}") });
+      }
+      return Response.json(list);
     }
     if (url.pathname === "/health") return new Response("ok");
     // Manual test fire: pushes a fake "session in 15 min" to all tokens.
@@ -104,6 +128,7 @@ export default {
     }) }).then((r) => r?.length && console.log("game", JSON.stringify(r)))
       .catch((e) => console.log("game", e)));
     ctx.waitUntil(autoAnnouncements(env).catch((e) => console.log("auto", String(e))));
+    ctx.waitUntil(scheduledAnnouncements(env).catch((e) => console.log("scheduled", String(e))));
   },
 };
 
@@ -318,6 +343,17 @@ async function announceOnce(env, id, message) {
   await env.TOKENS.put(key, "1");
   const counts = await announce(env, message);
   console.log("announced", id, JSON.stringify(counts));
+}
+
+/// Announcements posted with a time ("at"): each goes out on the first
+/// 5-minute run after it, once.
+async function scheduledAnnouncements(env) {
+  for (const key of (await env.TOKENS.list({ prefix: "sched:" })).keys) {
+    const message = JSON.parse(await env.TOKENS.get(key.name) || "null");
+    if (!message || Date.parse(message.at) > Date.now()) continue;
+    await env.TOKENS.delete(key.name);
+    await announceOnce(env, key.name, message);
+  }
 }
 
 const JOLPICA = "https://api.jolpi.ca/ergast/f1";
